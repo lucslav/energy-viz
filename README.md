@@ -1,5 +1,6 @@
 # ⚡ energy-viz
 
+![Vibe Coding](https://img.shields.io/badge/Style-Vibe%20Coding-ff69b4?style=for-the-badge&logo=visual-studio-code)
 ![Status](https://img.shields.io/badge/Status-Active-success)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue)
 ![Location](https://img.shields.io/badge/Optimized%20for-Ireland-orange)
