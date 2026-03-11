@@ -17,7 +17,7 @@ with st.container():
             <img src="https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png" width="55">
             <div style="text-align: left;">
                 <h1 style="margin:0; font-size: 2rem; letter-spacing: -1px;">Energy Viz</h1>
-                <p style="color:gray; margin:0;">Professional Analytics</p>
+                <p style="color:gray; margin:0;">ESB Smart Meter Analysis</p>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -34,8 +34,9 @@ with st.sidebar:
 uploaded_file = st.file_uploader("Upload ESB CSV file", type="csv")
 
 def get_tariff(dt):
-    if 17 <= dt.hour < 19: return 'Peak'
-    elif dt.hour >= 23 or dt.hour < 8: return 'Night'
+    hour = dt.hour
+    if 17 <= hour < 19: return 'Peak'
+    elif hour >= 23 or hour < 8: return 'Night'
     else: return 'Day'
 
 if uploaded_file:
@@ -55,45 +56,41 @@ if uploaded_file:
 
     df['Cost_VAT'] = df.apply(calc_cost, axis=1)
 
+    # Calculation of stats
     days = max(1, (df['Timestamp'].max() - df['Timestamp'].min()).days)
+    months = max(1, days / 30.44)
     total_usage = df['Usage_kWh'].sum()
     total_cost_energy = df['Cost_VAT'].sum()
     total_standing = days * standing_ch * 1.09
-    total_bill = total_cost_energy + total_standing
+    total_cost_sum = total_cost_energy + total_standing
 
     # --- TOP METRICS ---
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Usage", f"{total_usage:.1f} kWh")
-    m2.metric("Estimated Bill", f"€{total_bill:.2f}")
-    m3.metric("Avg. Daily Usage", f"{(total_usage/days):.2f} kWh")
-    m4.metric("Avg. Daily Cost", f"€{(total_bill/days):.2f}")
+    row1_1, row1_2 = st.columns(2)
+    row1_1.metric("Total Usage", f"{total_usage:.1f} kWh")
+    row1_2.metric("Total Cost", f"€{total_cost_sum:.2f}")
+
+    row2_1, row2_2, row2_3, row2_4 = st.columns(4)
+    row2_1.metric("Avg Monthly Usage", f"{(total_usage/months):.1f} kWh")
+    row2_2.metric("Avg Monthly Cost", f"€{(total_cost_sum/months):.2f}")
+    row2_3.metric("Avg Daily Usage", f"{(total_usage/days):.2f} kWh")
+    row2_4.metric("Avg Daily Cost", f"€{(total_cost_sum/days):.2f}")
 
     st.divider()
 
-    st.subheader("Tariff Analysis")
-    t_col1, t_col2 = st.columns([2, 1])
-    
-    with t_col1:
-        tariff_daily = df.groupby([df['Timestamp'].dt.date, 'Tariff'])['Usage_kWh'].sum().reset_index()
-        fig_tariff = px.bar(tariff_daily, x='Timestamp', y='Usage_kWh', color='Tariff',
-                           color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'},
-                           template="plotly_white", barmode='stack')
-        fig_tariff.update_layout(height=400, margin=dict(l=0, r=0, t=20, b=0))
-        st.plotly_chart(fig_tariff, use_container_width=True)
-
-    with t_col2:
-        tariff_sum = df.groupby('Tariff')['Usage_kWh'].sum().reset_index()
-        fig_pie = px.pie(tariff_sum, values='Usage_kWh', names='Tariff', hole=0.5,
-                        color='Tariff', color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'})
-        fig_pie.update_layout(height=400, showlegend=True)
-        st.plotly_chart(fig_pie, use_container_width=True)
+    # --- TARIFF PIE CHART ---
+    st.subheader("Tariff Usage Distribution")
+    tariff_sum = df.groupby('Tariff')['Usage_kWh'].sum().reset_index()
+    fig_pie = px.pie(tariff_sum, values='Usage_kWh', names='Tariff', hole=0.5,
+                    color='Tariff', color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'})
+    fig_pie.update_layout(height=400)
+    st.plotly_chart(fig_pie, use_container_width=True)
 
     st.divider()
 
     view_mode = st.radio("Chart Unit:", ["kWh", "Euro (€)"], horizontal=True)
     target_col = 'Usage_kWh' if view_mode == "kWh" else 'Cost_VAT'
     
-    tab1, tab2 = st.tabs(["📊 Daily History", "📈 Trends"])
+    tab1, tab2 = st.tabs(["📊 Daily History", "📈 Long-term Trends"])
     with tab1:
         daily = df.groupby(df['Timestamp'].dt.date)[target_col].sum().reset_index()
         fig_main = px.bar(daily, x='Timestamp', y=target_col, template="plotly_white", color_discrete_sequence=['#00CC96'])
