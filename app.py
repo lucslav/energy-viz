@@ -4,6 +4,7 @@ import plotly.express as px
 
 st.set_page_config(page_title="Energy Viz", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
 
+# --- UI STYLING ---
 st.markdown("""
     <style>
     [data-testid="stMetric"] { background-color: rgba(240, 242, 246, 0.4); padding: 15px; border-radius: 12px; border: 1px solid #e6e9ef; }
@@ -31,10 +32,17 @@ with st.sidebar:
     st.divider()
     st.info("Prices include 9% VAT.")
 
+with st.expander("ℹ️ How to get the correct data file?"):
+    st.markdown("""
+    To see full **Day/Night/Peak** breakdown:
+    1. Log in to **ESB Networks Online Store**.
+    2. Select: **"HDF Half-hourly energy consumption data"** (2nd option).
+    3. Download and upload the CSV here.
+    """)
+
 uploaded_file = st.file_uploader("Upload ESB CSV file", type="csv")
 
 def get_tariff(dt):
-    # Night: 23:00 - 08:00, Peak: 17:00 - 19:00, Day: Rest
     h = dt.hour
     if 17 <= h < 19: return 'Peak'
     elif h >= 23 or h < 8: return 'Night'
@@ -42,18 +50,21 @@ def get_tariff(dt):
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    
-    # Próba automatycznego wykrycia formatu daty (obsługa różnych wariantów ESB)
     df['Timestamp'] = pd.to_datetime(df['Read Date and End Time'], dayfirst=True, errors='coerce')
-    df = df.dropna(subset=['Timestamp'])
-    df = df.sort_values('Timestamp')
+    df = df.dropna(subset=['Timestamp']).sort_values('Timestamp')
     
-    # Korekta wartości (Wh -> kWh)
-    df.loc[df['Read Value'] > 100000, 'Read Value'] = df['Read Value'] / 1000
-    df['Usage_kWh'] = df['Read Value'].diff().fillna(0)
+    # --- AUTO-DETECT DATA TYPE (Cumulative vs Interval) ---
+    read_type = str(df['Read Type'].iloc[0]).lower()
+    
+    if "interval" in read_type:
+        # If HDF Half-hourly, Read Value is likely the actual usage for that 30min
+        df['Usage_kWh'] = df['Read Value']
+    else:
+        # If Daily or Register, it's cumulative and needs differentiation
+        df.loc[df['Read Value'] > 100000, 'Read Value'] = df['Read Value'] / 1000
+        df['Usage_kWh'] = df['Read Value'].diff().fillna(0)
+    
     df = df[df['Usage_kWh'] >= 0]
-    
-    # Przypisanie taryfy
     df['Tariff'] = df['Timestamp'].apply(get_tariff)
     
     def calc_cost(row):
@@ -62,56 +73,56 @@ if uploaded_file:
 
     df['Cost_VAT'] = df.apply(calc_cost, axis=1)
 
-    # Statystyki
-    days = max(1, (df['Timestamp'].max() - df['Timestamp'].min()).days)
-    months = max(1, days / 30.44)
+    # Stats
+    days_count = max(1, (df['Timestamp'].max() - df['Timestamp'].min()).days)
+    months_count = max(1, days_count / 30.44)
     total_usage = df['Usage_kWh'].sum()
-    total_cost_sum = df['Cost_VAT'].sum() + (days * standing_ch * 1.09)
+    total_cost_full = df['Cost_VAT'].sum() + (days_count * standing_ch * 1.09)
 
-    # --- METRYKI ---
+    # Metrics
+    st.subheader("Key Performance Indicators")
     c1, c2 = st.columns(2)
     c1.metric("Total Usage", f"{total_usage:.1f} kWh")
-    c2.metric("Total Cost", f"€{total_cost_sum:.2f}")
+    c2.metric("Total Cost", f"€{total_cost_full:.2f}")
 
     c3, c4, c5, c6 = st.columns(4)
-    c3.metric("Avg Monthly Usage", f"{(total_usage/months):.1f} kWh")
-    c4.metric("Avg Monthly Cost", f"€{(total_cost_sum/months):.2f}")
-    c5.metric("Avg Daily Usage", f"{(total_usage/days):.2f} kWh")
-    c6.metric("Avg Daily Cost", f"€{(total_cost_sum/days):.2f}")
+    c3.metric("Avg Monthly Usage", f"{(total_usage/months_count):.1f} kWh")
+    c4.metric("Avg Monthly Cost", f"€{(total_cost_full/months_count):.2f}")
+    c5.metric("Avg Daily Usage", f"{(total_usage/days_count):.2f} kWh")
+    c6.metric("Avg Daily Cost", f"€{(total_cost_full/days_count):.2f}")
 
     st.divider()
 
-    # --- DIAGNOSTYKA (Tylko jeśli coś jest nie tak) ---
-    if df['Tariff'].nunique() == 1:
-        st.warning(f"⚠️ Only one tariff detected: **{df['Tariff'].iloc[0]}**. Checking data format...")
-        st.write("Sample timestamps from your file:", df['Timestamp'].head(5))
-
-    # --- WYKRES KOŁOWY TARYF ---
+    # Pie Chart
     st.subheader("Tariff Usage Distribution")
-    tariff_sum = df.groupby('Tariff')['Usage_kWh'].sum().reset_index()
-    fig_pie = px.pie(tariff_sum, values='Usage_kWh', names='Tariff', hole=0.5,
-                    color='Tariff', color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'})
-    st.plotly_chart(fig_pie, use_container_width=True)
+    if df['Timestamp'].dt.hour.nunique() == 1:
+        st.error("🚨 This file only contains daily totals. Use 'Half-hourly' file for breakdown.")
+    else:
+        tariff_sum = df.groupby('Tariff')['Usage_kWh'].sum().reset_index()
+        fig_pie = px.pie(tariff_sum, values='Usage_kWh', names='Tariff', hole=0.5,
+                        color='Tariff', color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'})
+        st.plotly_chart(fig_pie, use_container_width=True)
 
     st.divider()
 
-    view_mode = st.radio("Chart Unit:", ["kWh", "Euro (€)"], horizontal=True)
+    # Historical Charts
+    view_mode = st.radio("Chart Metric:", ["kWh", "Euro (€)"], horizontal=True)
     target_col = 'Usage_kWh' if view_mode == "kWh" else 'Cost_VAT'
+    chart_color = '#00CC96' if view_mode == "kWh" else '#FF4B4B'
     
     tab1, tab2 = st.tabs(["📊 Daily History", "📈 Trends"])
     with tab1:
-        daily = df.groupby(df['Timestamp'].dt.date)[target_col].sum().reset_index()
-        fig_main = px.bar(daily, x='Timestamp', y=target_col, template="plotly_white", color_discrete_sequence=['#00CC96'])
+        daily_df = df.groupby(df['Timestamp'].dt.date)[target_col].sum().reset_index()
+        fig_main = px.bar(daily_df, x='Timestamp', y=target_col, template="plotly_white", color_discrete_sequence=[chart_color])
         fig_main.update_xaxes(rangeslider_visible=True)
         st.plotly_chart(fig_main, use_container_width=True)
             
     with tab2:
-        freq_choice = st.radio("Frequency:", ["Weekly", "Monthly"], horizontal=True)
-        freq = 'W' if freq_choice == "Weekly" else 'M'
-        agg = df.resample(freq, on='Timestamp')[target_col].sum().reset_index()
-        fig_trend = px.area(agg, x='Timestamp', y=target_col, template="plotly_white", markers=True)
+        freq_opt = st.radio("Group By:", ["Weekly", "Monthly"], horizontal=True)
+        agg_df = df.resample('W' if freq_opt == "Weekly" else 'M', on='Timestamp')[target_col].sum().reset_index()
+        fig_trend = px.area(agg_df, x='Timestamp', y=target_col, template="plotly_white", markers=True, color_discrete_sequence=[chart_color])
         fig_trend.update_xaxes(rangeslider_visible=True)
         st.plotly_chart(fig_trend, use_container_width=True)
 else:
-    st.info("👋 Upload CSV to begin analysis.")
+    st.info("👋 Please upload your ESB HDF CSV file.")
     
