@@ -18,4 +18,3 @@
 2. Access the UI via `your-nas-ip:8501`.
 3. Drop your `consumption.csv` file.
 4. Profit (and save on your next bill)!
-5. 
