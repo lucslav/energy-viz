@@ -34,20 +34,26 @@ with st.sidebar:
 uploaded_file = st.file_uploader("Upload ESB CSV file", type="csv")
 
 def get_tariff(dt):
-    hour = dt.hour
-    if 17 <= hour < 19: return 'Peak'
-    elif hour >= 23 or hour < 8: return 'Night'
+    # Night: 23:00 - 08:00, Peak: 17:00 - 19:00, Day: Rest
+    h = dt.hour
+    if 17 <= h < 19: return 'Peak'
+    elif h >= 23 or h < 8: return 'Night'
     else: return 'Day'
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    df['Timestamp'] = pd.to_datetime(df['Read Date and End Time'], format='%d-%m-%Y %H:%M')
+    
+    # Próba automatycznego wykrycia formatu daty (obsługa różnych wariantów ESB)
+    df['Timestamp'] = pd.to_datetime(df['Read Date and End Time'], dayfirst=True, errors='coerce')
+    df = df.dropna(subset=['Timestamp'])
     df = df.sort_values('Timestamp')
     
+    # Korekta wartości (Wh -> kWh)
     df.loc[df['Read Value'] > 100000, 'Read Value'] = df['Read Value'] / 1000
     df['Usage_kWh'] = df['Read Value'].diff().fillna(0)
     df = df[df['Usage_kWh'] >= 0]
     
+    # Przypisanie taryfy
     df['Tariff'] = df['Timestamp'].apply(get_tariff)
     
     def calc_cost(row):
@@ -56,33 +62,35 @@ if uploaded_file:
 
     df['Cost_VAT'] = df.apply(calc_cost, axis=1)
 
-    # Calculation of stats
+    # Statystyki
     days = max(1, (df['Timestamp'].max() - df['Timestamp'].min()).days)
     months = max(1, days / 30.44)
     total_usage = df['Usage_kWh'].sum()
-    total_cost_energy = df['Cost_VAT'].sum()
-    total_standing = days * standing_ch * 1.09
-    total_cost_sum = total_cost_energy + total_standing
+    total_cost_sum = df['Cost_VAT'].sum() + (days * standing_ch * 1.09)
 
-    # --- TOP METRICS ---
-    row1_1, row1_2 = st.columns(2)
-    row1_1.metric("Total Usage", f"{total_usage:.1f} kWh")
-    row1_2.metric("Total Cost", f"€{total_cost_sum:.2f}")
+    # --- METRYKI ---
+    c1, c2 = st.columns(2)
+    c1.metric("Total Usage", f"{total_usage:.1f} kWh")
+    c2.metric("Total Cost", f"€{total_cost_sum:.2f}")
 
-    row2_1, row2_2, row2_3, row2_4 = st.columns(4)
-    row2_1.metric("Avg Monthly Usage", f"{(total_usage/months):.1f} kWh")
-    row2_2.metric("Avg Monthly Cost", f"€{(total_cost_sum/months):.2f}")
-    row2_3.metric("Avg Daily Usage", f"{(total_usage/days):.2f} kWh")
-    row2_4.metric("Avg Daily Cost", f"€{(total_cost_sum/days):.2f}")
+    c3, c4, c5, c6 = st.columns(4)
+    c3.metric("Avg Monthly Usage", f"{(total_usage/months):.1f} kWh")
+    c4.metric("Avg Monthly Cost", f"€{(total_cost_sum/months):.2f}")
+    c5.metric("Avg Daily Usage", f"{(total_usage/days):.2f} kWh")
+    c6.metric("Avg Daily Cost", f"€{(total_cost_sum/days):.2f}")
 
     st.divider()
 
-    # --- TARIFF PIE CHART ---
+    # --- DIAGNOSTYKA (Tylko jeśli coś jest nie tak) ---
+    if df['Tariff'].nunique() == 1:
+        st.warning(f"⚠️ Only one tariff detected: **{df['Tariff'].iloc[0]}**. Checking data format...")
+        st.write("Sample timestamps from your file:", df['Timestamp'].head(5))
+
+    # --- WYKRES KOŁOWY TARYF ---
     st.subheader("Tariff Usage Distribution")
     tariff_sum = df.groupby('Tariff')['Usage_kWh'].sum().reset_index()
     fig_pie = px.pie(tariff_sum, values='Usage_kWh', names='Tariff', hole=0.5,
                     color='Tariff', color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'})
-    fig_pie.update_layout(height=400)
     st.plotly_chart(fig_pie, use_container_width=True)
 
     st.divider()
@@ -90,7 +98,7 @@ if uploaded_file:
     view_mode = st.radio("Chart Unit:", ["kWh", "Euro (€)"], horizontal=True)
     target_col = 'Usage_kWh' if view_mode == "kWh" else 'Cost_VAT'
     
-    tab1, tab2 = st.tabs(["📊 Daily History", "📈 Long-term Trends"])
+    tab1, tab2 = st.tabs(["📊 Daily History", "📈 Trends"])
     with tab1:
         daily = df.groupby(df['Timestamp'].dt.date)[target_col].sum().reset_index()
         fig_main = px.bar(daily, x='Timestamp', y=target_col, template="plotly_white", color_discrete_sequence=['#00CC96'])
