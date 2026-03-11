@@ -11,10 +11,9 @@
 * 📱 **Mobile-First Design**: Check your usage from your phone anywhere.
 * 💰 **Smart Tariff Support**: Tracks Day, Peak, and Night rates automatically.
 * 📊 **Time-Series Analytics**: View your data by day, week, month, or total period.
-* 🐳 **Dockerized**: Easy deployment on NAS (CasaOS / TerraMaster) or any home server.
+* 🐳 **Dockerized**: Easy deployment on NAS or any home server.
 
 ### 🚀 Quick Start
 1. Run the Docker container.
 2. Access the UI via `your-nas-ip:8501`.
 3. Drop your `consumption.csv` file.
-4. Profit (and save on your next bill)!
