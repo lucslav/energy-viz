@@ -29,7 +29,6 @@ def init_db():
 def save_to_db(df, data_type):
     df = df.rename(columns={'Timestamp': 'timestamp', 'Value': 'value'})
     df['type'] = data_type
-    # Fixed transaction logic for SQLite persistence
     with engine.begin() as conn:
         df.to_sql('temp_upload', conn, if_exists='replace', index=False)
         conn.execute(text("""
@@ -89,7 +88,6 @@ with st.expander("📤 Data Upload & Auto-Detection"):
         raw['Timestamp'] = pd.to_datetime(raw[date_col], dayfirst=True)
         r_types = " ".join(raw['Read Type'].astype(str).unique()).lower() if 'Read Type' in raw.columns else ""
         
-        # Mapping to ESB types
         if "interval (kwh)" in r_types: m = "CALC_KWH"
         elif "interval (kw)" in r_types: m = "READ_KW"
         elif "register (kwh)" in r_types: m = "DNP_SNAPSHOT"
@@ -118,11 +116,10 @@ if not full_data.empty:
             st.markdown(f'<div class="mode-badge {badge_class}">ACTIVE: {esb_name}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="status-box">📂 <b>Database Status:</b> Records from <b>{start}</b> to <b>{end}</b> ({len(df_subset)} records).</div>', unsafe_allow_html=True)
             return True
-        else:
-            st.info(f"Please upload the ESB file: **'{esb_name}'** to see analytics here.")
-            return False
+        st.info(f"Please upload the ESB file: **'{esb_name}'** to see analytics.")
+        return False
 
-    # 1. 30-minute readings in calculated kWh
+    # 1. calculated kWh
     with tabs[0]:
         df = full_data[full_data['type'] == "CALC_KWH"].copy()
         if show_status(df, "30-minute readings in calculated kWh", "badge-kwh"):
@@ -130,17 +127,14 @@ if not full_data.empty:
                 h = dt.hour
                 if 17 <= h < 19: return 'Peak'
                 elif h >= 23 or h < 8: return 'Night'
-                else: return 'Day'
+                return 'Day'
             
             df['Tariff'] = df['timestamp'].apply(get_tariff)
             rates = {'Day': s['day_rate'], 'Night': s['night_rate'], 'Peak': s['peak_rate']}
             df['Cost_VAT'] = df.apply(lambda r: r['value'] * rates[r['Tariff']] * v_mul, axis=1)
-            
             days = max(1, len(df['timestamp'].dt.date.unique()))
-            total_kwh = df['value'].sum()
-            total_cost = df['Cost_VAT'].sum() + (days * s['standing_charge'] * v_mul)
+            total_kwh, total_cost = df['value'].sum(), df['Cost_VAT'].sum() + (days * s['standing_charge'] * v_mul)
             
-            # KPIs
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Total Usage", f"{total_kwh:.1f} kWh")
             c2.metric("Total Cost", f"€{total_cost:.2f}")
@@ -156,7 +150,7 @@ if not full_data.empty:
             fig.update_xaxes(rangeslider_visible=True)
             st.plotly_chart(fig, width="stretch")
 
-    # 2. 30-minute readings in kW
+    # 2. readings in kW
     with tabs[1]:
         df = full_data[full_data['type'] == "READ_KW"].copy()
         if show_status(df, "30-minute readings in kW", "badge-kw"):
@@ -165,17 +159,37 @@ if not full_data.empty:
             st.plotly_chart(fig_kw, width="stretch")
             st.metric("Max Peak Load", f"{df['value'].max():.2f} kW")
 
-    # 3. Daily snapshot of day/night/peak usage in actual kWh*
+    # 3. Daily snapshot DNP
     with tabs[2]:
         df = full_data[full_data['type'] == "DNP_SNAPSHOT"].copy()
         if show_status(df, "Daily snapshot of day/night/peak usage in actual kWh*", "badge-dnp"):
-            fig_dnp = px.bar(df, x='timestamp', y='value', template="plotly_white")
+            fig_dnp = px.bar(df, x='timestamp', y='value', template="plotly_white", color_discrete_sequence=['#636EFA'])
             fig_dnp.update_xaxes(rangeslider_visible=True)
             st.plotly_chart(fig_dnp, width="stretch")
 
-    # 4. Daily snapshot of total usage and export data
+    # 4. Daily total & export
     with tabs[3]:
         df = full_data[full_data['type'] == "TOTAL_SNAPSHOT"].copy()
         if show_status(df, "Daily snapshot of total usage and export data in actual kWh", "badge-basic"):
-            fig_total = px.area(df, x='timestamp', y='value', color_discrete_sequence=['#7f
-                                                                                       
+            fig_total = px.area(df, x='timestamp', y='value', color_discrete_sequence=['#7f8c8d'], template="plotly_white")
+            fig_total.update_xaxes(rangeslider_visible=True)
+            st.plotly_chart(fig_total, width="stretch")
+else:
+    st.info("👋 Database is empty. Upload your first file to start.")
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.image(LOGO_URL, width=120)
+    st.header("⚙️ Settings")
+    st.write(f"🟢 Night: €{s['night_rate'] * v_mul:.4f}")
+    st.write(f"🟡 Day: €{s['day_rate'] * v_mul:.4f}")
+    st.write(f"🔴 Peak: €{s['peak_rate'] * v_mul:.4f}")
+    if st.button("🔄 Edit Rates"):
+        with engine.connect() as conn:
+            conn.execute(text("DELETE FROM settings WHERE id=1"))
+            conn.commit()
+        st.rerun()
+
+st.divider()
+st.caption("Energy Viz v1.1.0")
+        
