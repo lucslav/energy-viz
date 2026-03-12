@@ -29,14 +29,14 @@ def init_db():
 def save_to_db(df, data_type):
     df = df.rename(columns={'Timestamp': 'timestamp', 'Value': 'value'})
     df['type'] = data_type
-    df.to_sql('temp_upload', engine, if_exists='replace', index=False)
-    with engine.connect() as conn:
+    # Fixed transaction logic for SQLite persistence
+    with engine.begin() as conn:
+        df.to_sql('temp_upload', conn, if_exists='replace', index=False)
         conn.execute(text("""
             INSERT OR REPLACE INTO consumption (timestamp, value, type)
             SELECT timestamp, value, type FROM temp_upload
         """))
-        conn.execute(text("DROP TABLE temp_upload"))
-        conn.commit()
+        conn.execute(text("DROP TABLE IF EXISTS temp_upload"))
 
 # --- UI STYLING ---
 LOGO_URL = "https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png"
@@ -47,7 +47,7 @@ st.markdown("""
     <style>
     [data-testid="stMetric"] { background-color: rgba(240, 242, 246, 0.4); padding: 15px; border-radius: 12px; border: 1px solid #e6e9ef; }
     .main-header { background-color: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #e6e9ef; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 20px; }
-    .status-box { background-color: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px; font-size: 0.9rem; }
+    .status-box { background-color: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px; font-size: 0.9rem; border-left: 5px solid #00CC96; }
     .mode-badge { padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; margin-bottom: 10px; display: inline-block; }
     .badge-kwh { background-color: #00CC96; color: white; }
     .badge-kw { background-color: #FF4B4B; color: white; }
@@ -56,7 +56,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- SETTINGS ---
+# --- SETTINGS LOADING ---
 settings_df = pd.read_sql("SELECT * FROM settings WHERE id=1", engine)
 if settings_df.empty:
     st.header("⚡ Energy Viz Setup")
@@ -78,10 +78,10 @@ s = settings_df.iloc[0]
 v_mul = 1 + (s['vat_rate'] / 100)
 
 # --- HEADER ---
-st.markdown(f'<div class="main-header"><img src="{LOGO_URL}" width="55"><div style="text-align: left;"><h1 style="margin:0; font-size: 2rem;">Energy Viz</h1><p style="color:gray; margin:0;">Interactive ESB Analytics</p></div></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="main-header"><img src="{LOGO_URL}" width="55"><div style="text-align: left;"><h1 style="margin:0; font-size: 2rem;">Energy Viz</h1><p style="color:gray; margin:0;">Interactive ESB Smart Meter Analytics</p></div></div>', unsafe_allow_html=True)
 
-# --- UPLOAD ---
-with st.expander("📤 Data Upload & Detection"):
+# --- UPLOAD SECTION ---
+with st.expander("📤 Data Upload & Auto-Detection"):
     up = st.file_uploader("Upload ESB CSV file", type="csv", label_visibility="collapsed")
     if up:
         raw = pd.read_csv(up)
@@ -89,36 +89,43 @@ with st.expander("📤 Data Upload & Detection"):
         raw['Timestamp'] = pd.to_datetime(raw[date_col], dayfirst=True)
         r_types = " ".join(raw['Read Type'].astype(str).unique()).lower() if 'Read Type' in raw.columns else ""
         
-        if "interval (kwh)" in r_types: m = "KWH_INTERVAL"
-        elif "interval (kw)" in r_types: m = "KW_DEMAND"
-        elif "register (kwh)" in r_types: m = "DAILY_DNP"
-        else: m = "DAILY_TOTAL"
+        # Mapping to ESB types
+        if "interval (kwh)" in r_types: m = "CALC_KWH"
+        elif "interval (kw)" in r_types: m = "READ_KW"
+        elif "register (kwh)" in r_types: m = "DNP_SNAPSHOT"
+        else: m = "TOTAL_SNAPSHOT"
         
         df_save = pd.DataFrame({'Timestamp': raw['Timestamp'], 'Value': pd.to_numeric(raw['Read Value'], errors='coerce')})
         save_to_db(df_save.dropna(), m)
-        st.success(f"Data saved as: {m}")
+        st.success(f"File stored as: {m}")
         st.rerun()
 
 # --- CONTENT ---
 full_data = pd.read_sql("SELECT * FROM consumption ORDER BY timestamp ASC", engine, parse_dates=['timestamp'])
 
 if not full_data.empty:
-    tabs = st.tabs(["📊 Professional (kWh)", "📈 Demand (kW)", "📅 Daily Summary (DNP)", "📜 Basic History"])
+    tabs = st.tabs([
+        "📊 30-min calculated kWh", 
+        "📈 30-min readings in kW", 
+        "📅 Daily snapshot DNP", 
+        "📜 Daily total & export"
+    ])
 
-    def display_status(df_subset, label, badge_class):
+    def show_status(df_subset, esb_name, badge_class):
         if not df_subset.empty:
             start = df_subset['timestamp'].min().strftime('%Y-%m-%d')
             end = df_subset['timestamp'].max().strftime('%Y-%m-%d')
-            count = len(df_subset)
-            st.markdown(f'<div class="mode-badge {badge_class}">ACTIVE: {label}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="status-box">📂 <b>Database Status:</b> Records from <b>{start}</b> to <b>{end}</b> ({count} entries).</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="mode-badge {badge_class}">ACTIVE: {esb_name}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="status-box">📂 <b>Database Status:</b> Records from <b>{start}</b> to <b>{end}</b> ({len(df_subset)} records).</div>', unsafe_allow_html=True)
             return True
-        return False
+        else:
+            st.info(f"Please upload the ESB file: **'{esb_name}'** to see analytics here.")
+            return False
 
-    # 1. PROFESSIONAL (kWh)
+    # 1. 30-minute readings in calculated kWh
     with tabs[0]:
-        df = full_data[full_data['type'] == "KWH_INTERVAL"].copy()
-        if display_status(df, "30-min kWh Readings", "badge-kwh"):
+        df = full_data[full_data['type'] == "CALC_KWH"].copy()
+        if show_status(df, "30-minute readings in calculated kWh", "badge-kwh"):
             def get_tariff(dt):
                 h = dt.hour
                 if 17 <= h < 19: return 'Peak'
@@ -133,62 +140,42 @@ if not full_data.empty:
             total_kwh = df['value'].sum()
             total_cost = df['Cost_VAT'].sum() + (days * s['standing_charge'] * v_mul)
             
+            # KPIs
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Total Usage", f"{total_kwh:.1f} kWh")
-            c2.metric("Total Bill (Est.)", f"€{total_cost:.2f}")
+            c2.metric("Total Cost", f"€{total_cost:.2f}")
             c3.metric("Avg Daily Usage", f"{(total_kwh/days):.2f} kWh")
             c4.metric("Avg Daily Cost", f"€{(total_cost/days):.2f}")
             
-            view = st.radio("Chart View:", ["kWh", "Euro (€)"], horizontal=True, key="pro_radio")
-            y_col = 'value' if view == "kWh" else 'Cost_VAT'
+            view = st.radio("Display:", ["Usage (kWh)", "Cost (€)"], horizontal=True, key="pro_view")
+            y_col = 'value' if "Usage" in view else 'Cost_VAT'
             daily = df.groupby([df['timestamp'].dt.date, 'Tariff'])[y_col].sum().reset_index()
             fig = px.bar(daily, x='timestamp', y=y_col, color='Tariff', 
                          color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'},
                          barmode='stack', template="plotly_white")
             fig.update_xaxes(rangeslider_visible=True)
-            st.plotly_chart(fig, use_container_width=True)
-        else: st.info("No Pro kWh data found.")
+            st.plotly_chart(fig, width="stretch")
 
-    # 2. DEMAND (kW)
+    # 2. 30-minute readings in kW
     with tabs[1]:
-        df = full_data[full_data['type'] == "KW_DEMAND"].copy()
-        if display_status(df, "Power Demand Spikes (kW)", "badge-kw"):
+        df = full_data[full_data['type'] == "READ_KW"].copy()
+        if show_status(df, "30-minute readings in kW", "badge-kw"):
             fig_kw = px.line(df, x='timestamp', y='value', line_shape='hv', color_discrete_sequence=['#FF4B4B'], template="plotly_white")
             fig_kw.update_xaxes(rangeslider_visible=True)
-            st.plotly_chart(fig_kw, use_container_width=True)
+            st.plotly_chart(fig_kw, width="stretch")
             st.metric("Max Peak Load", f"{df['value'].max():.2f} kW")
 
-    # 3. DAILY DNP
+    # 3. Daily snapshot of day/night/peak usage in actual kWh*
     with tabs[2]:
-        df = full_data[full_data['type'] == "DAILY_DNP"].copy()
-        if display_status(df, "Daily Tariff Snapshot", "badge-dnp"):
+        df = full_data[full_data['type'] == "DNP_SNAPSHOT"].copy()
+        if show_status(df, "Daily snapshot of day/night/peak usage in actual kWh*", "badge-dnp"):
             fig_dnp = px.bar(df, x='timestamp', y='value', template="plotly_white")
             fig_dnp.update_xaxes(rangeslider_visible=True)
-            st.plotly_chart(fig_dnp, use_container_width=True)
+            st.plotly_chart(fig_dnp, width="stretch")
 
-    # 4. BASIC HISTORY
+    # 4. Daily snapshot of total usage and export data
     with tabs[3]:
-        df = full_data[full_data['type'] == "DAILY_TOTAL"].copy()
-        if display_status(df, "Simple Usage History", "badge-basic"):
-            fig_basic = px.area(df, x='timestamp', y='value', color_discrete_sequence=['#7f8c8d'], template="plotly_white")
-            fig_basic.update_xaxes(rangeslider_visible=True)
-            st.plotly_chart(fig_basic, use_container_width=True)
-else:
-    st.info("👋 Database is empty. Upload your first file to start.")
-
-# --- SIDEBAR ---
-with st.sidebar:
-    st.image(LOGO_URL, width=120)
-    st.header("⚙️ Settings")
-    st.write(f"🟢 Night: €{s['night_rate'] * v_mul:.4f}")
-    st.write(f"🟡 Day: €{s['day_rate'] * v_mul:.4f}")
-    st.write(f"🔴 Peak: €{s['peak_rate'] * v_mul:.4f}")
-    if st.button("🔄 Edit Rates"):
-        with engine.connect() as conn:
-            conn.execute(text("DELETE FROM settings WHERE id=1"))
-            conn.commit()
-        st.rerun()
-
-# --- FOOTER ---
-st.divider()
-st.caption("Energy Viz v1.1.0")
+        df = full_data[full_data['type'] == "TOTAL_SNAPSHOT"].copy()
+        if show_status(df, "Daily snapshot of total usage and export data in actual kWh", "badge-basic"):
+            fig_total = px.area(df, x='timestamp', y='value', color_discrete_sequence=['#7f
+                                                                                       
