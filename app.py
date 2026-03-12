@@ -31,7 +31,7 @@ with st.container():
         </div>
     """, unsafe_allow_html=True)
 
-# --- QUICK GUIDE (IMPERSONAL VERSION) ---
+# --- RECOMMENDATION ---
 st.markdown("""
 <div class="recommendation-box">
     <strong>🎯 Quick Guide:</strong> It is strongly recommended to upload: 
@@ -91,9 +91,10 @@ if uploaded_file:
         fig_kw = px.line(df, x='Timestamp', y='Read Value', title="Power Demand (kW) over Time",
                          line_shape='hv', color_discrete_sequence=['#FF4B4B'], template="plotly_white")
         
-        # Rangeslider configuration with mini-graph
+        # Configuration for Range Slider and Mini-graph (fixed glitch)
         fig_kw.update_xaxes(
             rangeslider_visible=True,
+            title_text="Timestamp",
             rangeselector=dict(
                 buttons=list([
                     dict(count=1, label="1d", step="day", stepmode="backward"),
@@ -102,7 +103,7 @@ if uploaded_file:
                 ])
             )
         )
-        fig_kw.update_layout(xaxis_title="Time", yaxis_title="Load (kW)", margin=dict(b=100), height=600)
+        fig_kw.update_layout(yaxis_title="Load (kW)", margin=dict(b=100), height=600)
         
         st.plotly_chart(fig_kw, use_container_width=True)
         st.metric("Peak Power Recorded", f"{df['Read Value'].max():.2f} kW")
@@ -123,11 +124,12 @@ if uploaded_file:
         else: # DAILY_TOTAL
             df.loc[df['Read Value'] > 100000, 'Read Value'] = df['Read Value'] / 1000
             df['Usage_kWh'] = df['Read Value'].diff().fillna(0)
-            df['Tariff'] = 'Day'
+            df['Tariff'] = '24h' # Unified label for total usage without hourly breakdown
 
         df = df[df['Usage_kWh'] >= 0]
         
         def calc_cost(r):
+            # For 24h tariff, we use Day Rate as a baseline
             rate = p_peak if r['Tariff'] == 'Peak' else (p_night if r['Tariff'] == 'Night' else p_day)
             return r['Usage_kWh'] * rate * 1.09
         df['Cost_VAT'] = df.apply(calc_cost, axis=1)
@@ -160,9 +162,9 @@ if uploaded_file:
             st.write(f"Daily {view_mode} Breakdown")
             daily = df.groupby([df['Timestamp'].dt.date, 'Tariff'])[target_col].sum().reset_index()
             fig_bar = px.bar(daily, x='Timestamp', y=target_col, color='Tariff',
-                             color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'},
+                             color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B', '24h': '#7f8c8d'},
                              template="plotly_white", barmode='stack')
-            fig_bar.update_xaxes(rangeslider_visible=True)
+            fig_bar.update_xaxes(rangeslider_visible=True, title_text="Timestamp")
             st.plotly_chart(fig_bar, use_container_width=True)
             
         with tab2:
@@ -171,7 +173,7 @@ if uploaded_file:
             agg = df.resample('W' if freq == "Weekly" else 'M', on='Timestamp')[target_col].sum().reset_index()
             fig_trend = px.area(agg, x='Timestamp', y=target_col, markers=True,
                                 color_discrete_sequence=[chart_color], template="plotly_white")
-            fig_trend.update_xaxes(rangeslider_visible=True)
+            fig_trend.update_xaxes(rangeslider_visible=True, title_text="Timestamp")
             st.plotly_chart(fig_trend, use_container_width=True)
 else:
     st.info("👋 Welcome! Please upload any ESB HDF file to start the analysis.")
