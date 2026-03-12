@@ -61,11 +61,13 @@ def get_tariff(dt):
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    df['Timestamp'] = pd.to_datetime(df['Read Date and End Time'], dayfirst=True, errors='coerce')
+    # Obsługa kolumny Timestamp lub Read Date and End Time
+    date_col = 'Read Date and End Time' if 'Read Date and End Time' in df.columns else 'Timestamp'
+    df['Timestamp'] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
     df = df.dropna(subset=['Timestamp']).sort_values('Timestamp')
     
     # --- AUTOMATYCZNE WYKRYWANIE TRYBU ---
-    read_type_sample = " ".join(df['Read Type'].astype(str).unique()).lower()
+    read_type_sample = " ".join(df['Read Type'].astype(str).unique()).lower() if 'Read Type' in df.columns else ""
     
     if "demand" in read_type_sample or "(kw)" in read_type_sample:
         mode = "kW_POWER"
@@ -91,6 +93,7 @@ if uploaded_file:
         if "interval" in read_type_sample:
             df['Usage_kWh'] = df['Read Value'] 
         else:
+            # Korekta dla starych plików Wh/kWh
             df.loc[df['Read Value'] > 100000, 'Read Value'] = df['Read Value'] / 1000
             df['Usage_kWh'] = df['Read Value'].diff().fillna(0)
             df = df[df['Usage_kWh'] >= 0]
@@ -121,5 +124,10 @@ if uploaded_file:
     elif mode == "EXPORT_MODE":
         st.success("☀️ **Current Mode:** Solar Export/Import Data")
         pivot_df = df.pivot_table(index=df['Timestamp'].dt.date, columns='Read Type', values='Read Value', aggfunc='sum').reset_index()
-        fig_solar = px.bar(pivot_df, x='
-        
+        fig_solar = px.bar(pivot_df, x='Timestamp', barmode='group', template="plotly_white",
+                           color_discrete_sequence=['#00CC96', '#636EFA'])
+        st.plotly_chart(fig_solar, use_container_width=True)
+
+else:
+    st.info("👋 Please upload an ESB CSV file to begin your analysis.")
+    
