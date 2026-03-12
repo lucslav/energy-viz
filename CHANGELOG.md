@@ -16,4 +16,3 @@
 
 ### Known Issues
 - **Power Demand Range Slider:** The mini-graph preview in the range slider for kW mode may not render correctly in some browser environments (to be addressed in a future update).
-- 
