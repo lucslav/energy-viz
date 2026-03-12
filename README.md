@@ -1,38 +1,34 @@
 # ⚡ Energy Viz
 
-Professional Smart Meter Analytics Dashboard designed for ESB Networks (Ireland) HDF files. This application provides a comprehensive interface to track energy consumption and estimate electricity costs based on Irish utility standards.
+Professional Smart Meter Analytics Dashboard designed for ESB Networks (Ireland) HDF files.
 
 ![Logo](https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png)
 
 ## 🚀 Docker Hub
-The project is automatically built and available on Docker Hub:
-**[lucslav/energy-viz](https://hub.docker.com/r/lucslav/energy-viz)**
+Project available at: **[lucslav/energy-viz](https://hub.docker.com/r/lucslav/energy-viz)**
 
 ---
 
-## ✨ Features & Capabilities
+## ✨ Main Features
 
-* **Interactive Visualizations:** Toggle between energy consumption (kWh) and real-time cost analysis (€).
-* **Intelligent Data Correction:** Automatically detects and fixes inconsistent meter readings (e.g., Wh vs kWh unit jumps) often found in ESB export files.
-* **Irish Billing Standard:** Built-in support for the 9% VAT rate applied to electricity in Ireland.
-* **Dynamic Cost Estimation:** Calculates totals including energy usage, standing charges, and taxes.
-* **Time-Series Analysis:** View data by daily bars or aggregate trends by week and month.
-* **Mobile Optimized:** Features interactive range sliders for easy navigation on touchscreens and mobile devices.
+* **Smart File Detection:** Automatically recognizes different ESB file types (30-min kWh, kW demand, Daily DNP, or Cumulative) and adapts the dashboard.
+* **Detailed Tariff Analysis:** Precise breakdown of usage and costs into **Day, Night, and Peak** periods based on 30-minute intervals.
+* **Power Demand Monitoring:** Detects and visualizes power "spikes" (kW) to identify high-load moments in your household.
+* **Automatic Cost Calculation:** Includes the Irish 9% VAT and daily standing charges for realistic bill estimation.
+* **Usage Trends:** Interactive charts showing energy consumption and costs across daily, weekly, and monthly scales.
+* **Data Auto-Correction:** Fixes common inconsistencies in ESB export files, such as unit jumps (Wh vs kWh).
 
-## ⚙️ Configurable Options
-Using the integrated sidebar, you can customize the analytics to match your specific utility plan:
-* **Day Rate:** Standard price per kWh.
-* **Peak Rate:** Premium price for usage between 17:00 - 19:00.
-* **Night Rate:** Reduced price for usage between 23:00 - 08:00.
-* **Daily Standing Charge:** Fixed daily cost for maintaining the connection.
+
 
 ---
 
-## 🛠️ Installation (NAS / Server)
+## 📂 Data Recommendation
+For the best experience, use the **"30-minute readings in calculated kWh"** file from the ESB Networks portal.
 
-To deploy this application on any NAS or Linux server supporting Docker, use the following configuration:
+---
 
-### Docker Compose / YAML
+## 🛠️ Installation (Docker Compose)
+
 ```yaml
 name: energy-viz
 services:
