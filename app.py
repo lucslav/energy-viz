@@ -8,7 +8,7 @@ DB_PATH = "/app/data/energy_viz.db"
 engine = create_engine(f"sqlite:///{DB_PATH}")
 
 def init_db():
-    """Create tables with primary keys for upserting."""
+    """Initialize tables with Daily Standing Charge."""
     with engine.connect() as conn:
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS settings (
@@ -27,7 +27,7 @@ def init_db():
         conn.commit()
 
 def save_to_db(df, data_type):
-    """Save data using INSERT OR REPLACE to handle ESB corrections."""
+    """Upsert ESB data to handle corrections."""
     df = df.rename(columns={'Timestamp': 'timestamp', 'Value': 'value'})
     df['type'] = data_type
     df.to_sql('temp_upload', engine, if_exists='replace', index=False)
@@ -50,20 +50,20 @@ if settings.empty or st.sidebar.button("⚙️ Setup Rates"):
     with st.form("settings_form"):
         c1, c2 = st.columns(2)
         with c1:
-            day = st.number_input("Day Rate (€/kWh)", format="%.4f", value=0.3500)
-            night = st.number_input("Night Rate (€/kWh)", format="%.4f", value=0.1500)
-            peak = st.number_input("Peak Rate (€/kWh)", format="%.4f", value=0.4000)
+            day_r = st.number_input("Day Rate (€/kWh)", format="%.4f", value=0.3800)
+            night_r = st.number_input("Night Rate (€/kWh)", format="%.4f", value=0.1500)
+            peak_r = st.number_input("Peak Rate (€/kWh)", format="%.4f", value=0.4200)
         with c2:
-            standing = st.number_input("Annual Standing Charge (€)", value=250.0)
-            vat = st.number_input("VAT Rate (%)", value=9.0)
+            standing_d = st.number_input("Daily Standing Charge (€/day)", format="%.4f", value=0.6303)
+            vat_p = st.number_input("VAT Rate (%)", value=9.0)
         if st.form_submit_button("Save & Start"):
-            pd.DataFrame([{'id':1,'day_rate':day,'night_rate':night,'peak_rate':peak,'standing_charge':standing,'vat_rate':vat}]).to_sql('settings', engine, if_exists='replace', index=False)
+            pd.DataFrame([{'id':1,'day_rate':day_r,'night_rate':night_r,'peak_rate':peak_r,'standing_charge':standing_d,'vat_rate':vat_p}]).to_sql('settings', engine, if_exists='replace', index=False)
             st.rerun()
     st.stop()
 
 s = settings.iloc[0]
 
-# File Upload & Smart Detection
+# File Upload
 st.title("⚡ Energy Viz")
 uploaded = st.file_uploader("Upload ESB HDF File", type="csv")
 
@@ -73,13 +73,9 @@ if uploaded:
         df = pd.DataFrame()
         df['Timestamp'] = pd.to_datetime(raw['Read Date and End Time'], dayfirst=True)
         df['Value'] = pd.to_numeric(raw['Read Value'], errors='coerce')
-        
-        # Detect mode: kW (Demand) vs kWh (Energy)
-        content_sample = str(raw.iloc[0])
-        mode = "Demand" if "Demand" in content_sample else "Energy"
-        
+        mode = "Demand" if "Demand" in str(raw.iloc[0]) else "Energy"
         save_to_db(df.dropna(), mode)
-        st.success(f"Merged {len(df)} records into database ({mode} mode).")
+        st.success(f"Merged records into database ({mode} mode).")
 
 # Load and Filter
 data = pd.read_sql("SELECT * FROM consumption ORDER BY timestamp ASC", engine, parse_dates=['timestamp'])
@@ -87,53 +83,44 @@ data = pd.read_sql("SELECT * FROM consumption ORDER BY timestamp ASC", engine, p
 if not data.empty:
     st.sidebar.header("View Mode")
     view = st.sidebar.radio("Analysis Type", ["Cost Analysis (kWh)", "Power Demand (kW)"])
-    
-    # Filter by selected mode
     target_type = "Energy" if view == "Cost Analysis (kWh)" else "Demand"
     filtered = data[data['type'] == target_type].copy()
     
     if not filtered.empty:
         # Charting
         fig = go.Figure()
-        
         if view == "Power Demand (kW)":
-            # HV-Line chart for demand spikes
-            fig.add_trace(go.Scatter(x=filtered['timestamp'], y=filtered['value'], 
-                                     line=dict(color='#FF4B4B', width=2),
-                                     fill='tozeroy', name="Load (kW)"))
-            
-            # --- FIXED RANGE SLIDER GLITCH ---
-            fig.update_layout(
-                xaxis=dict(
-                    rangeslider=dict(visible=True, thickness=0.10), # Explicit thickness
-                    type="date"
-                ),
-                yaxis=dict(title="Demand (kW)", fixedrange=False), # Allow vertical zoom
-                height=500,
-                margin=dict(l=20, r=20, t=40, b=20)
-            )
+            fig.add_trace(go.Scatter(x=filtered['timestamp'], y=filtered['value'], fill='tozeroy', line=dict(color='#FF4B4B')))
+            fig.update_layout(xaxis=dict(rangeslider=dict(visible=True, thickness=0.10)), yaxis_title="Demand (kW)")
         else:
-            # Cost analysis bar chart
-            fig.add_trace(go.Bar(x=filtered['timestamp'], y=filtered['value'], name="Consumption (kWh)"))
-            fig.update_layout(height=500, yaxis_title="Energy (kWh)")
-
+            fig.add_trace(go.Bar(x=filtered['timestamp'], y=filtered['value']))
+            fig.update_layout(yaxis_title="Energy (kWh)")
+        
         st.plotly_chart(fig, use_container_width=True)
         
-        # Quick Stats
-        c1, c2, c3 = st.columns(3)
-        total_val = filtered['value'].sum()
-        unit = "kWh" if target_type == "Energy" else "kW (Max)"
-        c1.metric("Total Period Usage", f"{total_val:.2f} {unit}")
-        
+        # Financial Summary
         if target_type == "Energy":
-            # Simple cost estimate (excluding VAT/Standing for now)
-            cost = total_val * s['day_rate'] 
-            c2.metric("Estimated Cost (Day Rate)", f"€{cost:.2f}")
-    else:
-        st.info(f"No {target_type} data found. Please upload the correct ESB file.")
+            st.subheader("Financial Overview (Excluding Tariffs)")
+            
+            # Calculate days for Standing Charge
+            num_days = len(filtered['timestamp'].dt.date.unique())
+            total_standing = num_days * s['standing_charge']
+            
+            # Basic calculation (Single Rate + Standing + VAT)
+            raw_energy_cost = filtered['value'].sum() * s['day_rate']
+            total_net = raw_energy_cost + total_standing
+            total_vat = total_net * (s['vat_rate'] / 100)
+            total_gross = total_net + total_vat
 
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Total Usage", f"{filtered['value'].sum():.2f} kWh")
+            c2.metric("Standing Charge", f"€{total_standing:.2f}", f"{num_days} days")
+            c3.metric("VAT ({:.0f}%)".format(s['vat_rate']), f"€{total_vat:.2f}")
+            c4.metric("Total Bill (Est.)", f"€{total_gross:.2f}")
+    else:
+        st.info(f"No {target_type} data found.")
 else:
-    st.warning("Database is empty. Upload a CSV file to begin.")
+    st.warning("Database empty. Upload CSV to begin.")
 
 st.divider()
-st.caption("Energy Viz v1.1.0 | Limerick, IE")
+st.caption("Energy Viz v1.1.1 | Limerick, IE")
