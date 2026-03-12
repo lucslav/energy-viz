@@ -31,9 +31,10 @@ with st.container():
         </div>
     """, unsafe_allow_html=True)
 
+# --- QUICK GUIDE (IMPERSONAL VERSION) ---
 st.markdown("""
 <div class="recommendation-box">
-    <strong>🎯 Quick Guide:</strong> We strongly recommend uploading: 
+    <strong>🎯 Quick Guide:</strong> It is strongly recommended to upload: 
     <u>30-minute readings in calculated kWh</u> for the best experience.
 </div>
 """, unsafe_allow_html=True)
@@ -86,50 +87,56 @@ if uploaded_file:
 
     # --- DATA PROCESSING ---
     if mode == "KW_DEMAND":
-        # kW Variant - Power Spikes
         st.subheader("Power Demand Spikes")
         fig_kw = px.line(df, x='Timestamp', y='Read Value', title="Power Demand (kW) over Time",
                          line_shape='hv', color_discrete_sequence=['#FF4B4B'], template="plotly_white")
-        fig_kw.update_xaxes(rangeslider_visible=True)
+        
+        # Rangeslider configuration with mini-graph
+        fig_kw.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1d", step="day", stepmode="backward"),
+                    dict(count=7, label="1w", step="day", stepmode="backward"),
+                    dict(step="all")
+                ])
+            )
+        )
+        fig_kw.update_layout(xaxis_title="Time", yaxis_title="Load (kW)", margin=dict(b=100), height=600)
+        
         st.plotly_chart(fig_kw, use_container_width=True)
         st.metric("Peak Power Recorded", f"{df['Read Value'].max():.2f} kW")
 
     else:
-        # kWh Variants (Interval, DNP, Total)
+        # kWh Variants
         if mode == "KWH_INTERVAL":
             df['Usage_kWh'] = df['Read Value']
             df['Tariff'] = df['Timestamp'].apply(get_tariff)
         elif mode == "DAILY_DNP":
-            # Map ESB Register Types to internal Tariffs
             def map_dnp(t):
                 t = t.lower()
                 if 'night' in t: return 'Night'
                 if 'peak' in t and 'off' not in t: return 'Peak'
                 return 'Day'
             df['Tariff'] = df['Read Type'].apply(map_dnp)
-            # Calculate daily diff for each register type
             df['Usage_kWh'] = df.groupby('Read Type')['Read Value'].diff().fillna(0)
         else: # DAILY_TOTAL
-            # Handle large Wh values and calculate diff
             df.loc[df['Read Value'] > 100000, 'Read Value'] = df['Read Value'] / 1000
             df['Usage_kWh'] = df['Read Value'].diff().fillna(0)
-            df['Tariff'] = 'Day' # No tariff info available
+            df['Tariff'] = 'Day'
 
         df = df[df['Usage_kWh'] >= 0]
         
-        # Cost Calculation
         def calc_cost(r):
             rate = p_peak if r['Tariff'] == 'Peak' else (p_night if r['Tariff'] == 'Night' else p_day)
             return r['Usage_kWh'] * rate * 1.09
         df['Cost_VAT'] = df.apply(calc_cost, axis=1)
 
-        # Statistics
         days = max(1, (df['Timestamp'].max() - df['Timestamp'].min()).days)
         months = max(1, days / 30.44)
         total_usage = df['Usage_kWh'].sum()
         total_cost = df['Cost_VAT'].sum() + (days * standing_ch * 1.09)
 
-        # 6 Key Performance Indicators
         st.subheader("Key Performance Indicators")
         c1, c2 = st.columns(2)
         c1.metric("Total Usage", f"{total_usage:.1f} kWh")
@@ -138,12 +145,11 @@ if uploaded_file:
         c3, c4, c5, c6 = st.columns(4)
         c3.metric("Avg Monthly Usage", f"{(total_usage/months):.1f} kWh")
         c4.metric("Avg Monthly Cost", f"€{(total_cost/months):.2f}")
-        c3.metric("Avg Daily Usage", f"{(total_usage/days):.2f} kWh")
-        c4.metric("Avg Daily Cost", f"€{(total_cost/days):.2f}")
+        c5.metric("Avg Daily Usage", f"{(total_usage/days):.2f} kWh")
+        c6.metric("Avg Daily Cost", f"€{(total_cost/days):.2f}")
 
         st.divider()
 
-        # Visualizations
         view_mode = st.radio("Chart Metric:", ["kWh", "Euro (€)"], horizontal=True)
         target_col = 'Usage_kWh' if view_mode == "kWh" else 'Cost_VAT'
         chart_color = '#00CC96' if view_mode == "kWh" else '#FF4B4B'
@@ -165,6 +171,7 @@ if uploaded_file:
             agg = df.resample('W' if freq == "Weekly" else 'M', on='Timestamp')[target_col].sum().reset_index()
             fig_trend = px.area(agg, x='Timestamp', y=target_col, markers=True,
                                 color_discrete_sequence=[chart_color], template="plotly_white")
+            fig_trend.update_xaxes(rangeslider_visible=True)
             st.plotly_chart(fig_trend, use_container_width=True)
 else:
     st.info("👋 Welcome! Please upload any ESB HDF file to start the analysis.")
