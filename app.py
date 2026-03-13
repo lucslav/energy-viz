@@ -31,7 +31,7 @@ def save_data(df, data_type):
         conn.execute(text("DROP TABLE IF EXISTS temp_upload"))
     st.cache_data.clear()
 
-# --- CSS: WHITE, THIN FONTS, NO BOXES ---
+# --- CSS: CLEAN WHITE & THIN FONTS ---
 st.set_page_config(page_title="Energy Viz", page_icon=LOGO_URL, layout="wide")
 init_db()
 
@@ -50,19 +50,14 @@ st.markdown(f"""
     }}
     hr {{ display: none !important; }}
     [data-testid="stVerticalBlock"] {{ gap: 0rem !important; }}
-    .section-header {{
-        font-size: 1.6rem;
-        margin-top: 45px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #f1f5f9;
-        margin-bottom: 25px;
-    }}
+    .section-header {{ font-size: 1.6rem; margin-top: 45px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9; margin-bottom: 5px; }}
+    .graph-info {{ color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; font-style: italic; }}
     </style>
     """, unsafe_allow_html=True)
 
 # --- SIDEBAR ---
 settings_df = pd.read_sql("SELECT * FROM settings WHERE id=1", engine)
-v_mul = 1.09
+v_mul = 1.09 # 9% VAT
 
 with st.sidebar:
     st.image(LOGO_URL, width=120)
@@ -76,32 +71,32 @@ with st.sidebar:
         if st.button("Edit Rates", use_container_width=True):
             with engine.begin() as conn: conn.execute(text("DELETE FROM settings WHERE id=1"))
             st.rerun()
-    
+
     st.markdown("---")
-    st.markdown("### 📖 Legend")
-    st.caption("**kWh:** Energy used.")
-    st.caption("**kW:** Power demand (speed).")
-    st.caption("**Delta:** Calculated consumption from meter readings.")
+    st.markdown("### 📖 Quick Guide")
+    st.caption("**kWh:** Actual energy consumed.")
+    st.caption("**kW:** Power demand (how hard you pull energy at once).")
 
 if settings_df.empty:
     with st.form("setup"):
-        dr, pr, nr, sc = st.number_input("Day", 0.3397, format="%.4f"), st.number_input("Peak", 0.3624, format="%.4f"), st.number_input("Night", 0.1785, format="%.4f"), st.number_input("Standing Charge", 0.6303, format="%.4f")
-        if st.form_submit_button("Start"):
+        dr, pr, nr, sc = st.number_input("Day", 0.3397, format="%.4f"), st.number_input("Peak", 0.3624, format="%.4f"), st.number_input("Night", 0.1785, format="%.4f"), st.number_input("Standing", 0.6303, format="%.4f")
+        if st.form_submit_button("Start Dashboard"):
             pd.DataFrame([{'id':1,'day_rate':dr,'peak_rate':pr,'night_rate':nr,'standing_charge':sc,'vat_rate':9.0}]).to_sql('settings', engine, if_exists='replace', index=False)
             st.rerun()
     st.stop()
 
 # --- HEADER ---
-st.markdown(f'<div style="text-align:center; padding: 30px 0;"><img src="{LOGO_URL}" width="160"><h1>Energy Viz</h1><p style="color:#94a3b8; font-size: 1.1rem; font-weight: 300;">Integrated ESB Smart Meter Analytics</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div style="text-align:center; padding: 30px 0;"><img src="{LOGO_URL}" width="160"><h1>Energy Viz</h1><p style="color:#94a3b8; font-size: 1.1rem; font-weight: 300;">Limerick Home Energy Analytics</p></div>', unsafe_allow_html=True)
 
 all_data = load_all_data()
 cl, cr = st.columns(2, gap="large")
 
-# --- 1. CONSUMPTION kWh ---
+# --- 1. 30-min Consumption ---
 with cl:
-    st.markdown('<div class="section-header">📊 30-min Energy Usage</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📊 30-min Consumption Details</div>', unsafe_allow_html=True)
+    st.markdown('<div class="graph-info">Source: HDF File. Shows exactly WHEN you used energy in 30-min blocks.</div>', unsafe_allow_html=True)
     df1 = all_data[all_data['type'] == "CALC_KWH"].copy()
-    with st.expander("📥 Browse File", expanded=df1.empty):
+    with st.expander("📥 Upload 30-min Usage", expanded=df1.empty):
         up1 = st.file_uploader("Upload", type="csv", key="u1", label_visibility="collapsed")
         if up1:
             raw = pd.read_csv(up1)
@@ -121,19 +116,20 @@ with cl:
         df1['Cost'] = df1.apply(lambda r: r['value'] * r_map[r['Tariff']] * v_mul, axis=1)
         
         m1, m2 = st.columns(2); m1.metric("Total Usage", f"{df1['value'].sum():.1f} kWh"); m2.metric("Total Cost", f"€{df1['Cost'].sum() + (days*s_v['standing_charge']*v_mul):.2f}")
-        m3, m4 = st.columns(2); m3.metric("Daily Avg", f"{df1['value'].sum()/days:.2f} kWh"); m4.metric("Daily Cost", f"€{(df1['Cost'].sum()/days) + (s_v['standing_charge']*v_mul):.2f}")
-        m5, m6 = st.columns(2); m5.metric("Monthly Avg", f"{(df1['value'].sum()/days)*30.44:.0f} kWh"); m6.metric("Monthly Cost", f"€{((df1['Cost'].sum()/days) + (s_v['standing_charge']*v_mul))*30.44:.2f}")
+        m3, m4 = st.columns(2); m3.metric("Daily Avg", f"{df1['value'].sum()/days:.2f} kWh"); m4.metric("Daily Avg Cost", f"€{(df1['Cost'].sum()/days) + (s_v['standing_charge']*v_mul):.2f}")
+        m5, m6 = st.columns(2); m5.metric("Monthly Avg", f"{(df1['value'].sum()/days)*30.44:.0f} kWh"); m6.metric("Monthly Avg Cost", f"€{((df1['Cost'].sum()/days) + (s_v['standing_charge']*v_mul))*30.44:.2f}")
         
-        v_opt = st.radio("Display:", ["kWh", "Euro"], horizontal=True, key="v1")
-        y_col = 'value' if v_opt == "kWh" else 'Cost'
-        fig1 = px.bar(df1.groupby([df1['timestamp'].dt.date, 'Tariff'])[y_col].sum().reset_index(), x='timestamp', y=y_col, color='Tariff', color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'}, template="plotly_white", labels={y_col: v_opt})
+        v_opt = st.radio("Display:", ["Usage (kWh)", "Cost (€)"], horizontal=True, key="v1")
+        y_col = 'value' if "Usage" in v_opt else 'Cost'
+        fig1 = px.bar(df1.groupby([df1['timestamp'].dt.date, 'Tariff'])[y_col].sum().reset_index(), x='timestamp', y=y_col, color='Tariff', color_discrete_map={'Day': '#00CC96', 'Night': '#636EFA', 'Peak': '#EF553B'}, template="plotly_white", labels={y_col: "kWh" if "Usage" in v_opt else "€"})
         fig1.update_xaxes(rangeslider_visible=True); st.plotly_chart(fig1, use_container_width=True, config={'scrollZoom': True})
 
-# --- 2. DEMAND kW ---
+# --- 2. 30-min Demand ---
 with cr:
-    st.markdown('<div class="section-header">📈 30-min Power Demand</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📈 Peak Power Demand</div>', unsafe_allow_html=True)
+    st.markdown('<div class="graph-info">Source: HDF File. Shows how hard your electrical system was loaded (kW).</div>', unsafe_allow_html=True)
     df2 = all_data[all_data['type'] == "READ_KW"].copy()
-    with st.expander("📥 Browse File", expanded=df2.empty):
+    with st.expander("📥 Upload 30-min Demand", expanded=df2.empty):
         up2 = st.file_uploader("Upload", type="csv", key="u2", label_visibility="collapsed")
         if up2:
             raw = pd.read_csv(up2)
@@ -141,16 +137,17 @@ with cr:
             save_data(pd.DataFrame({'Timestamp': raw['Timestamp'], 'Value': pd.to_numeric(raw['Read Value'], errors='coerce')}).dropna(), "READ_KW")
             st.rerun()
     if not df2.empty:
-        st.metric("Peak Power Demand", f"{df2['value'].max():.2f} kW")
+        st.metric("Peak Recorded Load", f"{df2['value'].max():.2f} kW")
         fig2 = px.line(df2, x='timestamp', y='value', line_shape='hv', color_discrete_sequence=['#FF4B4B'], template="plotly_white", labels={'value': 'Demand (kW)'})
         fig2.update_xaxes(rangeslider_visible=True); st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': True})
 
-# --- LOWER ROW ---
+# --- 3. Daily Snapshot ---
 bl, br = st.columns(2, gap="large")
 with bl:
-    st.markdown('<div class="section-header">📅 Daily Usage (from Snapshot)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📅 Daily Usage (DNP Snapshot)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="graph-info">Source: DNP Snapshot file. Calculated from meter "Odometer" readings.</div>', unsafe_allow_html=True)
     df3 = all_data[all_data['type'] == "DNP_SNAPSHOT"].copy()
-    with st.expander("📥 Browse File", expanded=df3.empty):
+    with st.expander("📥 Upload DNP Snapshot", expanded=df3.empty):
         up3 = st.file_uploader("Upload", type="csv", key="u3", label_visibility="collapsed")
         if up3:
             raw = pd.read_csv(up3)
@@ -159,14 +156,16 @@ with bl:
             st.rerun()
     if not df3.empty:
         df3 = df3.sort_values('timestamp'); df3['delta'] = df3['value'].diff(); df3.loc[(df3['delta'] > 500) | (df3['delta'] < 0), 'delta'] = 0
-        st.metric("Total Period Usage", f"{df3['delta'].sum():.1f} kWh")
-        fig3 = px.bar(df3, x='timestamp', y='delta', template="plotly_white", color_discrete_sequence=['#636EFA'], labels={'delta': 'Daily Usage (kWh)'})
+        st.metric("Total for this DNP Period", f"{df3['delta'].sum():.1f} kWh")
+        fig3 = px.bar(df3, x='timestamp', y='delta', template="plotly_white", color_discrete_sequence=['#636EFA'], labels={'delta': 'Usage (kWh)'})
         fig3.update_xaxes(rangeslider_visible=True); st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': True})
 
+# --- 4. Daily Total History ---
 with br:
-    st.markdown('<div class="section-header">📜 Daily Usage (from Total)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📜 Long-term Daily History</div>', unsafe_allow_html=True)
+    st.markdown('<div class="graph-info">Source: Total Snapshot file. Best for tracking total trends over months.</div>', unsafe_allow_html=True)
     df4 = all_data[all_data['type'] == "TOTAL_SNAPSHOT"].copy()
-    with st.expander("📥 Browse File", expanded=df4.empty):
+    with st.expander("📥 Upload Total History", expanded=df4.empty):
         up4 = st.file_uploader("Upload", type="csv", key="u4", label_visibility="collapsed")
         if up4:
             raw = pd.read_csv(up4)
@@ -175,7 +174,7 @@ with br:
             st.rerun()
     if not df4.empty:
         df4 = df4.sort_values('timestamp'); df4['delta'] = df4['value'].diff(); df4.loc[(df4['delta'] > 500) | (df4['delta'] < 0), 'delta'] = 0
-        st.metric("Total Period Usage", f"{df4['delta'].sum():.1f} kWh")
-        fig4 = px.area(df4, x='timestamp', y='delta', template="plotly_white", color_discrete_sequence=['#7f8c8d'], labels={'delta': 'Daily Usage (kWh)'})
+        st.metric("Total for this History Period", f"{df4['delta'].sum():.1f} kWh")
+        fig4 = px.area(df4, x='timestamp', y='delta', template="plotly_white", color_discrete_sequence=['#7f8c8d'], labels={'delta': 'Usage (kWh)'})
         fig4.update_xaxes(rangeslider_visible=True); st.plotly_chart(fig4, use_container_width=True, config={'scrollZoom': True})
         
