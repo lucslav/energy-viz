@@ -1,18 +1,39 @@
 # Changelog
 
-## [1.0.0] - 2026-03-12
+All notable changes to the **energy-viz** project will be documented in this file.
+
+## [1.1.0] - 2026-03-13
 
 ### Added
-- **Smart File Detection:** Automatic recognition of 4 ESB file types (30-min kWh, kW demand, Daily DNP, and Cumulative).
-- **Power Demand Mode:** High-visibility HV-line charts for tracking peak power consumption (kW).
-- **24h Tariff Label:** Unified labeling for basic daily total files to improve clarity.
-- **Professional UX:** Updated all guides and UI prompts to an impersonal, technical tone.
-- **Unified Axis:** Standardized "Timestamp" labeling across all chart types for consistency.
+- **Unit View Toggle:** Dynamic switching between kWh and Euro in the consumption panel.
+- **Contextual Documentation:** Source-specific guides and interpretation labels under section headers.
+- **Extended Analytics:** Added Monthly/Daily averages for both cost and usage metrics.
+- **Global Range Controls:** Added Range Sliders and scroll-zoom to all interactive charts.
 
 ### Changed
-- **UI Styling:** Enhanced KPI metrics display and main header with project branding.
-- **Tax Logic:** Improved VAT (9%) calculation accuracy across all usage modes.
-- **Pricing:** Refined standing charge integration for more realistic Irish bill estimation.
+- **Interface Architecture:** Flat layout utilizing transparent component containers.
+- **Typography:** Standardized to thin, technical font weights across the dashboard.
+- **Rate Engine:** 4-decimal precision with Standing Charge and VAT integration.
+- **Sidebar:** Updated layout with border-based layout separation.
+
+### Fixed
+- **Block 4 Logic:** Corrected delta/register calculation errors.
+- **Outlier Filtering:** Improved ESB glitch protection for data ingestion.
 
 ### Known Issues
-- **Power Demand Range Slider:** The mini-graph preview in the range slider for kW mode may not render correctly in some browser environments (to be addressed in a future update).
+- Power Demand Range Slider mini-graph rendering issues in some browsers.
+
+## [1.0.0] - 2026-03-11
+
+### Added
+- **Smart File Detection:** Automatic recognition of 4 ESB file types.
+- **Power Demand Mode:** High-visibility HV-line charts for kW spikes.
+- **24h Tariff Label:** Unified labeling for basic daily total files.
+- **Professional UX:** Updated all guides to an impersonal, technical tone.
+
+### Changed
+- **UI Styling:** Enhanced KPI metrics and main branding components.
+- **Tax Logic:** Improved 9% VAT calculation accuracy.
+
+### Known Issues
+- Power Demand Range Slider mini-graph rendering issues in some browsers.
