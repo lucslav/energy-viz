@@ -11,14 +11,15 @@ Project available at: **[lucslav/energy-viz](https://hub.docker.com/r/lucslav/en
 
 ## ✨ Main Features
 
-* **Smart File Detection:** Automatically recognizes different ESB file types (30-min kWh, kW demand, Daily DNP, or Cumulative) and adapts the dashboard.
-* **Detailed Tariff Analysis:** Precise breakdown of usage and costs into **Day, Night, and Peak** periods based on 30-minute intervals.
-* **Power Demand Monitoring:** Detects and visualizes power "spikes" (kW) to identify high-load moments in your household.
-* **Automatic Cost Calculation:** Includes the Irish 9% VAT and daily standing charges for realistic bill estimation.
-* **Usage Trends:** Interactive charts showing energy consumption and costs across daily, weekly, and monthly scales.
-* **Data Auto-Correction:** Fixes common inconsistencies in ESB export files, such as unit jumps (Wh vs kWh).
-
-
+* **Dynamic Unit Switching:** Live toggle between **Usage (kWh)** and **Cost (€)** views within the primary consumption panel.
+* **Extended Analytics Suite:** Detailed summary cards providing Total, Daily Average, and Monthly Average metrics for both energy and cost.
+* **Interactive Navigation:** Range sliders and scroll-to-zoom enabled on all charts for high-precision historical data browsing.
+* **Contextual Documentation:** Source-specific guides and interpretation labels integrated directly under section headers.
+* **Smart File Detection:** Automatically recognizes ESB file types (30-min kWh, kW demand, Daily DNP, or Cumulative) and adapts the dashboard logic.
+* **Detailed Tariff Analysis:** Precise breakdown into **Day, Night, and Peak** periods based on Irish utility standards.
+* **Power Demand Monitoring:** High-visibility visualization of power spikes (kW) to identify peak household loads.
+* **Automatic Financial Calculation:** Integrated Irish 9% VAT and 4-decimal rate precision including daily standing charges.
+* **Flat Architecture:** Minimalist interface utilizing transparent containers and thin technical typography.
 
 ---
 
@@ -38,4 +39,6 @@ services:
     network_mode: bridge
     ports:
       - "8501:8501"
+    volumes:
+      - /path/to/your/data:/app/data
     restart: unless-stopped
