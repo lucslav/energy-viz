@@ -86,7 +86,7 @@ if settings_df.empty:
     st.stop()
 
 # --- HEADER ---
-st.markdown(f'<div style="text-align:center; padding: 30px 0;"><img src="{LOGO_URL}" width="160"><h1>Energy Viz</h1><p style="color:#94a3b8; font-size: 1.1rem; font-weight: 300;">Limerick Home Energy Analytics</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div style="text-align:center; padding: 30px 0;"><img src="{LOGO_URL}" width="160"><h1>Energy Viz</h1><p style="color:#94a3b8; font-size: 1.1rem; font-weight: 300;">Integrated ESB Smart Meter Analytics</p></div>', unsafe_allow_html=True)
 
 all_data = load_all_data()
 cl, cr = st.columns(2, gap="large")
