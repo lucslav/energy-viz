@@ -250,6 +250,26 @@ hr { border-color:var(--border)!important; }
 .alert-good  { background:#3fb95022;border-color:#3fb950;color:#3fb950; }
 .alert-red   { background:#f8514922;border-color:#f85149;color:#f85149; }
 
+/* ── radio button contrast fix (dark theme) ── */
+[data-testid="stRadio"] label {
+    color: var(--text) !important;
+    font-size: .88rem !important;
+}
+[data-testid="stRadio"] label p {
+    color: var(--text) !important;
+}
+[data-testid="stRadio"] > div {
+    gap: .4rem !important;
+}
+/* selected option highlight */
+[data-testid="stRadio"] label:has(input:checked) {
+    color: var(--accent-blue, #58a6ff) !important;
+}
+[data-testid="stRadio"] label:has(input:checked) p {
+    color: #58a6ff !important;
+    font-weight: 600 !important;
+}
+
 /* ── invoice setup card ── */
 .setup-card {
     background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
@@ -404,10 +424,10 @@ def get_period(hour, minute=0):
 #  PDF INVOICE PARSER  (multi-provider AI)
 # ─────────────────────────────────────────────
 PROVIDERS = {
-    "OpenAI (GPT-4o)":       "openai",
-    "Google (Gemini 1.5)":   "gemini",
-    "Anthropic (Claude)":    "anthropic",
-    "Mistral (Large)":       "mistral",
+    "Anthropic (Claude 3.5 Sonnet)": "anthropic",   # best PDF support — recommended
+    "Google (Gemini 2.0 Flash)":     "gemini",       # good PDF support
+    "OpenAI (GPT-4o — images only)": "openai",       # PDF converted to images
+    "Mistral (Large)":               "mistral",
 }
 
 EXTRACT_PROMPT = """You are a utility bill parser. Extract the following fields from this electricity bill image/PDF.
@@ -437,111 +457,136 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
 
     b64 = base64.b64encode(pdf_bytes).decode()
 
-    # ── OpenAI ──
-    if provider == "openai":
-        import urllib.request
-        payload = {
-            "model": "gpt-4o",
-            "max_tokens": 500,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": EXTRACT_PROMPT},
-                    {"type": "image_url",
-                     "image_url": {"url": f"data:application/pdf;base64,{b64}",
-                                   "detail": "high"}},
-                ],
-            }],
-        }
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {api_key}"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-        raw = resp["choices"][0]["message"]["content"]
+    try:
+        # ── Anthropic Claude — native PDF support (recommended) ──
+        if provider == "anthropic":
+            payload = {
+                "model": "claude-sonnet-4-6",
+                "max_tokens": 600,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "document",
+                         "source": {"type": "base64",
+                                    "media_type": "application/pdf",
+                                    "data": b64}},
+                        {"type": "text", "text": EXTRACT_PROMPT},
+                    ],
+                }],
+            }
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json",
+                         "x-api-key": api_key,
+                         "anthropic-version": "2023-06-01"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=40) as r:
+                resp = json.loads(r.read())
+            raw = resp["content"][0]["text"]
 
-    # ── Anthropic ──
-    elif provider == "anthropic":
-        payload = {
-            "model": "claude-opus-4-6",
-            "max_tokens": 500,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "document",
-                     "source": {"type": "base64", "media_type": "application/pdf", "data": b64}},
-                    {"type": "text", "text": EXTRACT_PROMPT},
-                ],
-            }],
-        }
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json",
-                     "x-api-key": api_key,
-                     "anthropic-version": "2023-06-01"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-        raw = resp["content"][0]["text"]
+        # ── Google Gemini 2.0 Flash — native PDF support ──
+        elif provider == "gemini":
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": EXTRACT_PROMPT},
+                        {"inline_data": {"mime_type": "application/pdf",
+                                         "data": b64}},
+                    ]
+                }],
+                "generationConfig": {"maxOutputTokens": 600},
+            }
+            url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+                   "gemini-2.0-flash:generateContent"
+                   f"?key={api_key}")
+            req = urllib.request.Request(
+                url, data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=40) as r:
+                resp = json.loads(r.read())
+            raw = resp["candidates"][0]["content"]["parts"][0]["text"]
 
-    # ── Google Gemini ──
-    elif provider == "gemini":
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": EXTRACT_PROMPT},
-                    {"inline_data": {"mime_type": "application/pdf", "data": b64}},
-                ]
-            }],
-            "generationConfig": {"maxOutputTokens": 500},
-        }
-        url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-               f"gemini-1.5-flash:generateContent?key={api_key}")
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-        raw = resp["candidates"][0]["content"]["parts"][0]["text"]
+        # ── OpenAI GPT-4o — PDF sent as base64 image (first page) ──
+        elif provider == "openai":
+            # GPT-4o does not accept application/pdf directly.
+            # We send as a base64 data-URI with image/jpeg mimetype fallback;
+            # works if the PDF is a scanned image. For best results use Claude or Gemini.
+            payload = {
+                "model": "gpt-4o",
+                "max_tokens": 600,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": EXTRACT_PROMPT},
+                        {"type": "image_url",
+                         "image_url": {
+                             "url": f"data:image/jpeg;base64,{b64}",
+                             "detail": "high",
+                         }},
+                    ],
+                }],
+            }
+            req = urllib.request.Request(
+                "https://api.openai.com/v1/chat/completions",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json",
+                         "Authorization": f"Bearer {api_key}"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=40) as r:
+                resp = json.loads(r.read())
+            raw = resp["choices"][0]["message"]["content"]
 
-    # ── Mistral ──
-    elif provider == "mistral":
-        payload = {
-            "model": "mistral-large-latest",
-            "max_tokens": 500,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": EXTRACT_PROMPT},
-                    {"type": "image_url",
-                     "image_url": f"data:application/pdf;base64,{b64}"},
-                ],
-            }],
-        }
-        req = urllib.request.Request(
-            "https://api.mistral.ai/v1/chat/completions",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {api_key}"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-        raw = resp["choices"][0]["message"]["content"]
+        # ── Mistral Large ──
+        elif provider == "mistral":
+            payload = {
+                "model": "mistral-large-latest",
+                "max_tokens": 600,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": EXTRACT_PROMPT},
+                        {"type": "image_url",
+                         "image_url": f"data:application/pdf;base64,{b64}"},
+                    ],
+                }],
+            }
+            req = urllib.request.Request(
+                "https://api.mistral.ai/v1/chat/completions",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json",
+                         "Authorization": f"Bearer {api_key}"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=40) as r:
+                resp = json.loads(r.read())
+            raw = resp["choices"][0]["message"]["content"]
 
-    else:
-        raise ValueError(f"Unknown provider: {provider}")
+        else:
+            raise ValueError(f"Unknown provider: {provider}")
 
-    # clean and parse JSON
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode()[:300]
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"HTTP {e.code} from {provider} API. "
+            f"Check your API key and quota. Details: {body}"
+        ) from e
+
+    # ── Parse JSON response ──
     raw = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
-    return json.loads(raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"AI returned invalid JSON. Raw response (first 200 chars): {raw[:200]}"
+        ) from e
 
 
 # ─────────────────────────────────────────────
@@ -600,6 +645,14 @@ def setup_screen():
 
 def _setup_pdf():
     st.markdown("#### 🤖 AI Invoice Parser")
+
+    st.markdown("""
+    <div class="alert-box alert-info">
+        ℹ️ <strong>The AI API is called only when you click "Extract tariff data from invoice"</strong>
+        — not automatically on upload. Your PDF is sent as a one-time request to the chosen provider.
+        <br>Recommended: <strong>Anthropic (Claude)</strong> or <strong>Google (Gemini)</strong>
+        — both have native PDF support. OpenAI processes the PDF as an image (may be less accurate).
+    </div>""", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 1])
     with col1:
@@ -767,7 +820,8 @@ def _setup_manual(inside_expander=False):
     if not inside_expander:
         st.markdown("#### ✏️ Manual Entry")
 
-    with st.form("manual_setup"):
+    form_key = "manual_setup_expander" if inside_expander else "manual_setup"
+    with st.form(form_key):
         c1, c2 = st.columns(2)
         with c1:
             mprn     = st.text_input("MPRN (optional)", placeholder="leave blank if unknown")
