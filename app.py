@@ -1461,10 +1461,6 @@ with st.sidebar:
 
     st.divider()
 
-    # ── Settings ──
-
-    st.divider()
-
     # ── Tariff rates (editable — save on change) ──
     st.markdown("##### 🧾 Tariff Rates (€/kWh)")
     t_day   = st.number_input("Day",           value=TARIFF_DAY,   step=0.001, format="%.4f")
