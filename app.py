@@ -188,14 +188,16 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 [data-testid="stSidebar"] * { color: var(--text) !important; }
 
-/* ── file uploader ── */
+/* ── file uploader — sidebar and main ── */
+section[data-testid="stSidebar"] [data-testid="stFileUploader"],
 [data-testid="stFileUploader"] {
     background: var(--bg-card2) !important;
     border: 1px dashed var(--border) !important;
     border-radius: 10px !important;
     padding: 6px !important;
 }
-/* Dropzone area — override white background */
+/* Dropzone area — override white background everywhere including sidebar */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
 [data-testid="stFileUploaderDropzone"] {
     background: #1c2330 !important;
     border: 1px dashed #30363d !important;
@@ -462,6 +464,36 @@ p, label, span {
 ::-webkit-scrollbar-track { background:var(--bg-base); }
 ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
 .stApp { background:var(--bg-base)!important; }
+/* ── Sidebar file uploader explicit overrides ── */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    background: #1c2330 !important;
+    border: 1px dashed #30363d !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] small {
+    color: #7d8590 !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] button {
+    background: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+/* Filename text in sidebar uploader */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] {
+    color: #e6edf3 !important;
+    background: transparent !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] * {
+    color: #e6edf3 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -480,15 +512,40 @@ COLORS = dict(
     red="#f85149", yellow="#d29922",
 )
 
+def _rgba(hex_color: str, alpha: float = 0.15) -> str:
+    """Convert #rrggbb hex to rgba() string for Plotly fillcolor."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+
 PLOTLY_BASE = dict(
     paper_bgcolor=COLORS["bg"], plot_bgcolor=COLORS["bg"],
     font=dict(family="Space Grotesk, sans-serif", color=COLORS["text"], size=12),
-    xaxis=dict(gridcolor=COLORS["grid"], linecolor=COLORS["grid"], showgrid=True, zeroline=False),
-    yaxis=dict(gridcolor=COLORS["grid"], linecolor=COLORS["grid"], showgrid=True, zeroline=False),
-    legend=dict(bgcolor="#1c2330", bordercolor=COLORS["grid"], borderwidth=1,
-                font=dict(size=11), orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    margin=dict(l=10, r=10, t=40, b=10),
+    xaxis=dict(
+        gridcolor=COLORS["grid"], linecolor=COLORS["grid"],
+        showgrid=True, zeroline=False,
+        tickfont=dict(color=COLORS["text"], size=11),
+        title_font=dict(color=COLORS["text"]),
+    ),
+    yaxis=dict(
+        gridcolor=COLORS["grid"], linecolor=COLORS["grid"],
+        showgrid=True, zeroline=False,
+        tickfont=dict(color=COLORS["text"], size=11),
+        title_font=dict(color=COLORS["text"]),
+    ),
+    legend=dict(
+        bgcolor="#1c2330", bordercolor=COLORS["grid"], borderwidth=1,
+        font=dict(size=11, color=COLORS["text"]),
+        orientation="h", yanchor="top", y=-0.15, xanchor="left", x=0,
+    ),
+    margin=dict(l=10, r=10, t=40, b=50),
     hovermode="x unified",
+    hoverlabel=dict(
+        bgcolor="#1c2330", bordercolor=COLORS["grid"],
+        font=dict(color=COLORS["text"], size=12),
+    ),
 )
 
 RANGESLIDER_X = dict(
@@ -1458,8 +1515,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 #  HEADER  (with logo)
 # ─────────────────────────────────────────────
-supplier_str = st.session_state["supplier"] or "Smart Meter"
-tariff_hint  = f"{supplier_str} · Smart Meter HDF Analysis"
+tariff_hint  = "Smart Meter HDF Analysis"
 st.markdown(f"""
 <div class="app-header">
     <img src="{LOGO_URL}" alt="Energy Viz" onerror="this.style.display='none'">
@@ -1738,7 +1794,7 @@ with tabs[1]:
     for p, color, label in [("night",COLORS["night"],"🌙 Night"),("day",COLORS["day"],"☀️ Day"),("peak",COLORS["peak"],"🔥 Peak")]:
         df_p = df_f[df_f["period"]==p]
         fig.add_trace(go.Scatter(x=df_p["datetime"], y=df_p[y_col], mode="lines", name=label,
-                                 line=dict(color=color, width=1), fill="tozeroy", fillcolor=color+"22"))
+                                 line=dict(color=color, width=1), fill="tozeroy", fillcolor=_rgba(color, 0.13)))
     apply_layout(fig, f"Half-hourly {y_label} by tariff period", height=440)
     fig.update_layout(yaxis_title=y_label, xaxis=RANGESLIDER_X)
     st.plotly_chart(fig, use_container_width=True)
@@ -1760,7 +1816,7 @@ with tabs[1]:
         colorscale=[[0,"#0d1117"],[0.25,"#1f3a5f"],[0.55,"#58a6ff"],[0.8,"#f0883e"],[1,"#f85149"]],
         hoverongaps=False, colorbar=dict(title="kWh", tickfont=dict(color=COLORS["muted"])),
     ))
-    fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=COLORS["peak"]+"22", line_width=0,
+    fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=_rgba(COLORS["peak"], 0.13), line_width=0,
                    annotation_text="Peak", annotation_font_color=COLORS["peak"])
     apply_layout(fig2, "Energy heatmap — darker = higher usage", height=max(280, len(heat_piv)*14+60))
     fig2.update_layout(xaxis_nticks=24, yaxis_autorange="reversed")
@@ -1797,7 +1853,7 @@ with tabs[2]:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df_f["datetime"], y=df_f["value"], mode="lines", name="kW",
                              line=dict(color=COLORS["kw"], width=1),
-                             fill="tozeroy", fillcolor=COLORS["kw"]+"18"))
+                             fill="tozeroy", fillcolor=_rgba(COLORS["kw"], 0.09)))
     spikes = df_f[df_f["value"]>p99]
     fig.add_trace(go.Scatter(x=spikes["datetime"], y=spikes["value"], mode="markers",
                              name=f">p99 ({p99:.2f} kW)",
@@ -1823,7 +1879,7 @@ with tabs[2]:
     sv = df_f["value"].sort_values(ascending=False).reset_index(drop=True)
     fig3 = go.Figure(go.Scatter(x=list(range(len(sv))), y=sv, mode="lines", fill="tozeroy",
                                 line=dict(color=COLORS["kw"], width=2),
-                                fillcolor=COLORS["kw"]+"22"))
+                                fillcolor=_rgba(COLORS["kw"], 0.13)))
     for pv, lbl, col in [(0.50,"Median",COLORS["muted"]),(0.95,"p95",COLORS["peak"])]:
         idx = int(len(sv)*(1-pv))
         fig3.add_vline(x=idx, line_dash="dot", line_color=col,
@@ -2016,9 +2072,9 @@ with tabs[5]:
           for _,r in slot_avg.iterrows()]
     fig2 = go.Figure(go.Bar(x=slot_avg["time"], y=slot_avg["value"],
                             marker_color=sc, marker_line_width=0))
-    fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=COLORS["peak"]+"22", line_width=0,
+    fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=_rgba(COLORS["peak"], 0.13), line_width=0,
                    annotation_text="Peak", annotation_font_color=COLORS["peak"])
-    fig2.add_vrect(x0="00:00", x1="07:30", fillcolor=COLORS["night"]+"22", line_width=0,
+    fig2.add_vrect(x0="00:00", x1="07:30", fillcolor=_rgba(COLORS["night"], 0.13), line_width=0,
                    annotation_text="Night", annotation_font_color=COLORS["night"])
     apply_layout(fig2, "Average kWh per 30-min slot", height=300)
     fig2.update_layout(xaxis=dict(tickangle=45, nticks=24, gridcolor=COLORS["grid"]),
