@@ -421,241 +421,201 @@ def get_period(hour, minute=0):
     return "day"
 
 # ─────────────────────────────────────────────
-#  PDF INVOICE PARSER  (multi-provider AI)
+#  PDF INVOICE PARSER  (multi-provider AI SDKs)
 # ─────────────────────────────────────────────
 PROVIDERS = {
-    "Anthropic (Claude 3.5 Sonnet)":      "anthropic",
-    "Google (Gemini 3.1 Flash Lite ★)":   "gemini_31_flash_lite",   # 500 req/day free
-    "Google (Gemini 3 Flash)":            "gemini_3_flash",          # 20 req/day free
-    "Google (Gemini 2.5 Flash)":          "gemini_25_flash",         # 20 req/day free
-    "OpenAI (GPT-4o — images only)":      "openai",
-    "Mistral (Large)":                    "mistral",
+    "Anthropic (Claude 3.5 Sonnet)":    "anthropic",
+    "Google (Gemini 2.5 Flash)":        "gemini-2.5-flash-preview-05-20",
+    "Google (Gemini 2.0 Flash)":        "gemini-2.0-flash",
+    "Google (Gemini 1.5 Flash)":        "gemini-1.5-flash",
+    "Google (Gemini 1.5 Flash-8B)":     "gemini-1.5-flash-8b",
+    "OpenAI (GPT-4o)":                  "openai",
 }
 
-# Gemini provider key → actual API model string
-GEMINI_MODELS = {
-    "gemini_31_flash_lite": "gemini-3.1-flash-lite",   # 500 RPD — best free option
-    "gemini_3_flash":       "gemini-3-flash",           # 20 RPD
-    "gemini_25_flash":      "gemini-2.5-flash",         # 20 RPD
-    "gemini_25_pro":        "gemini-2.5-pro",           # paid only
-}
+# Which PROVIDERS keys are Gemini models (used for error messaging)
+def _is_gemini(provider: str) -> bool:
+    return provider.startswith("gemini-")
 
-EXTRACT_PROMPT = """You are a utility bill parser. Extract the following fields from this electricity bill image/PDF.
-Return ONLY a JSON object with these exact keys (use null if not found):
+EXTRACT_PROMPT = """You are a utility bill parser. Extract the following fields from this electricity bill.
+Return ONLY a valid JSON object — no markdown, no explanation, nothing else:
 {
-  "mprn": "meter point reference number as string",
-  "supplier": "electricity supplier name",
-  "tariff_name": "tariff/plan name",
-  "rate_day": <float, day/off-peak unit rate in euro per kWh>,
-  "rate_peak": <float, peak unit rate in euro per kWh>,
-  "rate_night": <float, night unit rate in euro per kWh>,
-  "standing_charge": <float, standing charge in euro per day>,
-  "discount_pct": <float, percentage discount if any, else 0>,
-  "vat_pct": <float, VAT percentage e.g. 9>,
-  "billing_period_start": "DD Mon YY string e.g. 13 Jan 26",
-  "billing_period_end": "DD Mon YY string e.g. 12 Mar 26",
-  "billing_period_days": <integer, number of days in billing period>,
-  "total_due": <float, total amount due in euro>
-}
-All monetary values must be in EURO (not cents). Return only valid JSON, no markdown, no explanation."""
+  "mprn": "meter point reference number as string or null",
+  "supplier": "electricity supplier name or null",
+  "tariff_name": "tariff/plan name or null",
+  "rate_day": <float, day/off-peak unit rate in EURO per kWh, or null>,
+  "rate_peak": <float, peak unit rate in EURO per kWh, or null>,
+  "rate_night": <float, night unit rate in EURO per kWh, or null>,
+  "standing_charge": <float, daily standing charge in EURO, or null>,
+  "discount_pct": <float, percentage discount e.g. 30.0, or 0>,
+  "vat_pct": <float, VAT percentage e.g. 9.0>,
+  "billing_period_start": "DD Mon YY e.g. 13 Jan 26 or null",
+  "billing_period_end": "DD Mon YY e.g. 12 Mar 26 or null",
+  "billing_period_days": <integer or null>,
+  "total_due": <float, total amount due in EURO, or null>
+}"""
+
+
+def _parse_raw_json(raw: str) -> dict:
+    """Extract and parse JSON from AI response, with truncation recovery."""
+    raw = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
+    # Extract JSON object if surrounded by other text
+    if not raw.startswith("{"):
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            raw = m.group(0)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        # Try to fix truncated JSON by closing open braces
+        diff = raw.count("{") - raw.count("}")
+        if diff > 0:
+            try:
+                return json.loads(raw.rstrip(",\n ") + "}" * diff)
+            except json.JSONDecodeError:
+                pass
+        raise RuntimeError(
+            "AI returned malformed or truncated JSON.\n"
+            f"First 300 chars of response: {raw[:300]}"
+        )
+
+
+def _error_msg(provider: str, code: int, detail: str = "") -> str:
+    """Return a human-readable error message for common HTTP error codes."""
+    if code == 429:
+        if _is_gemini(provider):
+            return (
+                f"**Google Gemini 429 — daily quota exhausted** (`{provider}`)\n\n"
+                "Your AI Studio key is correct — the free daily limit is used up.\n\n"
+                "**Try in order:**\n"
+                "1. Switch to **Gemini 1.5 Flash-8B** — highest free RPD\n"
+                "2. Switch to **Anthropic Claude** — reliable, $5 free credit at "
+                "[console.anthropic.com](https://console.anthropic.com)\n"
+                "3. Wait until midnight PT for quota reset "
+                "([monitor](https://ai.dev/rate-limit))\n"
+                "4. Enable billing in AI Studio (~€0.0003/invoice)"
+            )
+        return (
+            f"**{provider} 429 — rate limit hit.**\n"
+            "Wait 60 seconds and try again, or check your quota."
+        )
+    if code in (401, 403):
+        gemini_tip = (" For Gemini: key must be from "
+                      "[aistudio.google.com](https://aistudio.google.com) → Get API key."
+                      if _is_gemini(provider) else "")
+        return (
+            f"**{provider} {code} — invalid or expired API key.**\n"
+            f"Copy the full key carefully.{gemini_tip}"
+        )
+    return f"**{provider} HTTP {code}.**\nDetails: {detail[:200]}"
 
 
 @st.cache_data(show_spinner=False)
 def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
-    """Call chosen AI provider to extract tariff data from PDF bytes."""
-    import urllib.request, urllib.error
-
-    b64 = base64.b64encode(pdf_bytes).decode()
+    """
+    Extract tariff data from an invoice PDF using the chosen AI provider SDK.
+    Uses official SDKs (google-generativeai, anthropic, openai) — no raw urllib calls.
+    """
+    raw = ""
 
     try:
-        # ── Anthropic Claude — native PDF support (recommended) ──
+        # ── Anthropic Claude — native PDF document support ──
         if provider == "anthropic":
-            payload = {
-                "model": "claude-sonnet-4-6",
-                "max_tokens": 600,
-                "messages": [{
+            import anthropic as _anthropic
+            client = _anthropic.Anthropic(api_key=api_key)
+            msg = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                messages=[{
                     "role": "user",
                     "content": [
-                        {"type": "document",
-                         "source": {"type": "base64",
-                                    "media_type": "application/pdf",
-                                    "data": b64}},
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": base64.b64encode(pdf_bytes).decode(),
+                            },
+                        },
                         {"type": "text", "text": EXTRACT_PROMPT},
                     ],
                 }],
-            }
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json",
-                         "x-api-key": api_key,
-                         "anthropic-version": "2023-06-01"},
-                method="POST",
             )
-            with urllib.request.urlopen(req, timeout=40) as r:
-                resp = json.loads(r.read())
-            raw = resp["content"][0]["text"]
+            raw = msg.content[0].text
 
-        # ── Google Gemini (Flash variants) — native PDF support ──
-        elif provider in GEMINI_MODELS:
-            model_name = GEMINI_MODELS[provider]
-            payload = {
-                "contents": [{
-                    "parts": [
-                        {"text": EXTRACT_PROMPT},
-                        {"inline_data": {"mime_type": "application/pdf",
-                                         "data": b64}},
-                    ]
-                }],
-                "generationConfig": {"maxOutputTokens": 600},
-            }
-            url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-                   f"{model_name}:generateContent"
-                   f"?key={api_key}")
-            req = urllib.request.Request(
-                url, data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"}, method="POST",
+        # ── Google Gemini — native PDF via inline_data ──
+        elif _is_gemini(provider):
+            import google.generativeai as genai
+            from google.api_core.exceptions import ResourceExhausted, PermissionDenied
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel(
+                provider,
+                generation_config=genai.GenerationConfig(max_output_tokens=1024),
             )
-            with urllib.request.urlopen(req, timeout=40) as r:
-                resp = json.loads(r.read())
-            raw = resp["candidates"][0]["content"]["parts"][0]["text"]
+            response = model.generate_content([
+                EXTRACT_PROMPT,
+                {"mime_type": "application/pdf",
+                 "data": base64.b64encode(pdf_bytes).decode()},
+            ])
+            raw = response.text
 
-        # ── OpenAI GPT-4o — PDF sent as base64 image (first page) ──
+        # ── OpenAI GPT-4o — PDF treated as image (best effort) ──
         elif provider == "openai":
-            # GPT-4o does not accept application/pdf directly.
-            # We send as a base64 data-URI with image/jpeg mimetype fallback;
-            # works if the PDF is a scanned image. For best results use Claude or Gemini.
-            payload = {
-                "model": "gpt-4o",
-                "max_tokens": 600,
-                "messages": [{
+            from openai import OpenAI as _OpenAI
+            client = _OpenAI(api_key=api_key)
+            resp = client.chat.completions.create(
+                model="gpt-4o",
+                max_tokens=1024,
+                messages=[{
                     "role": "user",
                     "content": [
                         {"type": "text", "text": EXTRACT_PROMPT},
-                        {"type": "image_url",
-                         "image_url": {
-                             "url": f"data:image/jpeg;base64,{b64}",
-                             "detail": "high",
-                         }},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": ("data:image/jpeg;base64,"
+                                        + base64.b64encode(pdf_bytes).decode()),
+                                "detail": "high",
+                            },
+                        },
                     ],
                 }],
-            }
-            req = urllib.request.Request(
-                "https://api.openai.com/v1/chat/completions",
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json",
-                         "Authorization": f"Bearer {api_key}"},
-                method="POST",
             )
-            with urllib.request.urlopen(req, timeout=40) as r:
-                resp = json.loads(r.read())
-            raw = resp["choices"][0]["message"]["content"]
-
-        # ── Mistral Large ──
-        elif provider == "mistral":
-            payload = {
-                "model": "mistral-large-latest",
-                "max_tokens": 600,
-                "messages": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": EXTRACT_PROMPT},
-                        {"type": "image_url",
-                         "image_url": f"data:application/pdf;base64,{b64}"},
-                    ],
-                }],
-            }
-            req = urllib.request.Request(
-                "https://api.mistral.ai/v1/chat/completions",
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json",
-                         "Authorization": f"Bearer {api_key}"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=40) as r:
-                resp = json.loads(r.read())
-            raw = resp["choices"][0]["message"]["content"]
+            raw = resp.choices[0].message.content
 
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
-    except urllib.error.HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode()[:400]
-        except Exception:
-            pass
+    # ── SDK-specific quota/auth exceptions ──
+    except Exception as exc:
+        cls = type(exc).__name__
+        msg = str(exc)
 
-        PROVIDER_NAMES = {
-            "anthropic": "Anthropic",
-            "gemini":    "Google Gemini",
-            "openai":    "OpenAI",
-            "mistral":   "Mistral",
-        }
-        pname = PROVIDER_NAMES.get(provider, provider)
-
-        if e.code == 429:
-            # Determine if it's a Gemini provider
-            is_gemini = provider in GEMINI_MODELS
-            gemini_model = GEMINI_MODELS.get(provider, "")
-
-            tips = {
-                True: (  # any Gemini variant
-                    f"**Google Gemini 429 — dzienny limit wyczerpany** (`{gemini_model}`)\n\n"
-                    "Twój klucz z AI Studio jest poprawny — wyczerpałeś dzienny limit req.\n\n"
-                    "**Wypróbuj w tej kolejności:**\n"
-                    "1. **Zmień model** → wybierz **Gemini 3.1 Flash Lite** (500 req/dzień zamiast 20)\n"
-                    "2. **Poczekaj do jutra** — limit resetuje się o północy czasu Pacyfiku "
-                    f"([sprawdź tutaj](https://ai.dev/rate-limit))\n"
-                    "3. **Włącz billing** w AI Studio — koszt ~€0.0003 za fakturę, "
-                    "limity wzrastają 100× ([aistudio.google.com](https://aistudio.google.com/billing))\n"
-                    "4. **Anthropic Claude** — utwórz klucz na "
-                    "[console.anthropic.com](https://console.anthropic.com) ($5 free credit, ~500 faktur)"
-                ),
-                "anthropic": (
-                    "**Anthropic 429 — rate limit**\n\nWait 60 seconds and try again.\n"
-                    "Check usage: [console.anthropic.com/usage](https://console.anthropic.com/usage)"
-                ),
-                "openai": (
-                    "**OpenAI 429 — quota exceeded**\n\n"
-                    "Check billing: [platform.openai.com/usage](https://platform.openai.com/usage)"
-                ),
-                "mistral": (
-                    "**Mistral 429 — rate limit**\n\n"
-                    "Check quota: [console.mistral.ai](https://console.mistral.ai)"
-                ),
-            }
-            msg = tips.get(True if is_gemini else provider,
-                           f"{pname} returned 429 (quota exceeded). Check your API plan.")
-            raise RuntimeError(msg)
-
-        elif e.code in (401, 403):
+        # Google SDK quota exception
+        if "ResourceExhausted" in cls or "429" in msg:
+            raise RuntimeError(_error_msg(provider, 429)) from exc
+        # Google / Anthropic / OpenAI auth
+        if "PermissionDenied" in cls or "AuthenticationError" in cls or "401" in msg or "403" in msg:
+            raise RuntimeError(_error_msg(provider, 401)) from exc
+        # Network
+        if "ConnectionError" in cls or "TimeoutError" in cls:
             raise RuntimeError(
-                f"**{pname} {e.code} — invalid or expired API key.**\n\n"
-                f"Make sure you copied the full key correctly. "
-                f"For Gemini: get your key at [aistudio.google.com](https://aistudio.google.com) "
-                f"→ 'Get API key'. Do NOT use a Google Cloud key."
+                f"Network error reaching {provider} API. Check your connection."
+            ) from exc
+        # SDK not installed
+        if "ModuleNotFoundError" in cls or "ImportError" in cls:
+            pkg = {"anthropic": "anthropic", "openai": "openai"}.get(
+                provider, "google-generativeai"
             )
-
-        else:
             raise RuntimeError(
-                f"HTTP {e.code} from {pname} API. Details: {body[:200]}"
-            ) from e
+                f"Required package not installed: `{pkg}`\n"
+                f"Add it to requirements.txt and rebuild the container."
+            ) from exc
+        # Re-raise raw if we already set a clean message
+        if isinstance(exc, RuntimeError):
+            raise
+        raise RuntimeError(f"Unexpected error from {provider}: {msg[:300]}") from exc
 
-    except urllib.error.URLError as e:
-        raise RuntimeError(
-            f"Network error reaching {provider} API: {e.reason}. "
-            f"Check your internet connection."
-        ) from e
-
-    # ── Parse JSON response ──
-    raw = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"AI returned invalid JSON. Raw response (first 200 chars): {raw[:200]}"
-        ) from e
+    return _parse_raw_json(raw)
 
 
 # ─────────────────────────────────────────────
@@ -716,34 +676,54 @@ def _setup_pdf():
     st.markdown("#### 🤖 AI Invoice Parser")
 
     st.markdown("""
-    <div class="alert-box alert-info">
-        ℹ️ <strong>API jest wywoływane tylko po kliknięciu przycisku</strong> — nie automatycznie.<br><br>
-        <strong>Aktualne limity darmowe Google AI Studio (Twoje konto):</strong><br>
-        ⭐ <strong>Gemini 3.1 Flash Lite</strong>: 500 req/dzień — <em>najlepszy wybór dla darmowego tier</em><br>
-        &nbsp;&nbsp;&nbsp;Gemini 3 Flash: 20 req/dzień<br>
-        &nbsp;&nbsp;&nbsp;Gemini 2.5 Flash: 20 req/dzień<br>
-        &nbsp;&nbsp;&nbsp;Gemini 2.0 Flash: <span style="color:#f85149">niedostępny (limit 0)</span><br><br>
-        <strong>Anthropic Claude</strong> — natywna obsługa PDF, niezawodny, $5 kredytu na start.
+    <div class="alert-box alert-info" style="color:var(--text)!important">
+        ℹ️ The API is called <strong>only when you click the Extract button</strong> — not on upload.<br><br>
+        <strong>Provider recommendations:</strong><br>
+        &nbsp;• <strong>Anthropic Claude</strong> — best PDF support, reliable, from $0.003/invoice<br>
+        &nbsp;• <strong>Google Gemini</strong> — good PDF support, free tier available (see quota limits
+        at <a href="https://aistudio.google.com" style="color:#58a6ff">aistudio.google.com</a>)<br>
+        &nbsp;• <strong>OpenAI GPT-4o</strong> — treats PDF as image, may be less accurate<br><br>
+        If you get a <strong>429 error</strong>, your daily free quota is exhausted —
+        try a different model or wait until midnight PT for reset.
     </div>""", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 1])
     with col1:
         provider_name = st.selectbox("AI Provider", list(PROVIDERS.keys()))
     with col2:
-        # Pre-fill if already saved
         saved_key = st.session_state.get("api_key", "")
         api_key = st.text_input("API Key", value=saved_key, type="password",
                                 placeholder="sk-... or AIza... etc.")
 
     # ── API key storage toggle ──────────────────────
     already_saved_to_disk = API_KEY_FILE.exists()
+
     st.markdown("""
     <div style="background:var(--bg-card2);border:1px solid var(--border);
                 border-radius:10px;padding:.8rem 1rem;margin:.6rem 0">
-        <div style="font-weight:600;font-size:.84rem;color:var(--text);margin-bottom:.5rem">
-            🔑 API Key — Privacy Options
+        <div style="font-weight:600;font-size:.88rem;color:var(--text)!important;margin-bottom:.4rem">
+            🔑 API Key — Privacy
+        </div>
+        <div style="font-size:.78rem;color:var(--text)!important">
+            Choose whether to save your key across container restarts:
         </div>
     </div>""", unsafe_allow_html=True)
+
+    # Force radio label colour via a wrapping container
+    st.markdown("""
+    <style>
+    div[data-testid="stRadio"] label,
+    div[data-testid="stRadio"] label p,
+    div[data-testid="stRadio"] label span {
+        color: #e6edf3 !important;
+        font-size: .88rem !important;
+    }
+    div[data-testid="stRadio"] label:has(input:checked) p,
+    div[data-testid="stRadio"] label:has(input:checked) span {
+        color: #58a6ff !important;
+        font-weight: 600 !important;
+    }
+    </style>""", unsafe_allow_html=True)
 
     api_storage = st.radio(
         "api_storage_radio",
@@ -759,11 +739,10 @@ def _setup_pdf():
     if save_api_to_disk:
         fernet_ok = _fernet() is not None
         if fernet_ok:
-            st.markdown(f"""
+            st.markdown("""
             <div class="alert-box alert-warn">
-                ⚠️ Key stored at <code>{API_KEY_FILE}</code> (AES-256 Fernet).
-                Readable only on this server. Set <code>ENERGY_VIZ_SECRET</code>
-                env var for a unique per-server encryption key.
+                ⚠️ Key will be AES-256 encrypted and stored on this server only.
+                Set the <code>ENERGY_VIZ_SECRET</code> env var for a unique encryption key.
             </div>""", unsafe_allow_html=True)
         else:
             st.markdown("""
@@ -774,12 +753,11 @@ def _setup_pdf():
             save_api_to_disk = False
     else:
         st.markdown("""
-        <div class="alert-box alert-info">
-            ℹ️ Key lives in browser session memory only. Closing the tab
-            or restarting the container requires re-entry.
+        <div class="alert-box alert-info" style="color:var(--text)!important">
+            ℹ️ Key lives in browser session memory only.
+            Re-entry required after tab close or container restart.
         </div>""", unsafe_allow_html=True)
 
-    # Delete saved key option
     if already_saved_to_disk:
         if st.button("🗑️ Delete saved API key from disk"):
             API_KEY_FILE.unlink(missing_ok=True)
