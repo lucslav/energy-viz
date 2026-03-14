@@ -542,6 +542,8 @@ COLORS = dict(
     total="#3fb950", kw="#39d0d8", bg="#161b22",
     grid="#30363d", text="#e6edf3", muted="#7d8590",
     red="#f85149", yellow="#d29922",
+    # aliases
+    blue="#58a6ff", cyan="#39d0d8", purple="#bc8cff",
 )
 
 def _rgba(hex_color: str, alpha: float = 0.15) -> str:
@@ -1461,7 +1463,6 @@ with st.sidebar:
 
     # ── Settings ──
     st.markdown("##### ⚙️ Settings")
-    show_disc  = st.toggle(f"Apply {DISC_PCT:.0f}% discount", value=DISC_PCT > 0)
 
     st.divider()
 
@@ -1615,7 +1616,7 @@ df_kw    = load_kw(src_kw)          if src_kw    else None
 df_dnp   = load_dnp(src_dnp)        if src_dnp   else None
 df_daily = load_daily(src_daily)    if src_daily else None
 
-disc_factor = (1 - DISC_PCT/100) if show_disc else 1.0
+disc_factor = DISC_FACTOR  # always apply configured discount
 # Recalculate costs if sidebar rates were changed
 if df_calc is not None:
     tmap = {"day": t_day, "peak": t_peak, "night": t_night}
@@ -1714,7 +1715,7 @@ with tabs[0]:
         kpis.append(kpi_html("Total Consumption",  f"{total_kwh:,.0f}", "kWh", "blue"))
         kpis.append(kpi_html("Daily Average",       f"{avg_daily_kwh:.1f}", "kWh/day", "green"))
         kpis.append(kpi_html("Energy Cost",        f"€{total_cost:,.2f}",
-                              f"incl. {DISC_PCT:.0f}% off" if show_disc else "gross", "orange"))
+                              f"incl. {DISC_PCT:.0f}% off", "orange"))
         kpis.append(kpi_html("Avg Daily Cost",     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
         kpis.append(kpi_html("Data Span",           f"{days_data}", "days", "purple"))
         kpis.append(kpi_html("Standby Load",        f"{standby*2*1000:.0f}", "W (2–4am)", "red"))
@@ -1800,7 +1801,7 @@ with tabs[1]:
     mask = (df_calc["date"] >= d_from) & (df_calc["date"] <= d_to)
     df_f = df_calc[mask].copy()
 
-    y_col   = ("cost_net" if show_disc else "cost") if view_mode == "€" else "value"
+    y_col   = "cost_net" if view_mode == "€" else "value"
     y_label = "€" if view_mode == "€" else "kWh"
 
     fig = go.Figure()
