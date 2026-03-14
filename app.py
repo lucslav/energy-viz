@@ -424,10 +424,20 @@ def get_period(hour, minute=0):
 #  PDF INVOICE PARSER  (multi-provider AI)
 # ─────────────────────────────────────────────
 PROVIDERS = {
-    "Anthropic (Claude 3.5 Sonnet)": "anthropic",   # best PDF support — recommended
-    "Google (Gemini 2.0 Flash)":     "gemini",       # good PDF support
-    "OpenAI (GPT-4o — images only)": "openai",       # PDF converted to images
-    "Mistral (Large)":               "mistral",
+    "Anthropic (Claude 3.5 Sonnet)":      "anthropic",
+    "Google (Gemini 3.1 Flash Lite ★)":   "gemini_31_flash_lite",   # 500 req/day free
+    "Google (Gemini 3 Flash)":            "gemini_3_flash",          # 20 req/day free
+    "Google (Gemini 2.5 Flash)":          "gemini_25_flash",         # 20 req/day free
+    "OpenAI (GPT-4o — images only)":      "openai",
+    "Mistral (Large)":                    "mistral",
+}
+
+# Gemini provider key → actual API model string
+GEMINI_MODELS = {
+    "gemini_31_flash_lite": "gemini-3.1-flash-lite",   # 500 RPD — best free option
+    "gemini_3_flash":       "gemini-3-flash",           # 20 RPD
+    "gemini_25_flash":      "gemini-2.5-flash",         # 20 RPD
+    "gemini_25_pro":        "gemini-2.5-pro",           # paid only
 }
 
 EXTRACT_PROMPT = """You are a utility bill parser. Extract the following fields from this electricity bill image/PDF.
@@ -486,8 +496,9 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
                 resp = json.loads(r.read())
             raw = resp["content"][0]["text"]
 
-        # ── Google Gemini 2.0 Flash — native PDF support ──
-        elif provider == "gemini":
+        # ── Google Gemini (Flash variants) — native PDF support ──
+        elif provider in GEMINI_MODELS:
+            model_name = GEMINI_MODELS[provider]
             payload = {
                 "contents": [{
                     "parts": [
@@ -499,7 +510,7 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
                 "generationConfig": {"maxOutputTokens": 600},
             }
             url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-                   "gemini-2.0-flash:generateContent"
+                   f"{model_name}:generateContent"
                    f"?key={api_key}")
             req = urllib.request.Request(
                 url, data=json.dumps(payload).encode(),
@@ -571,12 +582,70 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
     except urllib.error.HTTPError as e:
         body = ""
         try:
-            body = e.read().decode()[:300]
+            body = e.read().decode()[:400]
         except Exception:
             pass
+
+        PROVIDER_NAMES = {
+            "anthropic": "Anthropic",
+            "gemini":    "Google Gemini",
+            "openai":    "OpenAI",
+            "mistral":   "Mistral",
+        }
+        pname = PROVIDER_NAMES.get(provider, provider)
+
+        if e.code == 429:
+            # Determine if it's a Gemini provider
+            is_gemini = provider in GEMINI_MODELS
+            gemini_model = GEMINI_MODELS.get(provider, "")
+
+            tips = {
+                True: (  # any Gemini variant
+                    f"**Google Gemini 429 — dzienny limit wyczerpany** (`{gemini_model}`)\n\n"
+                    "Twój klucz z AI Studio jest poprawny — wyczerpałeś dzienny limit req.\n\n"
+                    "**Wypróbuj w tej kolejności:**\n"
+                    "1. **Zmień model** → wybierz **Gemini 3.1 Flash Lite** (500 req/dzień zamiast 20)\n"
+                    "2. **Poczekaj do jutra** — limit resetuje się o północy czasu Pacyfiku "
+                    f"([sprawdź tutaj](https://ai.dev/rate-limit))\n"
+                    "3. **Włącz billing** w AI Studio — koszt ~€0.0003 za fakturę, "
+                    "limity wzrastają 100× ([aistudio.google.com](https://aistudio.google.com/billing))\n"
+                    "4. **Anthropic Claude** — utwórz klucz na "
+                    "[console.anthropic.com](https://console.anthropic.com) ($5 free credit, ~500 faktur)"
+                ),
+                "anthropic": (
+                    "**Anthropic 429 — rate limit**\n\nWait 60 seconds and try again.\n"
+                    "Check usage: [console.anthropic.com/usage](https://console.anthropic.com/usage)"
+                ),
+                "openai": (
+                    "**OpenAI 429 — quota exceeded**\n\n"
+                    "Check billing: [platform.openai.com/usage](https://platform.openai.com/usage)"
+                ),
+                "mistral": (
+                    "**Mistral 429 — rate limit**\n\n"
+                    "Check quota: [console.mistral.ai](https://console.mistral.ai)"
+                ),
+            }
+            msg = tips.get(True if is_gemini else provider,
+                           f"{pname} returned 429 (quota exceeded). Check your API plan.")
+            raise RuntimeError(msg)
+
+        elif e.code in (401, 403):
+            raise RuntimeError(
+                f"**{pname} {e.code} — invalid or expired API key.**\n\n"
+                f"Make sure you copied the full key correctly. "
+                f"For Gemini: get your key at [aistudio.google.com](https://aistudio.google.com) "
+                f"→ 'Get API key'. Do NOT use a Google Cloud key."
+            )
+
+        else:
+            raise RuntimeError(
+                f"HTTP {e.code} from {pname} API. Details: {body[:200]}"
+            ) from e
+
+    except urllib.error.URLError as e:
         raise RuntimeError(
-            f"HTTP {e.code} from {provider} API. "
-            f"Check your API key and quota. Details: {body}"
+            f"Network error reaching {provider} API: {e.reason}. "
+            f"Check your internet connection."
         ) from e
 
     # ── Parse JSON response ──
@@ -648,10 +717,13 @@ def _setup_pdf():
 
     st.markdown("""
     <div class="alert-box alert-info">
-        ℹ️ <strong>The AI API is called only when you click "Extract tariff data from invoice"</strong>
-        — not automatically on upload. Your PDF is sent as a one-time request to the chosen provider.
-        <br>Recommended: <strong>Anthropic (Claude)</strong> or <strong>Google (Gemini)</strong>
-        — both have native PDF support. OpenAI processes the PDF as an image (may be less accurate).
+        ℹ️ <strong>API jest wywoływane tylko po kliknięciu przycisku</strong> — nie automatycznie.<br><br>
+        <strong>Aktualne limity darmowe Google AI Studio (Twoje konto):</strong><br>
+        ⭐ <strong>Gemini 3.1 Flash Lite</strong>: 500 req/dzień — <em>najlepszy wybór dla darmowego tier</em><br>
+        &nbsp;&nbsp;&nbsp;Gemini 3 Flash: 20 req/dzień<br>
+        &nbsp;&nbsp;&nbsp;Gemini 2.5 Flash: 20 req/dzień<br>
+        &nbsp;&nbsp;&nbsp;Gemini 2.0 Flash: <span style="color:#f85149">niedostępny (limit 0)</span><br><br>
+        <strong>Anthropic Claude</strong> — natywna obsługa PDF, niezawodny, $5 kredytu na start.
     </div>""", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 1])
@@ -737,9 +809,16 @@ def _setup_pdf():
                     st.success("✅ Invoice parsed! Review extracted values below.")
                     _show_extracted_review()
                 except Exception as e:
-                    st.error(f"Extraction failed: {e}")
-                    st.info("Please enter rates manually instead.")
-                    _setup_manual()
+                    err_msg = str(e)
+                    # Check if it's our formatted message (starts with **)
+                    if err_msg.startswith("**"):
+                        st.markdown(f"""
+                        <div class="alert-box alert-red">
+                            🚨 {err_msg.replace(chr(10), '<br>')}
+                        </div>""", unsafe_allow_html=True)
+                    else:
+                        st.error(f"Extraction failed: {err_msg}")
+                    st.info("💡 You can enter rates manually using the expander below.")
     elif pdf_file:
         st.info("Enter your API key to proceed.")
     else:
