@@ -1462,7 +1462,6 @@ with st.sidebar:
     st.divider()
 
     # ── Settings ──
-    st.markdown("##### ⚙️ Settings")
 
     st.divider()
 
@@ -2402,7 +2401,8 @@ with tabs[6]:
         ))
 
     # Period end marker
-    fig_proj.add_vline(x=str(b_end), line_dash="dot", line_color=COLORS["muted"],
+    fig_proj.add_vline(x=pd.Timestamp(b_end).timestamp() * 1000, line_dash="dot",
+                       line_color=COLORS["muted"],
                        annotation_text="Bill date", annotation_font_color=COLORS["muted"])
 
     apply_layout(fig_proj, "Cumulative bill cost — actual + 3 forecast methods", height=380)
