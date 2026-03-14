@@ -1,6 +1,6 @@
 """
 Energy Viz — Universal Smart Meter Dashboard
-ESB Networks (Ireland) HDF file analysis
+Smart Meter Dashboard — HDF file analysis
 """
 import streamlit as st
 import pandas as pd
@@ -818,8 +818,8 @@ def setup_screen():
 
     st.markdown(f"""
     <div class="setup-card">
-        <h3 style="margin:0 0 .5rem;color:var(--text)">Welcome! Let's configure your tariff.</h3>
-        <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:.8rem">
+        <h3 style="margin:0 0 .5rem;color:#e6edf3">Welcome! Let's configure your tariff.</h3>
+        <p style="color:#7d8590;font-size:.88rem;margin-bottom:.8rem">
             Your settings will be saved to <code style="color:#58a6ff">{DATA_DIR}</code>
             (Docker volume) and survive container restarts and rebuilds.
         </p>
@@ -860,7 +860,7 @@ def _setup_pdf():
     st.markdown("#### 🤖 AI Invoice Parser")
 
     st.markdown("""
-    <div class="alert-box alert-info" style="color:var(--text)!important">
+    <div class="alert-box alert-info" style="color:#e6edf3!important">
         ℹ️ The API is called <strong>only when you click the Extract button</strong> — not on upload.<br><br>
         <strong>Provider recommendations:</strong><br>
         &nbsp;• <strong>Anthropic Claude</strong> — best PDF support, reliable, from $0.003/invoice<br>
@@ -920,12 +920,12 @@ def _setup_pdf():
     already_saved_to_disk = API_KEY_FILE.exists()
 
     st.markdown("""
-    <div style="background:var(--bg-card2);border:1px solid var(--border);
+    <div style="background:#1c2330;border:1px solid #30363d;
                 border-radius:10px;padding:.8rem 1rem;margin:.6rem 0">
-        <div style="font-weight:600;font-size:.88rem;color:var(--text)!important;margin-bottom:.4rem">
+        <div style="font-weight:600;font-size:.88rem;color:#e6edf3!important;margin-bottom:.4rem">
             🔑 API Key — Privacy
         </div>
-        <div style="font-size:.78rem;color:var(--text)!important">
+        <div style="font-size:.78rem;color:#e6edf3!important">
             Choose whether to save your key across container restarts:
         </div>
     </div>""", unsafe_allow_html=True)
@@ -958,7 +958,7 @@ def _setup_pdf():
             save_api_to_disk = False
     else:
         st.markdown("""
-        <div class="alert-box alert-info" style="color:var(--text)!important">
+        <div class="alert-box alert-info" style="color:#e6edf3!important">
             ℹ️ Key lives in browser session memory only.
             Re-entry required after tab close or container restart.
         </div>""", unsafe_allow_html=True)
@@ -1058,13 +1058,13 @@ def _show_extracted_review():
     with b2:
         b_end = b_start + timedelta(days=b_days)
         st.markdown(f"""
-        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;
+        <div style="background:#1c2330;border:1px solid #30363d;border-radius:10px;
                     padding:1rem;margin-top:1.7rem">
-            <div style="font-size:.7rem;text-transform:uppercase;color:var(--text-muted)">Expected billing date</div>
+            <div style="font-size:.7rem;text-transform:uppercase;color:#7d8590">Expected billing date</div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:#58a6ff;margin:.3rem 0">
                 {b_end.strftime('%d %b %Y')}
             </div>
-            <div style="font-size:.78rem;color:var(--text-muted)">
+            <div style="font-size:.78rem;color:#7d8590">
                 {(b_end - dt_date.today()).days} days from today
             </div>
         </div>""", unsafe_allow_html=True)
@@ -1109,8 +1109,8 @@ def _setup_manual(inside_expander=False):
             b_days  = st.number_input("Typical cycle (days)", value=60, min_value=14, max_value=120, step=1)
         with b2:
             st.markdown("""
-            <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;
-                        padding:1rem;margin-top:1.7rem;font-size:.82rem;color:var(--text-muted)">
+            <div style="background:#1c2330;border:1px solid #30363d;border-radius:10px;
+                        padding:1rem;margin-top:1.7rem;font-size:.82rem;color:#7d8590">
                 💡 Find your billing period start on the last page of your electricity bill.<br><br>
                 The expected billing date will be calculated automatically.
             </div>""", unsafe_allow_html=True)
@@ -1284,14 +1284,14 @@ with st.sidebar:
         <img src="{LOGO_URL}" alt="logo" onerror="this.style.display='none'">
         <div>
             <div class="lname">Energy Viz</div>
-            <div class="lsub">ESB Networks · Ireland</div>
+            <div class="lsub">Smart Meter Dashboard</div>
         </div>
     </div>""", unsafe_allow_html=True)
 
     # ── HDF file uploads ──
     st.markdown("""
     <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;
-                color:var(--text-muted);margin-bottom:.6rem">📂 Upload HDF Files</div>
+                color:#7d8590;margin-bottom:.6rem">📂 Upload HDF Files</div>
     """, unsafe_allow_html=True)
 
     # ── PRIMARY: calckWh ──
@@ -1458,7 +1458,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 #  HEADER  (with logo)
 # ─────────────────────────────────────────────
-supplier_str = st.session_state["supplier"] or "ESB Networks"
+supplier_str = st.session_state["supplier"] or "Smart Meter"
 tariff_hint  = f"{supplier_str} · Smart Meter HDF Analysis"
 st.markdown(f"""
 <div class="app-header">
@@ -1490,7 +1490,8 @@ if not any([f_calc, f_dnp, f_kw, f_daily]) and not _any_persisted:
                  onerror="this.style.display='none'">
             <h2 style="color:#e6edf3;margin:.3rem 0">Upload HDF files to begin</h2>
             <p style="color:#7d8590;font-size:.84rem;margin:.3rem auto .8rem;max-width:380px">
-                Download CSV exports from the <strong style="color:#58a6ff">ESB Networks portal</strong>
+                Download CSV exports from the
+                <a href="https://myaccount.esbnetworks.ie/Api/HistoricConsumption" style="color:#58a6ff" target="_blank">smart meter portal</a>
                 and upload them using the sidebar on the left.
             </p>
         </div>
@@ -1503,7 +1504,7 @@ if not any([f_calc, f_dnp, f_kw, f_daily]) and not _any_persisted:
                     <span>⭐</span>
                     <strong style="color:#58a6ff;font-size:.85rem">calckWh — Start here</strong>
                 </div>
-                <div style="font-size:.75rem;color:var(--text-muted);line-height:1.5">
+                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
                     <code style="color:#e6edf3;font-size:.7rem">HDF_calckWh_…csv</code><br>
                     30-min kWh intervals with tariff split (Day / Peak / Night).
                     Powers <strong style="color:#e6edf3">all analysis tabs</strong>,
@@ -1511,39 +1512,39 @@ if not any([f_calc, f_dnp, f_kw, f_daily]) and not _any_persisted:
                 </div>
             </div>
 
-            <div style="background:var(--bg-card);border:1px solid var(--border);
+            <div style="background:#161b22;border:1px solid #30363d;
                         border-left:4px solid #39d0d8;border-radius:12px;padding:1rem">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
                     <span>⚡</span>
                     <strong style="color:#39d0d8;font-size:.85rem">kW — Power demand</strong>
                 </div>
-                <div style="font-size:.75rem;color:var(--text-muted);line-height:1.5">
+                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
                     <code style="color:#e6edf3;font-size:.7rem">HDF_kW_…csv</code><br>
                     Instantaneous power in kW. Identifies high-draw appliances
                     and demand spikes. Mathematically derived from calckWh × 2.
                 </div>
             </div>
 
-            <div style="background:var(--bg-card);border:1px solid var(--border);
+            <div style="background:#161b22;border:1px solid #30363d;
                         border-left:4px solid #bc8cff;border-radius:12px;padding:1rem">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
                     <span>🌙</span>
                     <strong style="color:#bc8cff;font-size:.85rem">Daily DNP — Invoice check</strong>
                 </div>
-                <div style="font-size:.75rem;color:var(--text-muted);line-height:1.5">
+                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
                     <code style="color:#e6edf3;font-size:.7rem">HDF_DailyDNP_kWh_…csv</code><br>
                     Cumulative meter registers by Night / Day / Peak. Used to
                     cross-verify register readings against your electricity bill.
                 </div>
             </div>
 
-            <div style="background:var(--bg-card);border:1px solid var(--border);
+            <div style="background:#161b22;border:1px solid #30363d;
                         border-left:4px solid #3fb950;border-radius:12px;padding:1rem">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
                     <span>📅</span>
                     <strong style="color:#3fb950;font-size:.85rem">Daily kWh — Long range</strong>
                 </div>
-                <div style="font-size:.75rem;color:var(--text-muted);line-height:1.5">
+                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
                     <code style="color:#e6edf3;font-size:.7rem">HDF_Daily_kWh_…csv</code><br>
                     Single 24h cumulative register (no tariff split). Best for
                     viewing long-range daily consumption trends over many months.
@@ -1582,7 +1583,7 @@ if df_calc is not None:
 if df_calc is not None:
     with sidebar_chart_slot.container():
         st.divider()
-        st.markdown('<p style="color:var(--text-muted);font-size:.7rem;text-transform:uppercase;'
+        st.markdown('<p style="color:#7d8590;font-size:.7rem;text-transform:uppercase;'
                     'letter-spacing:.08em;margin-bottom:4px">⚡ Tariff Split</p>',
                     unsafe_allow_html=True)
         by_p   = df_calc.groupby("period")["value"].sum()
@@ -1615,17 +1616,17 @@ if df_calc is not None:
             st.markdown(
                 f'<div class="tariff-row">'
                 f'<div class="tariff-dot" style="background:{color}"></div>'
-                f'<span style="color:var(--text-muted)">{p}</span>'
+                f'<span style="color:#7d8590">{p}</span>'
                 f'<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;'
                 f'color:{color}">{pct:.1f}%</span>'
-                f'<span style="color:var(--text-muted);font-size:.7rem">{kwh:.0f} kWh</span>'
+                f'<span style="color:#7d8590;font-size:.7rem">{kwh:.0f} kWh</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
         # Show MPRN only if user entered it
         if st.session_state.get("mprn"):
             st.markdown(
-                f'<p style="color:var(--text-muted);font-size:.7rem;text-align:center;'
+                f'<p style="color:#7d8590;font-size:.7rem;text-align:center;'
                 f'margin-top:8px">MPRN: {st.session_state["mprn"]}</p>',
                 unsafe_allow_html=True,
             )
@@ -1701,14 +1702,14 @@ with tabs[0]:
             rate = {"day":t_day,"peak":t_peak,"night":t_night}[p]
             with col:
                 st.markdown(f"""
-                <div style="background:var(--bg-card);border:1px solid var(--border);
+                <div style="background:#161b22;border:1px solid #30363d;
                             border-radius:12px;padding:1rem;border-top:3px solid {color}">
                     <div style="font-size:1.3rem">{icon}</div>
                     <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;
-                                color:var(--text-muted);margin:.3rem 0">{p.upper()}</div>
+                                color:#7d8590;margin:.3rem 0">{p.upper()}</div>
                     <div style="font-family:'JetBrains Mono',monospace;font-size:1.35rem;
                                 font-weight:700;color:{color}">{v:,.1f} kWh</div>
-                    <div style="font-size:.8rem;color:var(--text-muted)">
+                    <div style="font-size:.8rem;color:#7d8590">
                         {v/tot*100:.1f}% · €{v*rate*disc_factor:,.2f} net
                     </div>
                 </div>""", unsafe_allow_html=True)
@@ -1948,17 +1949,17 @@ with tabs[4]:
         for _, row in by_p.iterrows():
             p = row["period"]; color = cmap.get(p,"#888")
             st.markdown(f"""
-            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;
                         padding:.75rem 1.1rem;margin:.4rem 0;border-left:3px solid {color}">
                 <div style="display:flex;justify-content:space-between;align-items:center">
                     <div>
                         <div style="font-weight:600;color:{color};text-transform:capitalize">{p}</div>
-                        <div style="font-size:.78rem;color:var(--text-muted)">{row['kwh']:,.1f} kWh</div>
+                        <div style="font-size:.78rem;color:#7d8590">{row['kwh']:,.1f} kWh</div>
                     </div>
                     <div style="text-align:right">
                         <div style="font-family:'JetBrains Mono',monospace;font-size:1.15rem;font-weight:600">
                             €{row['cost_net']:.2f}</div>
-                        <div style="font-size:.73rem;color:var(--text-muted)">
+                        <div style="font-size:.73rem;color:#7d8590">
                             {row['cost_net']/total_cost*100:.1f}%</div>
                     </div>
                 </div>
@@ -2127,21 +2128,21 @@ with tabs[6]:
 
     # ── Progress bar ──
     st.markdown(f"""
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
                 padding:1.2rem 1.4rem;margin-bottom:1rem">
         <div style="display:flex;justify-content:space-between;font-size:.78rem;
-                    color:var(--text-muted);margin-bottom:6px">
+                    color:#7d8590;margin-bottom:6px">
             <span>{b_start.strftime('%d %b %Y')}</span>
             <span style="color:#58a6ff;font-weight:600">{pct_elapsed:.0f}% elapsed</span>
             <span>{b_end.strftime('%d %b %Y')}</span>
         </div>
-        <div style="background:var(--bg-card2);border-radius:6px;height:10px;overflow:hidden">
+        <div style="background:#1c2330;border-radius:6px;height:10px;overflow:hidden">
             <div style="height:10px;border-radius:6px;width:{min(pct_elapsed,100):.1f}%;
                         background:linear-gradient(90deg,#58a6ff,#39d0d8);
                         transition:width .5s ease"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.74rem;
-                    color:var(--text-muted);margin-top:6px">
+                    color:#7d8590;margin-top:6px">
             <span>{days_elapsed} days elapsed</span>
             <span>{days_remain} days remaining</span>
         </div>
@@ -2230,18 +2231,18 @@ with tabs[6]:
     for col, label, kwh, total, desc, color in method_data:
         with col:
             st.markdown(f"""
-            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
-                        padding:1.1rem;border-top:3px solid var(--{color})">
-                <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:.5rem">
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                        padding:1.1rem;border-top:3px solid {color}">
+                <div style="font-size:.78rem;font-weight:600;color:#7d8590;margin-bottom:.5rem">
                     {label}
                 </div>
                 <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;
-                            color:var(--text)">€{total:.2f}</div>
-                <div style="font-size:.78rem;color:var(--text-muted);margin:.2rem 0">
+                            color:#e6edf3">€{total:.2f}</div>
+                <div style="font-size:.78rem;color:#7d8590;margin:.2rem 0">
                     ~{kwh:.0f} kWh projected
                 </div>
-                <div style="font-size:.7rem;color:var(--text-muted);margin-top:.4rem;
-                            padding-top:.4rem;border-top:1px solid var(--border)">
+                <div style="font-size:.7rem;color:#7d8590;margin-top:.4rem;
+                            padding-top:.4rem;border-top:1px solid #30363d">
                     {desc}
                 </div>
             </div>""", unsafe_allow_html=True)
@@ -2252,16 +2253,16 @@ with tabs[6]:
     high_bill = max(total1, total2, total3)
     mid_bill  = (total1 + total2 + total3) / 3
     st.markdown(f"""
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
                 padding:1.2rem 1.4rem">
-        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.8rem">
+        <div style="font-size:.78rem;color:#7d8590;margin-bottom:.8rem">
             📊 Predicted bill range
         </div>
         <div style="display:flex;align-items:center;gap:12px">
             <div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:#3fb950">
                 €{low_bill:.2f}
             </div>
-            <div style="flex:1;background:var(--bg-card2);border-radius:6px;height:12px;
+            <div style="flex:1;background:#1c2330;border-radius:6px;height:12px;
                         position:relative;overflow:hidden">
                 <div style="position:absolute;left:0;right:0;height:12px;
                             background:linear-gradient(90deg,#3fb950,#d29922,#f85149);
@@ -2274,7 +2275,7 @@ with tabs[6]:
                 €{high_bill:.2f}
             </div>
         </div>
-        <div style="text-align:center;margin-top:.5rem;font-size:.78rem;color:var(--text-muted)">
+        <div style="text-align:center;margin-top:.5rem;font-size:.78rem;color:#7d8590">
             Most likely: <strong style="color:#58a6ff">€{mid_bill:.2f}</strong>
             &nbsp;·&nbsp; Range: €{high_bill-low_bill:.2f}
         </div>
@@ -2350,11 +2351,11 @@ with tabs[6]:
         st.markdown(f"""
         <div style="display:flex;justify-content:space-between;align-items:center;
                     padding:{'.9rem' if is_total else '.55rem'} 1rem;
-                    background:{'var(--bg-card2)' if is_total else 'transparent'};
+                    background:{'#1c2330' if is_total else 'transparent'};
                     border-radius:{'10px' if is_total else '0'};
-                    border-bottom:{'none' if is_total else '1px solid var(--border)'};
+                    border-bottom:{'none' if is_total else '1px solid #30363d'};
                     {'margin-top:.5rem' if is_total else ''}">
-            <span style="color:{'var(--text)' if is_total else 'var(--text-muted)'};
+            <span style="color:{'#e6edf3' if is_total else '#7d8590'};
                          font-weight:{'700' if is_total else '400'};font-size:.88rem">
                 {label}
             </span>
@@ -2374,13 +2375,13 @@ with tabs[6]:
     with col_b:
         new_end = new_start + timedelta(days=int(new_days))
         st.markdown(f"""
-        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;
+        <div style="background:#1c2330;border:1px solid #30363d;border-radius:10px;
                     padding:1rem;margin-top:1.8rem">
-            <div style="font-size:.7rem;text-transform:uppercase;color:var(--text-muted)">Next bill expected</div>
+            <div style="font-size:.7rem;text-transform:uppercase;color:#7d8590">Next bill expected</div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:#58a6ff;margin:.3rem 0">
                 {new_end.strftime('%d %b %Y')}
             </div>
-            <div style="font-size:.78rem;color:var(--text-muted)">{(new_end - today).days} days from today</div>
+            <div style="font-size:.78rem;color:#7d8590">{(new_end - today).days} days from today</div>
         </div>""", unsafe_allow_html=True)
 
     if st.button("💾 Update billing period"):
@@ -2428,12 +2429,12 @@ with tabs[7]:
                 details.append("No issues found")
             st.markdown(f"""
             <div style="display:flex;align-items:flex-start;gap:10px;
-                        background:var(--bg-card);border:1px solid var(--border);
+                        background:#161b22;border:1px solid #30363d;
                         border-radius:10px;padding:.7rem 1rem;margin:.3rem 0">
                 <span style="font-size:1rem;margin-top:1px">{icon}</span>
                 <div>
-                    <div style="font-weight:600;font-size:.84rem;color:var(--text)">{fname}</div>
-                    <div style="font-size:.76rem;color:var(--text-muted)">
+                    <div style="font-weight:600;font-size:.84rem;color:#e6edf3">{fname}</div>
+                    <div style="font-size:.76rem;color:#7d8590">
                         {qr['rows_raw']:,} rows in → {qr['rows_clean']:,} rows clean
                         &nbsp;·&nbsp; {" · ".join(details)}
                     </div>
