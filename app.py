@@ -257,13 +257,14 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
 
 /* ── metrics ── */
 [data-testid="stMetric"] {
-    background:var(--bg-card) !important;
-    border:1px solid var(--border) !important;
+    background:#161b22 !important;
+    border:1px solid #30363d !important;
     border-radius:12px !important;
     padding:1rem 1.2rem !important;
 }
-[data-testid="stMetricLabel"]  { color:var(--text-muted)!important;font-size:.78rem!important;text-transform:uppercase!important;letter-spacing:.07em!important; }
-[data-testid="stMetricValue"]  { font-family:'JetBrains Mono',monospace!important;font-size:1.5rem!important;font-weight:600!important; }
+[data-testid="stMetricLabel"]  { color:#a0aab4!important;font-size:.78rem!important;text-transform:uppercase!important;letter-spacing:.07em!important; }
+[data-testid="stMetricValue"]  { font-family:'JetBrains Mono',monospace!important;font-size:1.5rem!important;font-weight:600!important;color:#ffffff!important; }
+[data-testid="stMetricDelta"]  { font-size:.78rem!important; }
 
 /* ── tabs ── */
 [data-testid="stTabs"] button { font-family:'Space Grotesk',sans-serif!important;font-weight:500!important;color:var(--text-muted)!important; }
@@ -287,9 +288,9 @@ hr { border-color:var(--border)!important; }
 .kpi-card.purple::before { background:linear-gradient(90deg,#bc8cff,#58a6ff); }
 .kpi-card.red::before    { background:linear-gradient(90deg,#f85149,#f0883e); }
 .kpi-card.cyan::before   { background:linear-gradient(90deg,#39d0d8,#3fb950); }
-.kpi-label { font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:3px; }
-.kpi-value { font-family:'JetBrains Mono',monospace;font-size:1.45rem;font-weight:600;color:var(--text);line-height:1.2; }
-.kpi-sub   { font-size:.76rem;color:var(--text-muted);margin-top:3px; }
+.kpi-label { font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#a0aab4;margin-bottom:3px; }
+.kpi-value { font-family:'JetBrains Mono',monospace;font-size:1.45rem;font-weight:600;color:#ffffff;line-height:1.2; }
+.kpi-sub   { font-size:.76rem;color:#a0aab4;margin-top:3px; }
 
 /* ── alert boxes ── */
 .alert-box { border-radius:10px;padding:.75rem 1rem;border-left:3px solid;margin:.5rem 0;font-size:.86rem; }
@@ -493,6 +494,14 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
 section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] * {
     color: #e6edf3 !important;
 }
+/* Nuclear option: any white/light backgrounds inside sidebar uploader */
+section[data-testid="stSidebar"] [data-testid^="stFileUploader"] > div,
+section[data-testid="stSidebar"] [data-testid^="stFileUploader"] li,
+section[data-testid="stSidebar"] [data-testid^="stFileUploader"] ul {
+    background: #1c2330 !important;
+    background-color: #1c2330 !important;
+    color: #e6edf3 !important;
+}
 
 </style>
 """, unsafe_allow_html=True)
@@ -557,10 +566,11 @@ RANGESLIDER_X = dict(
         activecolor="#58a6ff", font=dict(color=COLORS["text"], size=11),
         buttons=[
             dict(count=1,  label="1d",  step="day",   stepmode="backward"),
-            dict(count=3,  label="3d",  step="day",   stepmode="backward"),
-            dict(count=7,  label="7d",  step="day",   stepmode="backward"),
-            dict(count=14, label="14d", step="day",   stepmode="backward"),
+            dict(count=7,  label="1w",  step="day",   stepmode="backward"),
+            dict(count=14, label="2w",  step="day",   stepmode="backward"),
             dict(count=1,  label="1m",  step="month", stepmode="backward"),
+            dict(count=3,  label="3m",  step="month", stepmode="backward"),
+            dict(count=1,  label="1y",  step="year",  stepmode="backward"),
             dict(step="all", label="All"),
         ],
     ),
@@ -619,10 +629,12 @@ def alert(msg, kind="info"):
     st.markdown(f'<div class="alert-box alert-{kind}">{icons.get(kind,"ℹ️")} {msg}</div>',
                 unsafe_allow_html=True)
 
-def apply_layout(fig, title="", height=380):
+def apply_layout(fig, title="", height=380, has_rangeselector=False):
     fig.update_layout(**PLOTLY_BASE,
                       title=dict(text=title, font=dict(size=13, color=COLORS["muted"]), x=0),
                       height=height)
+    if has_rangeselector:
+        fig.update_layout(margin=dict(l=10, r=10, t=80, b=60))
     return fig
 
 def get_period(hour, minute=0):
@@ -1472,9 +1484,7 @@ with st.sidebar:
 
     # ── Settings ──
     st.markdown("##### ⚙️ Settings")
-    view_mode  = st.radio("Primary view", ["Usage (kWh)", "Cost (€)"], horizontal=True)
     show_disc  = st.toggle(f"Apply {DISC_PCT:.0f}% discount", value=DISC_PCT > 0)
-    col_days   = st.slider("Days in overview", 7, 90, 30)
 
     st.divider()
 
@@ -1692,20 +1702,45 @@ if df_calc is not None:
 #  TAB 0 — OVERVIEW
 # ════════════════════════════════════════════
 with tabs[0]:
-    section("📌", "Key Metrics")
-    kpis = []
+    # ── Period selector ──
+    ov_col1, ov_col2 = st.columns([3, 1])
+    with ov_col1:
+        section("📌", "Key Metrics")
+    with ov_col2:
+        ov_period = st.radio("Period", ["Week", "Month", "Bill", "Total"],
+                             index=3, horizontal=True, label_visibility="collapsed",
+                             key="ov_period")
+
+    # Filter data by selected period
     if df_calc is not None:
-        total_kwh  = df_calc["value"].sum()
-        total_cost = df_calc["cost"].sum() * disc_factor
-        days_data  = max((df_calc["datetime"].max() - df_calc["datetime"].min()).days, 1)
-        avg_daily  = total_kwh / days_data
-        standby    = df_calc[df_calc["hour"].isin([2,3])]["value"].mean()
-        kpis.append(kpi_html("Total Consumption",  f"{total_kwh:,.0f}", "kWh recorded", "blue"))
-        kpis.append(kpi_html("Daily Average",       f"{avg_daily:.1f}", "kWh/day", "green"))
-        kpis.append(kpi_html("Energy Cost (net)",  f"€{total_cost:,.2f}",
+        now = df_calc["datetime"].max()
+        if ov_period == "Week":
+            ov_cutoff = now - pd.Timedelta(days=7)
+        elif ov_period == "Month":
+            ov_cutoff = now - pd.Timedelta(days=30)
+        elif ov_period == "Bill" and st.session_state.get("billing_start"):
+            ov_cutoff = pd.Timestamp(st.session_state["billing_start"])
+        else:  # Total
+            ov_cutoff = df_calc["datetime"].min()
+        df_ov = df_calc[df_calc["datetime"] >= ov_cutoff]
+    else:
+        df_ov = None
+
+    kpis = []
+    if df_ov is not None and len(df_ov):
+        total_kwh  = df_ov["value"].sum()
+        total_cost = df_ov["cost"].sum() * disc_factor
+        days_data  = max((df_ov["datetime"].max() - df_ov["datetime"].min()).days, 1)
+        avg_daily_kwh  = total_kwh / days_data
+        avg_daily_cost = total_cost / days_data
+        standby    = df_ov[df_ov["hour"].isin([2,3])]["value"].mean()
+        kpis.append(kpi_html("Total Consumption",  f"{total_kwh:,.0f}", "kWh", "blue"))
+        kpis.append(kpi_html("Daily Average",       f"{avg_daily_kwh:.1f}", "kWh/day", "green"))
+        kpis.append(kpi_html("Energy Cost",        f"€{total_cost:,.2f}",
                               f"incl. {DISC_PCT:.0f}% off" if show_disc else "gross", "orange"))
+        kpis.append(kpi_html("Avg Daily Cost",     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
         kpis.append(kpi_html("Data Span",           f"{days_data}", "days", "purple"))
-        kpis.append(kpi_html("Standby Load",        f"{standby*2*1000:.0f}", "W (2–4am)", "cyan"))
+        kpis.append(kpi_html("Standby Load",        f"{standby*2*1000:.0f}", "W (2–4am)", "red"))
     if df_kw is not None:
         kpis.append(kpi_html("Peak Demand", f"{df_kw['value'].max():.2f}", "kW all-time", "red"))
     st.markdown('<div class="kpi-row">' + "".join(kpis) + '</div>', unsafe_allow_html=True)
@@ -1715,16 +1750,14 @@ with tabs[0]:
         if incomplete:
             alert(f"<strong>{incomplete} day(s)</strong> with incomplete 30-min data "
                   f"(e.g. DST clock change — 44 intervals). Minor underestimate for those days.", "warn")
-    if df_daily is not None:
+    if df_daily is not None and st.session_state.get("_qr_daily", {}).get("outliers_removed"):
         alert("Daily kWh file: outlier row(s) automatically removed (likely meter rollover artifact).", "red")
 
     st.divider()
 
-    if df_calc is not None:
-        section("📈", "Daily Energy by Tariff Period", badge=f"Last {col_days} days")
-        cutoff = df_calc["datetime"].max() - pd.Timedelta(days=col_days)
-        dc = df_calc[df_calc["datetime"] >= cutoff]
-        dp = dc.groupby(["date","period"])["value"].sum().reset_index()
+    if df_ov is not None and len(df_ov):
+        section("📈", "Daily Energy by Tariff Period", badge=ov_period)
+        dp = df_ov.groupby(["date","period"])["value"].sum().reset_index()
         dpiv = dp.pivot(index="date", columns="period", values="value").fillna(0).reset_index()
         for c in ["day","peak","night"]:
             if c not in dpiv.columns: dpiv[c] = 0
@@ -1781,28 +1814,36 @@ with tabs[1]:
     section("🔌", "30-Minute Interval Consumption", badge="calckWh")
     min_d = df_calc["datetime"].min().date()
     max_d = df_calc["datetime"].max().date()
-    ca, cb = st.columns(2)
-    with ca: d_from = st.date_input("From", value=max_d-timedelta(days=14), min_value=min_d, max_value=max_d, key="cf")
+
+    # Date range + view mode on same row
+    ca, cb, cc = st.columns([2, 2, 1])
+    with ca: d_from = st.date_input("From", value=min_d, min_value=min_d, max_value=max_d, key="cf")
     with cb: d_to   = st.date_input("To",   value=max_d, min_value=min_d, max_value=max_d, key="ct")
+    with cc: view_mode = st.radio("View", ["kWh", "€"], horizontal=True, key="cons_view")
     mask = (df_calc["date"] >= d_from) & (df_calc["date"] <= d_to)
     df_f = df_calc[mask].copy()
 
-    y_col   = ("cost_net" if show_disc else "cost") if view_mode == "Cost (€)" else "value"
-    y_label = "€" if view_mode == "Cost (€)" else "kWh"
+    y_col   = ("cost_net" if show_disc else "cost") if view_mode == "€" else "value"
+    y_label = "€" if view_mode == "€" else "kWh"
 
     fig = go.Figure()
     for p, color, label in [("night",COLORS["night"],"🌙 Night"),("day",COLORS["day"],"☀️ Day"),("peak",COLORS["peak"],"🔥 Peak")]:
         df_p = df_f[df_f["period"]==p]
         fig.add_trace(go.Scatter(x=df_p["datetime"], y=df_p[y_col], mode="lines", name=label,
                                  line=dict(color=color, width=1), fill="tozeroy", fillcolor=_rgba(color, 0.13)))
-    apply_layout(fig, f"Half-hourly {y_label} by tariff period", height=440)
-    fig.update_layout(yaxis_title=y_label, xaxis=RANGESLIDER_X)
+    apply_layout(fig, f"Half-hourly {y_label} by tariff period", height=460)
+    # Extra top margin so rangeselector doesn't overlap legend
+    fig.update_layout(
+        yaxis_title=y_label,
+        xaxis=RANGESLIDER_X,
+        margin=dict(l=10, r=10, t=80, b=60),
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total kWh",          f"{df_f['value'].sum():.2f}")
-    k2.metric("Peak kWh",           f"{df_f[df_f['period']=='peak']['value'].sum():.2f}")
-    k3.metric("Gross cost",          f"€{df_f['cost'].sum():.2f}")
+    k1.metric("Total kWh",   f"{df_f['value'].sum():.2f}")
+    k2.metric("Peak kWh",    f"{df_f[df_f['period']=='peak']['value'].sum():.2f}")
+    k3.metric("Gross cost",  f"€{df_f['cost'].sum():.2f}")
     k4.metric(f"Net ({DISC_PCT:.0f}% off)", f"€{df_f['cost_net'].sum():.2f}")
 
     st.divider()
@@ -1837,7 +1878,7 @@ with tabs[2]:
     min_d = df_kw["datetime"].min().date()
     max_d = df_kw["datetime"].max().date()
     ka, kb = st.columns(2)
-    with ka: d_from = st.date_input("From", value=max_d-timedelta(days=14), min_value=min_d, max_value=max_d, key="kf")
+    with ka: d_from = st.date_input("From", value=min_d, min_value=min_d, max_value=max_d, key="kf")
     with kb: d_to   = st.date_input("To",   value=max_d, min_value=min_d, max_value=max_d, key="kt")
     mask = (df_kw["date"] >= d_from) & (df_kw["date"] <= d_to)
     df_f = df_kw[mask].copy()
@@ -1860,8 +1901,8 @@ with tabs[2]:
                              marker=dict(color=COLORS["red"], size=6)))
     fig.add_hline(y=p95, line_dash="dash", line_color=COLORS["peak"],
                   annotation_text=f"p95: {p95:.2f} kW", annotation_font_color=COLORS["peak"])
-    apply_layout(fig, "Instantaneous Power Demand — spikes highlighted", height=440)
-    fig.update_layout(yaxis_title="kW", xaxis=RANGESLIDER_X)
+    apply_layout(fig, "Instantaneous Power Demand — spikes highlighted", height=460)
+    fig.update_layout(yaxis_title="kW", xaxis=RANGESLIDER_X, margin=dict(l=10, r=10, t=80, b=60))
     st.plotly_chart(fig, use_container_width=True)
 
     section("📊", "Daily Peak & Average")
@@ -2349,8 +2390,9 @@ with tabs[6]:
     daily_cost["cumcost"] = daily_cost["cost_net"].cumsum()
 
     # Add standing charge to cumulative
-    daily_cost["cumtotal"] = daily_cost.apply(
-        lambda r: float(r["cumcost"]) + (r["date"].date() - b_start).days * t_stand, axis=1
+    daily_cost["cumtotal"] = (
+        daily_cost["cumcost"] +
+        daily_cost["date"].apply(lambda d: (d.date() - b_start).days) * t_stand
     )
 
     # Projection lines from last actual point
