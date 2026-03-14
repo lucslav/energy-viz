@@ -195,38 +195,51 @@ html, body, [data-testid="stAppViewContainer"] {
     border-radius: 10px !important;
     padding: 6px !important;
 }
-/* Uploader drag-drop text */
-[data-testid="stFileUploader"] span,
-[data-testid="stFileUploader"] p,
-[data-testid="stFileUploader"] small,
-[data-testid="stFileUploaderDropzoneInstructions"] span,
-[data-testid="stFileUploaderDropzoneInstructions"] p,
-[data-testid="stFileUploaderDropzoneInstructions"] small,
-[data-testid="stFileUploaderDropzone"] span,
-[data-testid="stFileUploaderDropzone"] p {
-    color: var(--text) !important;
+/* Dropzone area — override white background */
+[data-testid="stFileUploaderDropzone"] {
+    background: #1c2330 !important;
+    border: 1px dashed #30363d !important;
+    border-radius: 8px !important;
 }
-/* "Drag and drop" heading inside uploader */
-[data-testid="stFileUploaderDropzoneInstructions"] > div > span {
-    color: var(--text) !important;
-    font-weight: 600 !important;
-}
-/* "Limit 200MB" subtext — keep muted but visible */
-[data-testid="stFileUploaderDropzoneInstructions"] > div > small {
-    color: var(--text-muted) !important;
+/* ALL text inside uploader */
+[data-testid="stFileUploader"] *,
+[data-testid="stFileUploaderDropzone"] *,
+[data-testid="stFileUploaderDropzoneInstructions"] * {
+    color: #e6edf3 !important;
     opacity: 1 !important;
 }
-/* Uploaded file name row */
-[data-testid="stFileUploaderFile"] span,
-[data-testid="stFileUploaderFile"] p {
-    color: var(--text) !important;
+/* "Drag and drop" heading */
+[data-testid="stFileUploaderDropzoneInstructions"] span {
+    color: #e6edf3 !important;
+    font-weight: 600 !important;
 }
-/* Browse files button inside uploader */
+/* "Limit 200MB" — slightly muted but still visible */
+[data-testid="stFileUploaderDropzoneInstructions"] small,
+[data-testid="stFileUploader"] small {
+    color: #7d8590 !important;
+    opacity: 1 !important;
+}
+/* Uploaded filename */
+[data-testid="stFileUploaderFileName"],
+[data-testid="stFileUploaderFile"] * {
+    color: #e6edf3 !important;
+}
+/* Browse files button */
+[data-testid="stFileUploaderDropzone"] button,
 [data-testid="stFileUploader"] button {
-    background: var(--bg-card) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border) !important;
+    background: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
     border-radius: 6px !important;
+}
+[data-testid="stFileUploader"] button:hover {
+    background: #30363d !important;
+    border-color: #58a6ff !important;
+}
+/* Label above uploader */
+[data-testid="stFileUploader"] > label,
+[data-testid="stFileUploader"] > label * {
+    color: #e6edf3 !important;
 }
 
 /* ── buttons ── */
@@ -307,7 +320,110 @@ div[role="radiogroup"] label span {
     accent-color: #58a6ff !important;
 }
 
-/* ── invoice setup card ── */
+/* ── input / selectbox labels ── */
+[data-testid="stSelectbox"] label,
+[data-testid="stSelectbox"] label *,
+[data-testid="stTextInput"] label,
+[data-testid="stTextInput"] label *,
+[data-testid="stNumberInput"] label,
+[data-testid="stNumberInput"] label *,
+[data-testid="stDateInput"] label,
+[data-testid="stDateInput"] label * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+/* Selectbox dropdown background */
+[data-testid="stSelectbox"] > div > div {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+/* Text input field */
+[data-testid="stTextInput"] input {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+[data-testid="stTextInput"] input::placeholder { color: #7d8590 !important; opacity: 1 !important; }
+
+/* Number input */
+[data-testid="stNumberInput"] input {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+[data-testid="stNumberInput"] button {
+    background: #21262d !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+/* Date input */
+[data-testid="stDateInput"] input {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+
+/* Textarea */
+[data-testid="stTextArea"] textarea {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+
+/* ── st.form submit button — different from stButton ── */
+[data-testid="stFormSubmitButton"] button {
+    background: linear-gradient(135deg, #1f6feb, #388bfd) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 600 !important;
+    padding: .45rem 1.1rem !important;
+    opacity: 1 !important;
+    min-width: 160px !important;
+}
+[data-testid="stFormSubmitButton"] button:hover {
+    opacity: .85 !important;
+    background: linear-gradient(135deg, #388bfd, #58a6ff) !important;
+}
+[data-testid="stFormSubmitButton"] button p,
+[data-testid="stFormSubmitButton"] button span {
+    color: #ffffff !important;
+}
+
+/* ── toggle / checkbox ── */
+[data-testid="stToggle"] label,
+[data-testid="stToggle"] label * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] label * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+
+/* ── selectbox option text ── */
+[data-testid="stSelectbox"] * {
+    color: #e6edf3 !important;
+}
+
+/* ── expander ── */
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary * {
+    color: #e6edf3 !important;
+}
+[data-testid="stExpander"] {
+    border-color: #30363d !important;
+    background: #161b22 !important;
+}
+
+/* ── global fallback: any p/span/label still grey ── */
+p, label, span {
+    opacity: 1 !important;
+}
 .setup-card {
     background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
     padding:2rem;max-width:640px;margin:2rem auto;
@@ -464,11 +580,12 @@ def get_period(hour, minute=0):
 # The old google-generativeai package is deprecated (EOL Nov 30 2025)
 # and does not support models released after that date.
 PROVIDERS = {
-    "Anthropic (Claude 3.5 Sonnet)": "anthropic",
-    "Google (Gemini 2.5 Flash)":     "gemini-2.5-flash",
-    "Google (Gemini 2.0 Flash)":     "gemini-2.0-flash",
-    "Google (Gemini 2.0 Flash Lite)":"gemini-2.0-flash-lite",
-    "OpenAI (GPT-4o)":               "openai",
+    "Anthropic (Claude 3.5 Sonnet)":    "anthropic",
+    "Google (Gemini 2.5 Flash)":        "gemini-2.5-flash",
+    "Google (Gemini 2.0 Flash)":        "gemini-2.0-flash",
+    "Google (Gemini 2.0 Flash Lite)":   "gemini-2.0-flash-lite",
+    "OpenRouter (choose model below)":  "openrouter",
+    "OpenAI (GPT-4o)":                  "openai",
 }
 
 def _is_gemini(provider: str) -> bool:
@@ -583,7 +700,11 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
                         mime_type="application/pdf",
                     ),
                 ],
-                config=_gtypes.GenerateContentConfig(max_output_tokens=1024),
+                config=_gtypes.GenerateContentConfig(
+                    max_output_tokens=2048,
+                    # Force JSON output — prevents truncation and wrapping text
+                    response_mime_type="application/json",
+                ),
             )
             raw = response.text
 
@@ -608,6 +729,39 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
                         },
                     ],
                 }],
+            )
+            raw = resp.choices[0].message.content
+
+        # ── OpenRouter — OpenAI-compatible, any model ──
+        elif provider == "openrouter":
+            from openai import OpenAI as _OAI
+            or_model = api_key.split("||")[1] if "||" in api_key else "google/gemini-2.0-flash-exp:free"
+            or_key   = api_key.split("||")[0]
+            client   = _OAI(
+                api_key=or_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+            resp = client.chat.completions.create(
+                model=or_model,
+                max_tokens=2048,
+                response_format={"type": "json_object"},
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": EXTRACT_PROMPT},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": ("data:application/pdf;base64,"
+                                        + base64.b64encode(pdf_bytes).decode()),
+                            },
+                        },
+                    ],
+                }],
+                extra_headers={
+                    "HTTP-Referer": "https://github.com/lucslav/energy-viz",
+                    "X-Title": "Energy Viz",
+                },
             )
             raw = resp.choices[0].message.content
 
@@ -706,8 +860,10 @@ def _setup_pdf():
         ℹ️ The API is called <strong>only when you click the Extract button</strong> — not on upload.<br><br>
         <strong>Provider recommendations:</strong><br>
         &nbsp;• <strong>Anthropic Claude</strong> — best PDF support, reliable, from $0.003/invoice<br>
-        &nbsp;• <strong>Google Gemini</strong> — good PDF support, free tier available (see quota limits
-        at <a href="https://aistudio.google.com" style="color:#58a6ff">aistudio.google.com</a>)<br>
+        &nbsp;• <strong>Google Gemini</strong> — good PDF support, free tier available
+        (<a href="https://aistudio.google.com" style="color:#58a6ff">aistudio.google.com</a>)<br>
+        &nbsp;• <strong>OpenRouter</strong> — one key, access to 200+ models including free ones
+        (<a href="https://openrouter.ai/models" style="color:#58a6ff">openrouter.ai/models</a>)<br>
         &nbsp;• <strong>OpenAI GPT-4o</strong> — treats PDF as image, may be less accurate<br><br>
         If you get a <strong>429 error</strong>, your daily free quota is exhausted —
         try a different model or wait until midnight PT for reset.
@@ -718,8 +874,37 @@ def _setup_pdf():
         provider_name = st.selectbox("AI Provider", list(PROVIDERS.keys()))
     with col2:
         saved_key = st.session_state.get("api_key", "")
-        api_key = st.text_input("API Key", value=saved_key, type="password",
+        # Strip model suffix if previously saved with OpenRouter
+        display_key = saved_key.split("||")[0] if "||" in saved_key else saved_key
+        api_key = st.text_input("API Key", value=display_key, type="password",
                                 placeholder="sk-... or AIza... etc.")
+
+    # ── OpenRouter model selector ──
+    provider_code = PROVIDERS[provider_name]
+    or_model = ""
+    if provider_code == "openrouter":
+        st.markdown("""
+        <div style="background:var(--bg-card2);border:1px solid var(--border);
+                    border-left:3px solid #58a6ff;border-radius:10px;
+                    padding:.7rem 1rem;margin:.4rem 0;font-size:.82rem;color:var(--text)">
+            🔀 <strong>OpenRouter</strong> — enter the model ID from
+            <a href="https://openrouter.ai/models" style="color:#58a6ff" target="_blank">openrouter.ai/models</a>.<br>
+            Free models end with <code>:free</code> e.g.
+            <code>google/gemini-2.0-flash-exp:free</code> &nbsp;·&nbsp;
+            <code>anthropic/claude-3.5-sonnet</code> &nbsp;·&nbsp;
+            <code>meta-llama/llama-3.3-70b-instruct:free</code>
+        </div>""", unsafe_allow_html=True)
+        saved_or_model = (st.session_state.get("api_key", "").split("||")[1]
+                          if "||" in st.session_state.get("api_key", "") else "")
+        or_model = st.text_input(
+            "OpenRouter model ID",
+            value=saved_or_model or "google/gemini-2.0-flash-exp:free",
+            placeholder="provider/model-name:free",
+        )
+        # Pack key + model into single string via separator
+        api_key_effective = f"{api_key}||{or_model}" if or_model else api_key
+    else:
+        api_key_effective = api_key
 
     # ── API key storage toggle ──────────────────────
     already_saved_to_disk = API_KEY_FILE.exists()
@@ -779,18 +964,17 @@ def _setup_pdf():
 
     if pdf_file and api_key:
         if st.button("🔍 Extract tariff data from invoice"):
-            provider_code = PROVIDERS[provider_name]
             with st.spinner(f"Analysing invoice with {provider_name}…"):
                 try:
                     pdf_bytes = pdf_file.getvalue()
-                    data = parse_invoice_ai(pdf_bytes, provider_code, api_key)
+                    data = parse_invoice_ai(pdf_bytes, provider_code, api_key_effective)
                     # Save invoice PDF to volume
                     INVOICE_FILE.write_bytes(pdf_bytes)
                     # Save API key per user choice
-                    st.session_state["api_key"]      = api_key
+                    st.session_state["api_key"]      = api_key_effective
                     st.session_state["api_provider"] = provider_code
                     if save_api_to_disk:
-                        enc = encrypt_api_key(api_key)
+                        enc = encrypt_api_key(api_key_effective)
                         if enc:
                             API_KEY_FILE.write_bytes(enc)
                     _apply_extracted(data)
