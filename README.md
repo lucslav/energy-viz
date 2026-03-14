@@ -1,4 +1,4 @@
-# ⚡ Energy Viz
+# <img src="https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png" alt="Energy Viz logo" width="32" style="vertical-align:middle"> Energy Viz
 
 [![Version](https://img.shields.io/badge/version-2.0.0-58a6ff?style=flat-square)](https://github.com/lucslav/energy-viz/releases)
 [![Docker](https://img.shields.io/badge/docker-lucslav%2Fenergy--viz-0db7ed?style=flat-square&logo=docker&logoColor=white)](https://hub.docker.com/r/lucslav/energy-viz)
@@ -9,8 +9,6 @@
 [![Ireland](https://img.shields.io/badge/made%20for-Ireland%20%F0%9F%87%AE%F0%9F%87%AA-169b62?style=flat-square)](https://github.com/lucslav/energy-viz)
 
 > **Hobby project — vibe coded with AI assistance.** A personal smart meter analytics dashboard for Irish electricity customers using ESB Networks HDF export files. Built with Streamlit and Plotly for self-hosting on a home server or NAS. Not affiliated with ESB Networks or any energy supplier.
-
-<img src="https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png" alt="Energy Viz logo" width="80">
 
 ---
 
