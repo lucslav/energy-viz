@@ -10,6 +10,8 @@
 
 > **Hobby project — vibe coded with AI assistance.** A personal smart meter analytics dashboard for Irish electricity customers using ESB Networks HDF export files. Built with Streamlit and Plotly for self-hosting on a home server or NAS. Not affiliated with ESB Networks or any energy supplier.
 
+<img src="https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png" alt="Energy Viz logo" width="80">
+
 ---
 
 ## 🤔 What is this?
