@@ -427,6 +427,29 @@ div[role="radiogroup"] label span {
 p, label, span {
     opacity: 1 !important;
 }
+
+/* ── slider label ── */
+[data-testid="stSlider"] label,
+[data-testid="stSlider"] label *,
+[data-testid="stSlider"] p {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+/* slider track value */
+[data-testid="stSlider"] [data-testid="stTickBarMin"],
+[data-testid="stSlider"] [data-testid="stTickBarMax"] {
+    color: #7d8590 !important;
+}
+
+/* ── toggle label ── */
+[data-testid="stToggle"] > label > div > p {
+    color: #e6edf3 !important;
+}
+
+/* ── all widget labels globally ── */
+.stMarkdown p { color: #e6edf3 !important; }
+div[class*="stRadio"] > label > div > p { color: #e6edf3 !important; }
+div[class*="stCheckbox"] > label > div > p { color: #e6edf3 !important; }
 .setup-card {
     background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
     padding:2rem;max-width:640px;margin:2rem auto;
@@ -1357,91 +1380,45 @@ with st.sidebar:
         </div>
     </div>""", unsafe_allow_html=True)
 
-    # ── HDF file uploads ──
-    st.markdown("""
-    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;
-                color:#7d8590;margin-bottom:.6rem">📂 Upload HDF Files</div>
-    """, unsafe_allow_html=True)
+    # ── HDF file uploads — compact design ──
+    st.markdown('<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#7d8590;margin-bottom:.5rem">📂 HDF Files</div>', unsafe_allow_html=True)
 
-    # ── PRIMARY: calckWh ──
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#1f3a5f,#1c2330);border:1px solid #58a6ff44;
-                border-left:3px solid #58a6ff;border-radius:10px;padding:.7rem .9rem;margin-bottom:.5rem">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:.25rem">
-            <span style="font-size:.9rem">⭐</span>
-            <span style="font-weight:700;font-size:.82rem;color:#58a6ff">30-min Calculated kWh</span>
-            <span style="font-size:.62rem;background:#58a6ff22;color:#58a6ff;padding:1px 6px;
-                         border-radius:10px;margin-left:auto;border:1px solid #58a6ff44">PRIMARY</span>
-        </div>
-        <div style="font-size:.72rem;color:#7d8590;line-height:1.4">
-            Filename: <code style="color:#e6edf3">HDF_calckWh_…csv</code><br>
-            Half-hourly kWh readings with Day/Peak/Night tariff split.
-            <strong style="color:#e6edf3">Upload this first</strong> — powers all
-            consumption, cost and prediction tabs.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    f_calc = st.file_uploader("calckWh CSV", type="csv", key="calc", label_visibility="collapsed")
+    # Helper: show persisted file status below each uploader
+    def _file_card(slot, color, icon, label, hint, primary=False):
+        info = hdf_file_info(slot)
+        border = f"border-left:3px solid {color}"
+        bg = "background:linear-gradient(135deg,#1a2a3a,#1c2330)" if primary else "background:#1c2330"
+        badge = f'<span style="font-size:.6rem;background:{color}22;color:{color};padding:1px 5px;border-radius:8px;margin-left:auto;border:1px solid {color}44">{"PRIMARY" if primary else "optional"}</span>'
+        # File status line
+        if info:
+            fname = info["path"].split("/")[-1]
+            # truncate long filename
+            if len(fname) > 22: fname = fname[:10] + "…" + fname[-8:]
+            status = f'<div style="margin-top:.3rem;font-size:.65rem;background:#0d1117;border:1px solid #30363d;border-radius:5px;padding:2px 6px;color:#58a6ff">💾 {fname}</div>'
+        else:
+            status = f'<div style="margin-top:.3rem;font-size:.65rem;color:#30363d">○ not loaded</div>'
+        st.markdown(f"""
+        <div style="{bg};{border};border-radius:8px;padding:.5rem .7rem;margin-bottom:.3rem">
+            <div style="display:flex;align-items:center;gap:5px">
+                <span style="font-size:.8rem">{icon}</span>
+                <span style="font-weight:600;font-size:.78rem;color:{color}">{label}</span>
+                {badge}
+            </div>
+            <div style="font-size:.65rem;color:#7d8590;margin-top:1px">{hint}</div>
+            {status}
+        </div>""", unsafe_allow_html=True)
 
-    # ── SUPPLEMENTARY: kW ──
-    st.markdown("""
-    <div style="background:#1c2330;border:1px solid #30363d;
-                border-left:3px solid #39d0d8;border-radius:10px;padding:.6rem .9rem;margin-bottom:.5rem;margin-top:.8rem">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:.2rem">
-            <span style="font-size:.85rem">⚡</span>
-            <span style="font-weight:600;font-size:.8rem;color:#39d0d8">Power Demand (kW)</span>
-            <span style="font-size:.62rem;background:#161b22;color:#7d8590;padding:1px 6px;
-                         border-radius:10px;margin-left:auto;border:1px solid #30363d">optional</span>
-        </div>
-        <div style="font-size:.7rem;color:#7d8590;line-height:1.4">
-            Filename: <code style="color:#e6edf3">HDF_kW_…csv</code><br>
-            Instantaneous power in kW per 30-min slot. Useful for identifying
-            high-draw appliances and peak demand spikes.
-            Mathematically identical to calckWh × 2 — upload for kW-specific charts only.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    f_kw = st.file_uploader("kW CSV", type="csv", key="kw", label_visibility="collapsed")
+    _file_card("calc",  "#58a6ff", "⭐", "30-min kWh", "HDF_calckWh_…csv", primary=True)
+    f_calc = st.file_uploader("calckWh", type="csv", key="calc", label_visibility="collapsed")
 
-    # ── SUPPLEMENTARY: DNP ──
-    st.markdown("""
-    <div style="background:#1c2330;border:1px solid #30363d;
-                border-left:3px solid #bc8cff;border-radius:10px;padding:.6rem .9rem;margin-bottom:.5rem;margin-top:.8rem">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:.2rem">
-            <span style="font-size:.85rem">🌙</span>
-            <span style="font-weight:600;font-size:.8rem;color:#bc8cff">Daily DNP (Night/Day/Peak)</span>
-            <span style="font-size:.62rem;background:#161b22;color:#7d8590;padding:1px 6px;
-                         border-radius:10px;margin-left:auto;border:1px solid #30363d">optional</span>
-        </div>
-        <div style="font-size:.7rem;color:#7d8590;line-height:1.4">
-            Filename: <code style="color:#e6edf3">HDF_DailyDNP_kWh_…csv</code><br>
-            Cumulative daily meter registers split by Night, Day Off-Peak and Peak.
-            Used for <strong style="color:#e6edf3">invoice cross-verification</strong>
-            — confirms register readings match your bill exactly.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    f_dnp = st.file_uploader("Daily DNP CSV", type="csv", key="dnp", label_visibility="collapsed")
+    _file_card("kw",    "#39d0d8", "⚡", "Power Demand", "HDF_kW_…csv")
+    f_kw = st.file_uploader("kW", type="csv", key="kw", label_visibility="collapsed")
 
-    # ── SUPPLEMENTARY: Daily kWh ──
-    st.markdown("""
-    <div style="background:#1c2330;border:1px solid #30363d;
-                border-left:3px solid #3fb950;border-radius:10px;padding:.6rem .9rem;margin-bottom:.5rem;margin-top:.8rem">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:.2rem">
-            <span style="font-size:.85rem">📅</span>
-            <span style="font-weight:600;font-size:.8rem;color:#3fb950">Daily kWh (24h Register)</span>
-            <span style="font-size:.62rem;background:#161b22;color:#7d8590;padding:1px 6px;
-                         border-radius:10px;margin-left:auto;border:1px solid #30363d">optional</span>
-        </div>
-        <div style="font-size:.7rem;color:#7d8590;line-height:1.4">
-            Filename: <code style="color:#e6edf3">HDF_Daily_kWh_…csv</code><br>
-            Single cumulative 24h register (no tariff split). Best for long-range
-            daily trend view. Note: contains a known rollover artifact on some exports
-            which is filtered automatically.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    f_daily = st.file_uploader("Daily kWh CSV", type="csv", key="daily", label_visibility="collapsed")
+    _file_card("dnp",   "#bc8cff", "🌙", "Daily DNP", "HDF_DailyDNP_kWh_…csv")
+    f_dnp = st.file_uploader("DNP", type="csv", key="dnp", label_visibility="collapsed")
+
+    _file_card("daily", "#3fb950", "📅", "Daily kWh", "HDF_Daily_kWh_…csv")
+    f_daily = st.file_uploader("Daily", type="csv", key="daily", label_visibility="collapsed")
 
     # ── Upload status summary + persistence ──
     # Save any newly uploaded files to disk immediately
@@ -2392,7 +2369,7 @@ with tabs[6]:
     # Add standing charge to cumulative
     daily_cost["cumtotal"] = (
         daily_cost["cumcost"] +
-        daily_cost["date"].apply(lambda d: (d.date() - b_start).days) * t_stand
+        (daily_cost["date"] - pd.Timestamp(b_start)).dt.days * t_stand
     )
 
     # Projection lines from last actual point
