@@ -1,8 +1,8 @@
-name: Build and Push to Docker Hub (Test Branch)
+name: Build and Push to Docker Hub
 
 on:
   push:
-    branches: [ "test" ] 
+    branches: [ "main" ]
 
 jobs:
   build-and-push:
@@ -22,4 +22,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: lucslav/energy-viz:test
+          tags: lucslav/energy-viz:latest
