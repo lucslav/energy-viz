@@ -735,12 +735,15 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
         # ── OpenRouter — OpenAI-compatible, any model ──
         elif provider == "openrouter":
             from openai import OpenAI as _OAI
-            or_model = api_key.split("||")[1] if "||" in api_key else "google/gemini-2.0-flash-exp:free"
+            or_model = api_key.split("||")[1] if "||" in api_key else "google/gemini-2.5-flash-lite"
             or_key   = api_key.split("||")[0]
             client   = _OAI(
                 api_key=or_key,
                 base_url="https://openrouter.ai/api/v1",
             )
+            # OpenRouter routes to many backends — send PDF as base64 inline_data
+            # for models that support it (Gemini), or text-only prompt as fallback.
+            # Using the multimodal format that works across most vision models:
             resp = client.chat.completions.create(
                 model=or_model,
                 max_tokens=2048,
@@ -882,6 +885,7 @@ def _setup_pdf():
     # ── OpenRouter model selector ──
     provider_code = PROVIDERS[provider_name]
     or_model = ""
+    # ── OpenRouter model info ──
     if provider_code == "openrouter":
         st.markdown("""
         <div style="background:var(--bg-card2);border:1px solid var(--border);
@@ -889,19 +893,18 @@ def _setup_pdf():
                     padding:.7rem 1rem;margin:.4rem 0;font-size:.82rem;color:var(--text)">
             🔀 <strong>OpenRouter</strong> — enter the model ID from
             <a href="https://openrouter.ai/models" style="color:#58a6ff" target="_blank">openrouter.ai/models</a>.<br>
-            Free models end with <code>:free</code> e.g.
+            Recommended free models with PDF support:<br>
+            <code>google/gemini-2.5-flash-lite</code> &nbsp;·&nbsp;
             <code>google/gemini-2.0-flash-exp:free</code> &nbsp;·&nbsp;
-            <code>anthropic/claude-3.5-sonnet</code> &nbsp;·&nbsp;
-            <code>meta-llama/llama-3.3-70b-instruct:free</code>
+            <code>anthropic/claude-3.5-sonnet</code>
         </div>""", unsafe_allow_html=True)
         saved_or_model = (st.session_state.get("api_key", "").split("||")[1]
                           if "||" in st.session_state.get("api_key", "") else "")
         or_model = st.text_input(
             "OpenRouter model ID",
-            value=saved_or_model or "google/gemini-2.0-flash-exp:free",
-            placeholder="provider/model-name:free",
+            value=saved_or_model or "google/gemini-2.5-flash-lite",
+            placeholder="provider/model-name",
         )
-        # Pack key + model into single string via separator
         api_key_effective = f"{api_key}||{or_model}" if or_model else api_key
     else:
         api_key_effective = api_key
@@ -968,21 +971,19 @@ def _setup_pdf():
                 try:
                     pdf_bytes = pdf_file.getvalue()
                     data = parse_invoice_ai(pdf_bytes, provider_code, api_key_effective)
-                    # Save invoice PDF to volume
                     INVOICE_FILE.write_bytes(pdf_bytes)
-                    # Save API key per user choice
-                    st.session_state["api_key"]      = api_key_effective
-                    st.session_state["api_provider"] = provider_code
+                    st.session_state["api_key"]        = api_key_effective
+                    st.session_state["api_provider"]   = provider_code
                     if save_api_to_disk:
                         enc = encrypt_api_key(api_key_effective)
                         if enc:
                             API_KEY_FILE.write_bytes(enc)
                     _apply_extracted(data)
-                    st.success("✅ Invoice parsed! Review extracted values below.")
-                    _show_extracted_review()
+                    # ── flag to show review form on next render ──
+                    st.session_state["_show_review"] = True
+                    st.rerun()
                 except Exception as e:
                     err_msg = str(e)
-                    # Check if it's our formatted message (starts with **)
                     if err_msg.startswith("**"):
                         st.markdown(f"""
                         <div class="alert-box alert-red">
@@ -995,6 +996,11 @@ def _setup_pdf():
         st.info("Enter your API key to proceed.")
     else:
         st.info("Upload a PDF invoice to continue.")
+
+    # ── Show review form if extraction succeeded (persists across rerenders) ──
+    if st.session_state.get("_show_review") and st.session_state.get("_extracted"):
+        st.success("✅ Invoice parsed! Review and confirm the values below.")
+        _show_extracted_review()
 
     with st.expander("Or enter rates manually instead"):
         _setup_manual(inside_expander=True)
@@ -1063,7 +1069,8 @@ def _show_extracted_review():
         st.session_state["billing_end"]   = b_end
         st.session_state["billing_days"]  = int(b_days)
         st.session_state["setup_done"]    = True
-        save_config()   # ← persist to /app/data/config.json
+        st.session_state["_show_review"]  = False   # clear flag
+        save_config()
         st.rerun()
 
 
