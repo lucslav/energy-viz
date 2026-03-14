@@ -2,7 +2,7 @@ name: Build and Push to Docker Hub
 
 on:
   push:
-    branches: [ "main" ] # Automatyczny build przy każdej zmianie w kodzie
+    branches: [ "main" ]
 
 jobs:
   build-and-push:
