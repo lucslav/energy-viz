@@ -522,13 +522,14 @@ ss("tariff",           DEFAULT_TARIFF.copy())
 ss("discount_pct",     0.0)
 ss("mprn",             "")
 ss("supplier",         "")
-ss("api_key",          "")        # session-only, never persisted directly
+ss("api_key",          "")        # legacy single key — kept for backward compat
+ss("api_keys",         {})        # dict: provider_code → api_key (per-provider storage)
 ss("api_provider",     "")
 ss("billing_start",    None)
 ss("billing_end",      None)
 ss("billing_days",     60)
 ss("invoices",         [])
-ss("_config_loaded",   False)     # flag: have we loaded from disk yet this session?
+ss("_config_loaded",   False)
 
 # ── Restore from disk on first render ──
 if not st.session_state["_config_loaded"]:
@@ -876,9 +877,14 @@ def _setup_pdf():
     with col1:
         provider_name = st.selectbox("AI Provider", list(PROVIDERS.keys()))
     with col2:
-        saved_key = st.session_state.get("api_key", "")
-        # Strip model suffix if previously saved with OpenRouter
-        display_key = saved_key.split("||")[0] if "||" in saved_key else saved_key
+        # Pre-fill from per-provider storage
+        saved_keys  = st.session_state.get("api_keys", {})
+        provider_code_tmp = PROVIDERS[provider_name]
+        default_key = saved_keys.get(provider_code_tmp, "")
+        if not default_key:  # legacy fallback
+            legacy = st.session_state.get("api_key", "")
+            default_key = legacy.split("||")[0] if "||" in legacy else legacy
+        display_key = default_key.split("||")[0] if "||" in default_key else default_key
         api_key = st.text_input("API Key", value=display_key, type="password",
                                 placeholder="sk-... or AIza... etc.")
 
@@ -888,18 +894,19 @@ def _setup_pdf():
     # ── OpenRouter model info ──
     if provider_code == "openrouter":
         st.markdown("""
-        <div style="background:var(--bg-card2);border:1px solid var(--border);
+        <div style="background:#1c2330;border:1px solid #30363d;
                     border-left:3px solid #58a6ff;border-radius:10px;
-                    padding:.7rem 1rem;margin:.4rem 0;font-size:.82rem;color:var(--text)">
+                    padding:.7rem 1rem;margin:.4rem 0;font-size:.82rem;color:#e6edf3">
             🔀 <strong>OpenRouter</strong> — enter the model ID from
             <a href="https://openrouter.ai/models" style="color:#58a6ff" target="_blank">openrouter.ai/models</a>.<br>
             Recommended free models with PDF support:<br>
             <code>google/gemini-2.5-flash-lite</code> &nbsp;·&nbsp;
-            <code>google/gemini-2.0-flash-exp:free</code> &nbsp;·&nbsp;
+            <code>google/gemini-2.5-pro:free</code> &nbsp;·&nbsp;
             <code>anthropic/claude-3.5-sonnet</code>
         </div>""", unsafe_allow_html=True)
-        saved_or_model = (st.session_state.get("api_key", "").split("||")[1]
-                          if "||" in st.session_state.get("api_key", "") else "")
+        # Restore saved model from per-provider key storage
+        saved_or_full  = st.session_state.get("api_keys", {}).get("openrouter", "")
+        saved_or_model = saved_or_full.split("||")[1] if "||" in saved_or_full else ""
         or_model = st.text_input(
             "OpenRouter model ID",
             value=saved_or_model or "google/gemini-2.5-flash-lite",
@@ -972,8 +979,10 @@ def _setup_pdf():
                     pdf_bytes = pdf_file.getvalue()
                     data = parse_invoice_ai(pdf_bytes, provider_code, api_key_effective)
                     INVOICE_FILE.write_bytes(pdf_bytes)
-                    st.session_state["api_key"]        = api_key_effective
-                    st.session_state["api_provider"]   = provider_code
+                    # Save API key per-provider
+                    st.session_state["api_keys"][provider_code] = api_key_effective
+                    st.session_state["api_key"]      = api_key_effective  # legacy compat
+                    st.session_state["api_provider"] = provider_code
                     if save_api_to_disk:
                         enc = encrypt_api_key(api_key_effective)
                         if enc:
@@ -1295,7 +1304,7 @@ with st.sidebar:
             <span style="font-size:.62rem;background:#58a6ff22;color:#58a6ff;padding:1px 6px;
                          border-radius:10px;margin-left:auto;border:1px solid #58a6ff44">PRIMARY</span>
         </div>
-        <div style="font-size:.72rem;color:var(--text-muted);line-height:1.4">
+        <div style="font-size:.72rem;color:#7d8590;line-height:1.4">
             Filename: <code style="color:#e6edf3">HDF_calckWh_…csv</code><br>
             Half-hourly kWh readings with Day/Peak/Night tariff split.
             <strong style="color:#e6edf3">Upload this first</strong> — powers all
@@ -1306,17 +1315,16 @@ with st.sidebar:
     f_calc = st.file_uploader("calckWh CSV", type="csv", key="calc", label_visibility="collapsed")
 
     # ── SUPPLEMENTARY: kW ──
-    _kw_loaded = "✅" if f_calc else "○"
     st.markdown("""
-    <div style="background:var(--bg-card2);border:1px solid var(--border);
+    <div style="background:#1c2330;border:1px solid #30363d;
                 border-left:3px solid #39d0d8;border-radius:10px;padding:.6rem .9rem;margin-bottom:.5rem;margin-top:.8rem">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:.2rem">
             <span style="font-size:.85rem">⚡</span>
             <span style="font-weight:600;font-size:.8rem;color:#39d0d8">Power Demand (kW)</span>
-            <span style="font-size:.62rem;background:var(--bg-card);color:var(--text-muted);padding:1px 6px;
-                         border-radius:10px;margin-left:auto;border:1px solid var(--border)">optional</span>
+            <span style="font-size:.62rem;background:#161b22;color:#7d8590;padding:1px 6px;
+                         border-radius:10px;margin-left:auto;border:1px solid #30363d">optional</span>
         </div>
-        <div style="font-size:.7rem;color:var(--text-muted);line-height:1.4">
+        <div style="font-size:.7rem;color:#7d8590;line-height:1.4">
             Filename: <code style="color:#e6edf3">HDF_kW_…csv</code><br>
             Instantaneous power in kW per 30-min slot. Useful for identifying
             high-draw appliances and peak demand spikes.
@@ -1328,15 +1336,15 @@ with st.sidebar:
 
     # ── SUPPLEMENTARY: DNP ──
     st.markdown("""
-    <div style="background:var(--bg-card2);border:1px solid var(--border);
+    <div style="background:#1c2330;border:1px solid #30363d;
                 border-left:3px solid #bc8cff;border-radius:10px;padding:.6rem .9rem;margin-bottom:.5rem;margin-top:.8rem">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:.2rem">
             <span style="font-size:.85rem">🌙</span>
             <span style="font-weight:600;font-size:.8rem;color:#bc8cff">Daily DNP (Night/Day/Peak)</span>
-            <span style="font-size:.62rem;background:var(--bg-card);color:var(--text-muted);padding:1px 6px;
-                         border-radius:10px;margin-left:auto;border:1px solid var(--border)">optional</span>
+            <span style="font-size:.62rem;background:#161b22;color:#7d8590;padding:1px 6px;
+                         border-radius:10px;margin-left:auto;border:1px solid #30363d">optional</span>
         </div>
-        <div style="font-size:.7rem;color:var(--text-muted);line-height:1.4">
+        <div style="font-size:.7rem;color:#7d8590;line-height:1.4">
             Filename: <code style="color:#e6edf3">HDF_DailyDNP_kWh_…csv</code><br>
             Cumulative daily meter registers split by Night, Day Off-Peak and Peak.
             Used for <strong style="color:#e6edf3">invoice cross-verification</strong>
@@ -1348,15 +1356,15 @@ with st.sidebar:
 
     # ── SUPPLEMENTARY: Daily kWh ──
     st.markdown("""
-    <div style="background:var(--bg-card2);border:1px solid var(--border);
+    <div style="background:#1c2330;border:1px solid #30363d;
                 border-left:3px solid #3fb950;border-radius:10px;padding:.6rem .9rem;margin-bottom:.5rem;margin-top:.8rem">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:.2rem">
             <span style="font-size:.85rem">📅</span>
             <span style="font-weight:600;font-size:.8rem;color:#3fb950">Daily kWh (24h Register)</span>
-            <span style="font-size:.62rem;background:var(--bg-card);color:var(--text-muted);padding:1px 6px;
-                         border-radius:10px;margin-left:auto;border:1px solid var(--border)">optional</span>
+            <span style="font-size:.62rem;background:#161b22;color:#7d8590;padding:1px 6px;
+                         border-radius:10px;margin-left:auto;border:1px solid #30363d">optional</span>
         </div>
-        <div style="font-size:.7rem;color:var(--text-muted);line-height:1.4">
+        <div style="font-size:.7rem;color:#7d8590;line-height:1.4">
             Filename: <code style="color:#e6edf3">HDF_Daily_kWh_…csv</code><br>
             Single cumulative 24h register (no tariff split). Best for long-range
             daily trend view. Note: contains a known rollover artifact on some exports
