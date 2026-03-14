@@ -195,6 +195,39 @@ html, body, [data-testid="stAppViewContainer"] {
     border-radius: 10px !important;
     padding: 6px !important;
 }
+/* Uploader drag-drop text */
+[data-testid="stFileUploader"] span,
+[data-testid="stFileUploader"] p,
+[data-testid="stFileUploader"] small,
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzoneInstructions"] p,
+[data-testid="stFileUploaderDropzoneInstructions"] small,
+[data-testid="stFileUploaderDropzone"] span,
+[data-testid="stFileUploaderDropzone"] p {
+    color: var(--text) !important;
+}
+/* "Drag and drop" heading inside uploader */
+[data-testid="stFileUploaderDropzoneInstructions"] > div > span {
+    color: var(--text) !important;
+    font-weight: 600 !important;
+}
+/* "Limit 200MB" subtext — keep muted but visible */
+[data-testid="stFileUploaderDropzoneInstructions"] > div > small {
+    color: var(--text-muted) !important;
+    opacity: 1 !important;
+}
+/* Uploaded file name row */
+[data-testid="stFileUploaderFile"] span,
+[data-testid="stFileUploaderFile"] p {
+    color: var(--text) !important;
+}
+/* Browse files button inside uploader */
+[data-testid="stFileUploader"] button {
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+}
 
 /* ── buttons ── */
 .stButton > button {
@@ -250,24 +283,28 @@ hr { border-color:var(--border)!important; }
 .alert-good  { background:#3fb95022;border-color:#3fb950;color:#3fb950; }
 .alert-red   { background:#f8514922;border-color:#f85149;color:#f85149; }
 
-/* ── radio button contrast fix (dark theme) ── */
-[data-testid="stRadio"] label {
-    color: var(--text) !important;
+/* ── radio buttons — force visible text on dark theme ── */
+[data-testid="stRadio"] label,
+[data-testid="stRadio"] label *,
+[data-testid="stRadio"] label p,
+[data-testid="stRadio"] label span,
+div[role="radiogroup"] label,
+div[role="radiogroup"] label p,
+div[role="radiogroup"] label span {
+    color: #e6edf3 !important;
     font-size: .88rem !important;
+    opacity: 1 !important;
 }
-[data-testid="stRadio"] label p {
-    color: var(--text) !important;
-}
-[data-testid="stRadio"] > div {
-    gap: .4rem !important;
-}
-/* selected option highlight */
-[data-testid="stRadio"] label:has(input:checked) {
-    color: var(--accent-blue, #58a6ff) !important;
-}
-[data-testid="stRadio"] label:has(input:checked) p {
+/* selected radio option */
+[data-testid="stRadio"] label:has(input:checked),
+[data-testid="stRadio"] label:has(input:checked) p,
+[data-testid="stRadio"] label:has(input:checked) span {
     color: #58a6ff !important;
     font-weight: 600 !important;
+}
+/* radio circle itself */
+[data-testid="stRadio"] input[type="radio"] {
+    accent-color: #58a6ff !important;
 }
 
 /* ── invoice setup card ── */
@@ -423,16 +460,17 @@ def get_period(hour, minute=0):
 # ─────────────────────────────────────────────
 #  PDF INVOICE PARSER  (multi-provider AI SDKs)
 # ─────────────────────────────────────────────
+# Model names use the new google-genai SDK (GA since May 2025).
+# The old google-generativeai package is deprecated (EOL Nov 30 2025)
+# and does not support models released after that date.
 PROVIDERS = {
-    "Anthropic (Claude 3.5 Sonnet)":    "anthropic",
-    "Google (Gemini 2.5 Flash)":        "gemini-2.5-flash-preview-05-20",
-    "Google (Gemini 2.0 Flash)":        "gemini-2.0-flash",
-    "Google (Gemini 1.5 Flash)":        "gemini-1.5-flash",
-    "Google (Gemini 1.5 Flash-8B)":     "gemini-1.5-flash-8b",
-    "OpenAI (GPT-4o)":                  "openai",
+    "Anthropic (Claude 3.5 Sonnet)": "anthropic",
+    "Google (Gemini 2.5 Flash)":     "gemini-2.5-flash",
+    "Google (Gemini 2.0 Flash)":     "gemini-2.0-flash",
+    "Google (Gemini 2.0 Flash Lite)":"gemini-2.0-flash-lite",
+    "OpenAI (GPT-4o)":               "openai",
 }
 
-# Which PROVIDERS keys are Gemini models (used for error messaging)
 def _is_gemini(provider: str) -> bool:
     return provider.startswith("gemini-")
 
@@ -458,7 +496,6 @@ Return ONLY a valid JSON object — no markdown, no explanation, nothing else:
 def _parse_raw_json(raw: str) -> dict:
     """Extract and parse JSON from AI response, with truncation recovery."""
     raw = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
-    # Extract JSON object if surrounded by other text
     if not raw.startswith("{"):
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if m:
@@ -466,7 +503,6 @@ def _parse_raw_json(raw: str) -> dict:
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        # Try to fix truncated JSON by closing open braces
         diff = raw.count("{") - raw.count("}")
         if diff > 0:
             try:
@@ -479,49 +515,40 @@ def _parse_raw_json(raw: str) -> dict:
         )
 
 
-def _error_msg(provider: str, code: int, detail: str = "") -> str:
-    """Return a human-readable error message for common HTTP error codes."""
+def _error_msg(provider: str, code: int) -> str:
     if code == 429:
         if _is_gemini(provider):
             return (
                 f"**Google Gemini 429 — daily quota exhausted** (`{provider}`)\n\n"
                 "Your AI Studio key is correct — the free daily limit is used up.\n\n"
                 "**Try in order:**\n"
-                "1. Switch to **Gemini 1.5 Flash-8B** — highest free RPD\n"
-                "2. Switch to **Anthropic Claude** — reliable, $5 free credit at "
+                "1. Switch to **Gemini 2.0 Flash Lite** — higher free RPD\n"
+                "2. Switch to **Anthropic Claude** — $5 free credit at "
                 "[console.anthropic.com](https://console.anthropic.com)\n"
                 "3. Wait until midnight PT for quota reset "
                 "([monitor](https://ai.dev/rate-limit))\n"
                 "4. Enable billing in AI Studio (~€0.0003/invoice)"
             )
-        return (
-            f"**{provider} 429 — rate limit hit.**\n"
-            "Wait 60 seconds and try again, or check your quota."
-        )
+        return f"**{provider} 429 — rate limit.** Wait 60s and retry."
     if code in (401, 403):
-        gemini_tip = (" For Gemini: key must be from "
-                      "[aistudio.google.com](https://aistudio.google.com) → Get API key."
-                      if _is_gemini(provider) else "")
-        return (
-            f"**{provider} {code} — invalid or expired API key.**\n"
-            f"Copy the full key carefully.{gemini_tip}"
-        )
-    return f"**{provider} HTTP {code}.**\nDetails: {detail[:200]}"
+        tip = (" Key must be from [aistudio.google.com](https://aistudio.google.com)."
+               if _is_gemini(provider) else "")
+        return f"**{provider} {code} — invalid API key.**{tip}"
+    return f"**{provider} HTTP {code}.**"
 
 
 @st.cache_data(show_spinner=False)
 def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
     """
-    Extract tariff data from an invoice PDF using the chosen AI provider SDK.
-    Uses official SDKs (google-generativeai, anthropic, openai) — no raw urllib calls.
+    Extract tariff data from an invoice PDF.
+    Uses google-genai (new SDK), anthropic, and openai packages.
     """
     raw = ""
-
     try:
         # ── Anthropic Claude — native PDF document support ──
         if provider == "anthropic":
-            import anthropic as _anthropic
-            client = _anthropic.Anthropic(api_key=api_key)
+            import anthropic as _anth
+            client = _anth.Anthropic(api_key=api_key)
             msg = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=1024,
@@ -542,26 +569,28 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
             )
             raw = msg.content[0].text
 
-        # ── Google Gemini — native PDF via inline_data ──
+        # ── Google Gemini — new google-genai SDK ──
         elif _is_gemini(provider):
-            import google.generativeai as genai
-            from google.api_core.exceptions import ResourceExhausted, PermissionDenied
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(
-                provider,
-                generation_config=genai.GenerationConfig(max_output_tokens=1024),
+            from google import genai as _genai
+            from google.genai import types as _gtypes
+            client = _genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model=provider,
+                contents=[
+                    EXTRACT_PROMPT,
+                    _gtypes.Part.from_bytes(
+                        data=pdf_bytes,
+                        mime_type="application/pdf",
+                    ),
+                ],
+                config=_gtypes.GenerateContentConfig(max_output_tokens=1024),
             )
-            response = model.generate_content([
-                EXTRACT_PROMPT,
-                {"mime_type": "application/pdf",
-                 "data": base64.b64encode(pdf_bytes).decode()},
-            ])
             raw = response.text
 
-        # ── OpenAI GPT-4o — PDF treated as image (best effort) ──
+        # ── OpenAI GPT-4o ──
         elif provider == "openai":
-            from openai import OpenAI as _OpenAI
-            client = _OpenAI(api_key=api_key)
+            from openai import OpenAI as _OAI
+            client = _OAI(api_key=api_key)
             resp = client.chat.completions.create(
                 model="gpt-4o",
                 max_tokens=1024,
@@ -585,35 +614,32 @@ def parse_invoice_ai(pdf_bytes: bytes, provider: str, api_key: str) -> dict:
         else:
             raise ValueError(f"Unknown provider: {provider}")
 
-    # ── SDK-specific quota/auth exceptions ──
     except Exception as exc:
-        cls = type(exc).__name__
-        msg = str(exc)
+        cls  = type(exc).__name__
+        msg  = str(exc)
 
-        # Google SDK quota exception
         if "ResourceExhausted" in cls or "429" in msg:
             raise RuntimeError(_error_msg(provider, 429)) from exc
-        # Google / Anthropic / OpenAI auth
-        if "PermissionDenied" in cls or "AuthenticationError" in cls or "401" in msg or "403" in msg:
+        if "PermissionDenied" in cls or "AuthenticationError" in cls \
+                or "401" in msg or "403" in msg:
             raise RuntimeError(_error_msg(provider, 401)) from exc
-        # Network
         if "ConnectionError" in cls or "TimeoutError" in cls:
             raise RuntimeError(
-                f"Network error reaching {provider} API. Check your connection."
+                f"Network error reaching {provider}. Check your connection."
             ) from exc
-        # SDK not installed
         if "ModuleNotFoundError" in cls or "ImportError" in cls:
             pkg = {"anthropic": "anthropic", "openai": "openai"}.get(
-                provider, "google-generativeai"
+                provider, "google-genai"
             )
             raise RuntimeError(
                 f"Required package not installed: `{pkg}`\n"
-                f"Add it to requirements.txt and rebuild the container."
+                "Add it to requirements.txt and rebuild the container."
             ) from exc
-        # Re-raise raw if we already set a clean message
         if isinstance(exc, RuntimeError):
             raise
-        raise RuntimeError(f"Unexpected error from {provider}: {msg[:300]}") from exc
+        raise RuntimeError(
+            f"Unexpected error from {provider}: {msg[:300]}"
+        ) from exc
 
     return _parse_raw_json(raw)
 
@@ -708,22 +734,6 @@ def _setup_pdf():
             Choose whether to save your key across container restarts:
         </div>
     </div>""", unsafe_allow_html=True)
-
-    # Force radio label colour via a wrapping container
-    st.markdown("""
-    <style>
-    div[data-testid="stRadio"] label,
-    div[data-testid="stRadio"] label p,
-    div[data-testid="stRadio"] label span {
-        color: #e6edf3 !important;
-        font-size: .88rem !important;
-    }
-    div[data-testid="stRadio"] label:has(input:checked) p,
-    div[data-testid="stRadio"] label:has(input:checked) span {
-        color: #58a6ff !important;
-        font-weight: 600 !important;
-    }
-    </style>""", unsafe_allow_html=True)
 
     api_storage = st.radio(
         "api_storage_radio",
