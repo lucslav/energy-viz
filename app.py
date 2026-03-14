@@ -4,19 +4,27 @@ Smart Meter Dashboard — HDF file analysis
 """
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-from sqlalchemy import create_engine, text
+import plotly.graph_objects as go
+import numpy as np
+from datetime import timedelta
+import base64, re, io, json, os, shutil, hashlib, hmac
+from pathlib import Path
 
-# --- DATABASE SETUP ---
-DB_PATH = "/app/data/energy_viz.db"
-engine = create_engine(f"sqlite:///{DB_PATH}")
-LOGO_URL = "https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png"
+# ─────────────────────────────────────────────
+#  PERSISTENCE LAYER
+#  All user data stored in /app/data (Docker volume).
+#  Mount this volume in docker-compose to survive
+#  container restarts and image rebuilds.
+# ─────────────────────────────────────────────
+DATA_DIR   = Path(os.environ.get("ENERGY_VIZ_DATA", "/app/data"))
+HDF_DIR    = DATA_DIR / "hdf"
+CONFIG_FILE    = DATA_DIR / "config.json"
+API_KEY_FILE   = DATA_DIR / "api_key.enc"
+INVOICE_FILE   = DATA_DIR / "invoice.pdf"
 
-def init_db():
-    with engine.connect() as conn:
-        conn.execute(text("CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, day_rate REAL, night_rate REAL, peak_rate REAL, standing_charge REAL, vat_rate REAL)"))
-        conn.execute(text("CREATE TABLE IF NOT EXISTS consumption (timestamp DATETIME, value REAL, type TEXT, PRIMARY KEY (timestamp, type))"))
-        conn.commit()
+# Create dirs on startup (safe if already exist)
+for d in [DATA_DIR, HDF_DIR]:
+    d.mkdir(parents=True, exist_ok=True)
 
 HDF_SLOTS = {
     "calc":  HDF_DIR / "calckWh.csv",
@@ -930,9 +938,20 @@ def setup_screen():
     </div>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR ---
-settings_df = pd.read_sql("SELECT * FROM settings WHERE id=1", engine)
-v_mul = 1.09 # 9% VAT
+    method = st.radio(
+        "How would you like to enter your tariff?",
+        ["📄 Upload invoice PDF (auto-extract)", "✏️ Enter rates manually"],
+        horizontal=True,
+    )
+
+    if method == "📄 Upload invoice PDF (auto-extract)":
+        _setup_pdf()
+    else:
+        _setup_manual()
+
+
+def _setup_pdf():
+    st.markdown("#### 🤖 AI Invoice Parser")
 
     st.markdown("""
     <div class="alert-box alert-info" style="color:#e6edf3!important">
@@ -1208,6 +1227,13 @@ def _setup_manual(inside_expander=False):
             st.session_state["setup_done"]    = True
             save_config()   # ← persist to /app/data/config.json
             st.rerun()
+
+
+# ─────────────────────────────────────────────
+#  SHOW SETUP SCREEN IF NOT CONFIGURED YET
+# ─────────────────────────────────────────────
+if not st.session_state["setup_done"]:
+    setup_screen()
     st.stop()
 
 # ─────────────────────────────────────────────
