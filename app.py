@@ -1713,7 +1713,7 @@ with tabs[0]:
                                  marker_color=color, marker_line_width=0))
         fig.add_trace(go.Scatter(x=dpiv["date"], y=roll7, name="7-day avg", mode="lines",
                                  line=dict(color=COLORS["yellow"], width=2, dash="dot")))
-        apply_layout(fig, "Daily kWh by tariff + 7-day rolling average", height=360)
+        apply_layout(fig, "", height=360)
         fig.update_layout(barmode="stack", yaxis_title="kWh")
         st.plotly_chart(fig, use_container_width=True)
 
@@ -1770,7 +1770,7 @@ with tabs[1]:
         df_p = df_f[df_f["period"]==p]
         fig.add_trace(go.Scatter(x=df_p["datetime"], y=df_p[y_col], mode="lines", name=label,
                                  line=dict(color=color, width=1), fill="tozeroy", fillcolor=_rgba(color, 0.13)))
-    apply_layout(fig, "Half-hourly kWh by tariff period", height=420)
+    apply_layout(fig, "", height=400)
     fig.update_layout(
         yaxis_title="kWh",
         xaxis=RANGESLIDER_X,
@@ -1780,7 +1780,7 @@ with tabs[1]:
     st.plotly_chart(fig, use_container_width=True)
     # Colour key below chart — avoids all overlap issues
     st.markdown(
-        f'<div style="display:flex;gap:16px;font-size:.78rem;padding:.2rem 0 .5rem">'
+        f'<div style="display:flex;gap:16px;font-size:.78rem;padding:.1rem 0 .4rem;margin-left:52px">'
         f'<span style="color:{COLORS["night"]}">🌙 Night</span>'
         f'<span style="color:{COLORS["day"]}">☀️ Day</span>'
         f'<span style="color:{COLORS["peak"]}">🔥 Peak</span>'
@@ -1807,7 +1807,7 @@ with tabs[1]:
     ))
     fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=_rgba(COLORS["peak"], 0.13), line_width=0,
                    annotation_text="Peak", annotation_font_color=COLORS["peak"])
-    apply_layout(fig2, "Energy heatmap — darker = higher usage", height=max(280, len(heat_piv)*14+60))
+    apply_layout(fig2, "", height=max(280, len(heat_piv)*14+60))
     fig2.update_layout(xaxis_nticks=24, yaxis_autorange="reversed")
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -1855,7 +1855,7 @@ with tabs[2]:
                              marker=dict(color=COLORS["red"], size=6)))
     fig.add_hline(y=p95, line_dash="dash", line_color=COLORS["peak"],
                   annotation_text=f"p95: {p95:.2f} kW", annotation_font_color=COLORS["peak"])
-    apply_layout(fig, "Instantaneous Power Demand — spikes highlighted", height=420)
+    apply_layout(fig, "", height=400)
     fig.update_layout(
         yaxis_title="kW", xaxis=RANGESLIDER_X,
         margin=dict(l=10, r=10, t=40, b=10),
@@ -1863,7 +1863,7 @@ with tabs[2]:
     )
     st.plotly_chart(fig, use_container_width=True)
     st.markdown(
-        f'<div style="display:flex;gap:16px;font-size:.78rem;padding:.2rem 0 .5rem">'
+        f'<div style="display:flex;gap:16px;font-size:.78rem;padding:.1rem 0 .4rem;margin-left:52px">'
         f'<span style="color:{COLORS["kw"]}">— kW</span>'
         f'<span style="color:{COLORS["red"]}">● spikes &gt;p99</span>'
         f'</div>',
@@ -1877,7 +1877,7 @@ with tabs[2]:
                           marker_color=COLORS["peak"], marker_line_width=0))
     fig2.add_trace(go.Scatter(x=ds2["date"], y=ds2["mean"], name="Avg",
                               line=dict(color=COLORS["kw"], width=2, dash="dot")))
-    apply_layout(fig2, "Daily peak vs average demand", height=280)
+    apply_layout(fig2, "", height=280)
     fig2.update_layout(yaxis_title="kW")
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -1890,7 +1890,7 @@ with tabs[2]:
         idx = int(len(sv)*(1-pv))
         fig3.add_vline(x=idx, line_dash="dot", line_color=col,
                        annotation_text=lbl, annotation_font_color=col)
-    apply_layout(fig3, "Load duration curve", height=260)
+    apply_layout(fig3, "", height=260)
     fig3.update_layout(xaxis_title="Reading rank", yaxis_title="kW")
     st.plotly_chart(fig3, use_container_width=True)
 
@@ -1900,7 +1900,7 @@ with tabs[2]:
             for h in hourly["hour"]]
     fig4 = go.Figure(go.Bar(x=hourly["hour"], y=hourly["value"],
                             marker_color=hcol, marker_line_width=0))
-    apply_layout(fig4, "Average kW by hour of day", height=250)
+    apply_layout(fig4, "", height=250)
     fig4.update_layout(xaxis=dict(tickmode="linear", tick0=0, dtick=1, gridcolor=COLORS["grid"]),
                        yaxis_title="kW")
     st.plotly_chart(fig4, use_container_width=True)
@@ -1934,7 +1934,7 @@ with tabs[3]:
             if dc in pivot.columns:
                 fig.add_trace(go.Bar(x=pivot["date"], y=pivot[dc], name=label,
                                      marker_color=color, marker_line_width=0))
-        apply_layout(fig, "Daily consumption per register (delta)", height=340)
+        apply_layout(fig, "", height=340)
         fig.update_layout(barmode="stack", yaxis_title="kWh")
         st.plotly_chart(fig, use_container_width=True)
 
@@ -1944,7 +1944,7 @@ with tabs[3]:
             if cn in pivot.columns:
                 fig2.add_trace(go.Scatter(x=pivot["date"], y=pivot[cn], name=label,
                                           line=dict(color=color, width=2)))
-        apply_layout(fig2, "Cumulative kWh by register", height=280)
+        apply_layout(fig2, "", height=280)
         fig2.update_layout(yaxis_title="kWh (cumulative)")
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -1961,7 +1961,7 @@ with tabs[3]:
         fig.add_hline(y=df_d["daily"].mean(), line_dash="dot", line_color=COLORS["muted"],
                       annotation_text=f"Mean: {df_d['daily'].mean():.1f} kWh",
                       annotation_font_color=COLORS["muted"])
-        apply_layout(fig, "Daily kWh with 7-day trend", height=320)
+        apply_layout(fig, "", height=320)
         fig.update_layout(yaxis_title="kWh/day")
         st.plotly_chart(fig, use_container_width=True)
 
@@ -2044,7 +2044,7 @@ with tabs[4]:
     fig_m.add_trace(go.Scatter(x=mo["month_str"], y=mo["total"], name="Total",
                                mode="lines+markers", line=dict(color=COLORS["total"], width=2),
                                marker=dict(size=7)))
-    apply_layout(fig_m, "Monthly estimated bill", height=340)
+    apply_layout(fig_m, "", height=340)
     fig_m.update_layout(barmode="stack", yaxis_title="€")
     st.plotly_chart(fig_m, use_container_width=True)
 
@@ -2063,7 +2063,7 @@ with tabs[5]:
                   for v in monthly_avg["avg"]]
     fig = go.Figure(go.Bar(x=monthly_avg["month"], y=monthly_avg["avg"],
                            marker_color=bar_colors, marker_line_width=0))
-    apply_layout(fig, "Avg daily kWh by month", height=260)
+    apply_layout(fig, "", height=260)
     fig.update_layout(yaxis_title="kWh/day")
     st.plotly_chart(fig, use_container_width=True)
 
@@ -2082,7 +2082,7 @@ with tabs[5]:
                    annotation_text="Peak", annotation_font_color=COLORS["peak"])
     fig2.add_vrect(x0="00:00", x1="07:30", fillcolor=_rgba(COLORS["night"], 0.13), line_width=0,
                    annotation_text="Night", annotation_font_color=COLORS["night"])
-    apply_layout(fig2, "Average kWh per 30-min slot", height=300)
+    apply_layout(fig2, "", height=300)
     fig2.update_layout(
         xaxis=dict(
             tickangle=-45,
@@ -2106,7 +2106,7 @@ with tabs[5]:
         x=dow_avg["name"], y=dow_avg["value"],
         marker_color=[COLORS["peak"] if d>=5 else COLORS["day"] for d in dow_avg["dow"]],
         marker_line_width=0))
-    apply_layout(fig3, "Average daily kWh by day of week", height=250)
+    apply_layout(fig3, "", height=250)
     fig3.update_layout(yaxis_title="kWh/day")
     st.plotly_chart(fig3, use_container_width=True)
 
@@ -2146,7 +2146,7 @@ with tabs[5]:
     fig5.add_hline(y=thresh, line_dash="dash", line_color=COLORS["red"],
                    annotation_text=f"mean+2σ = {thresh:.1f} kWh",
                    annotation_font_color=COLORS["red"])
-    apply_layout(fig5, "Daily kWh with anomaly threshold", height=300)
+    apply_layout(fig5, "", height=300)
     fig5.update_layout(yaxis_title="kWh/day")
     st.plotly_chart(fig5, use_container_width=True)
     if len(anom):
@@ -2402,7 +2402,7 @@ with tabs[6]:
                        line_color=COLORS["muted"],
                        annotation_text="Bill date", annotation_font_color=COLORS["muted"])
 
-    apply_layout(fig_proj, "Cumulative bill cost — actual + 3 forecast methods", height=380)
+    apply_layout(fig_proj, "", height=380)
     fig_proj.update_layout(yaxis_title="€ (cumulative)")
     st.plotly_chart(fig_proj, use_container_width=True)
 
