@@ -1293,7 +1293,7 @@ def setup_screen():
         horizontal=True,
     )
 
-    if method == "📄 Upload invoice PDF (auto-extract)":
+    if method == t("upload_pdf_opt"):
         _setup_pdf()
     else:
         _setup_manual()
@@ -1550,13 +1550,13 @@ def _setup_manual(inside_expander=False):
                                     help="Leave empty to skip — prediction tab will be unavailable")
             b_days  = st.number_input(t("billing_cycle_days"), value=60, min_value=14, max_value=120, step=1)
         with b2:
-            st.markdown("""
+            st.markdown(f"""
             <div style="background:#1c2330;border:1px solid #30363d;border-radius:10px;
                         padding:1rem;margin-top:1.7rem;font-size:.82rem;color:#7d8590">
                 {t("billing_tip")}
             </div>""", unsafe_allow_html=True)
 
-        st.markdown("""
+        st.markdown(f"""
         <div class="alert-box alert-info" style="margin-top:.5rem">
             {t("default_rates_tip")}
         </div>""", unsafe_allow_html=True)
