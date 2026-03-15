@@ -1326,7 +1326,19 @@ def _setup_pdf():
 
     col1, col2 = st.columns([1, 1])
     with col1:
-        provider_name = st.selectbox(t("ai_provider"), list(PROVIDERS.keys()))
+        _provider_display = {
+            "Anthropic (Claude 3.5 Sonnet)": "Anthropic (Claude 3.5 Sonnet)",
+            "Google (Gemini 2.5 Flash)": "Google (Gemini 2.5 Flash)",
+            "Google (Gemini 2.0 Flash)": "Google (Gemini 2.0 Flash)",
+            "Google (Gemini 2.0 Flash Lite)": "Google (Gemini 2.0 Flash Lite)",
+            "OpenRouter (choose model below)": f"OpenRouter ({t('period_selector').lower()} model)",
+            "OpenAI (GPT-4o)": "OpenAI (GPT-4o)",
+        }
+        _provider_keys = list(PROVIDERS.keys())
+        _provider_labels = [_provider_display.get(k, k) for k in _provider_keys]
+        _provider_idx = st.selectbox(t("ai_provider"), range(len(_provider_keys)),
+                                     format_func=lambda i: _provider_labels[i])
+        provider_name = _provider_keys[_provider_idx]
     with col2:
         # Pre-fill from per-provider storage
         saved_keys  = st.session_state.get("api_keys", {})
@@ -1630,14 +1642,14 @@ def _dedup_hdf(df: pd.DataFrame, value_col: str = "Read Value") -> tuple[pd.Data
 
     # Drop rows where MPRN + timestamp + raw value are 100% identical
     df = df.drop_duplicates(
-        subset=[t("mprn_optional"), "Read Date and End Time", value_col], keep="first"
+        subset=["MPRN", "Read Date and End Time", value_col], keep="first"
     ).reset_index(drop=True)
 
     after  = len(df)
     removed = before - after
 
     # Count remaining timestamp duplicates (these are legitimate DST slots)
-    ts_dupes = df.duplicated(subset=[t("mprn_optional"), "Read Date and End Time"], keep=False).sum()
+    ts_dupes = df.duplicated(subset=["MPRN", "Read Date and End Time"], keep=False).sum()
 
     report = {
         "rows_raw":     before,
@@ -1807,7 +1819,7 @@ with st.sidebar:
         elif info:
             return f'<span style="color:#7d8590">💾 {slot} <span style="font-size:.65rem">({info["modified"]})</span></span>'
         else:
-            return f'<span style="color:#30363d">○ {slot}</span>'
+            return f'<span style="color:#30363d">○ {slot} — {t("not_loaded")}</span>'
 
     status_html = " · ".join([
         _slot_status("calc",  f_calc),
@@ -1817,16 +1829,16 @@ with st.sidebar:
     ])
     st.markdown(
         f'<div style="font-size:.7rem;margin-top:.4rem;line-height:1.8">{status_html}</div>'
-        '<div style="font-size:.65rem;color:#30363d;margin-top:2px">'
-        '✅ just uploaded &nbsp;·&nbsp; 💾 saved from previous session &nbsp;·&nbsp; ○ not available'
-        '</div>',
+        f'<div style="font-size:.65rem;color:#30363d;margin-top:2px">'
+        f'✅ {t("just_uploaded")} &nbsp;·&nbsp; 💾 {t("saved_session")} &nbsp;·&nbsp; ○ {t("not_available")}'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
     if not f_calc and not hdf_file_info("calc"):
         st.markdown(
-            '<div style="font-size:.72rem;color:#f0883e;margin-top:.3rem">'
-            '⚠️ Upload the ⭐ calckWh file to begin analysis</div>',
+            f'<div style="font-size:.72rem;color:#f0883e;margin-top:.3rem">'
+            f'⚠️ {t("upload_calc_first")}</div>',
             unsafe_allow_html=True,
         )
 
