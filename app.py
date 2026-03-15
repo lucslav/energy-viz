@@ -1814,7 +1814,11 @@ with tabs[1]:
         xaxis=dict(
             tickmode="array",
             tickvals=[f"{h:02d}:00" for h in range(0, 24)],
-            ticktext=[f"{h:02d}:00" if h % 3 == 0 else "" for h in range(0, 24)],
+            ticktext=[f"{h:02d}:00" if h % 3 == 0 else " " for h in range(0, 24)],
+            ticks="outside",
+            ticklen=4,
+            tickwidth=1,
+            tickcolor=COLORS["text"],
             tickfont=dict(size=9, color=COLORS["text"]),
             tickangle=-45,
         ),
@@ -1918,11 +1922,14 @@ with tabs[2]:
         xaxis=dict(
             tickmode="array",
             tickvals=[f"{h:02d}:00" for h in range(0, 24)],
-            ticktext=[f"{h:02d}:00" if h % 3 == 0 else "" for h in range(0, 24)],
+            ticktext=[f"{h:02d}:00" if h % 3 == 0 else " " for h in range(0, 24)],
+            ticks="outside",
+            ticklen=4,
+            tickwidth=1,
+            tickcolor=COLORS["text"],
             tickfont=dict(size=9, color=COLORS["text"]),
             tickangle=-45,
             gridcolor=COLORS["grid"],
-            showticklabels=True,
         ),
         yaxis_title="kW",
     )
@@ -2109,12 +2116,15 @@ with tabs[5]:
     fig2.update_layout(
         xaxis=dict(
             tickmode="array",
-            tickvals=[slot_avg["time"].iloc[i] for i in range(0, len(slot_avg), 2)],  # every hour (2 slots)
-            ticktext=[slot_avg["time"].iloc[i] if i % 6 == 0 else "" for i in range(0, len(slot_avg), 2)],
+            tickvals=[slot_avg["time"].iloc[i] for i in range(0, len(slot_avg), 2)],
+            ticktext=[slot_avg["time"].iloc[i] if i % 6 == 0 else " " for i in range(0, len(slot_avg), 2)],
+            ticks="outside",
+            ticklen=4,
+            tickwidth=1,
+            tickcolor=COLORS["text"],
             tickfont=dict(size=9, color=COLORS["text"]),
             tickangle=-45,
             gridcolor=COLORS["grid"],
-            showticklabels=True,
         ),
         yaxis_title="avg kWh",
     )
