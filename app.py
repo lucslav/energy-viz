@@ -1476,10 +1476,10 @@ with st.sidebar:
     # ── Update / reset ──
     st.divider()
     st.markdown("##### 🔄 Configuration")
-    if st.button("📄 Re-parse invoice / Change rates"):
+    if st.button("📄 Change rates / Re-parse", use_container_width=True):
         st.session_state["setup_done"] = False
         st.rerun()
-    if st.button("🗑️ Clear all saved data"):
+    if st.button("🗑️ Clear all saved data", use_container_width=True):
         if st.session_state.get("_confirm_clear"):
             import shutil as _shutil
             _shutil.rmtree(DATA_DIR, ignore_errors=True)
@@ -1755,16 +1755,15 @@ with tabs[1]:
     min_d = df_calc["datetime"].min().date()
     max_d = df_calc["datetime"].max().date()
 
-    # Date range + view mode on same row
-    ca, cb, cc = st.columns([2, 2, 1])
+    # Date range
+    ca, cb = st.columns(2)
     with ca: d_from = st.date_input("From", value=min_d, min_value=min_d, max_value=max_d, key="cf")
     with cb: d_to   = st.date_input("To",   value=max_d, min_value=min_d, max_value=max_d, key="ct")
-    with cc: view_mode = st.radio("View", ["kWh", "€"], horizontal=True, key="cons_view")
     mask = (df_calc["date"] >= d_from) & (df_calc["date"] <= d_to)
     df_f = df_calc[mask].copy()
 
-    y_col   = "cost_net" if view_mode == "€" else "value"
-    y_label = "€" if view_mode == "€" else "kWh"
+    y_col   = "value"
+    y_label = "kWh"
 
     fig = go.Figure()
     for p, color, label in [("night",COLORS["night"],"🌙 Night"),("day",COLORS["day"],"☀️ Day"),("peak",COLORS["peak"],"🔥 Peak")]:
@@ -1826,6 +1825,12 @@ with tabs[2]:
     p99  = df_f["value"].quantile(0.99)
 
     k1, k2, k3, k4 = st.columns(4)
+    # Sanity check - domestic meters should be < 20 kW
+    max_val = df_f['value'].max()
+    if max_val > 50:
+        st.warning(f"⚠️ Peak value {max_val:,.1f} seems very high for a domestic meter. "
+                   f"Check you uploaded the correct file — Power Demand expects the "
+                   f"`HDF_kW_…csv` file, not the calckWh file.")
     k1.metric("Peak demand",  f"{df_f['value'].max():.3f} kW")
     k2.metric("Avg demand",   f"{df_f['value'].mean():.3f} kW")
     k3.metric("95th pct",     f"{p95:.3f} kW")
