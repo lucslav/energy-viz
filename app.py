@@ -1522,76 +1522,43 @@ tabs = st.tabs([
 _any_persisted = any(hdf_file_info(s) for s in ["calc","kw","dnp","daily"])
 if not any([f_calc, f_dnp, f_kw, f_daily]) and not _any_persisted:
     with tabs[0]:
-        st.markdown(f"""
-        <div style="text-align:center;padding:2.5rem 2rem 1.5rem;background:#161b22;border-radius:16px;
-                    border:1px dashed #30363d;margin-top:1.5rem">
-            <img src="{LOGO_URL}" style="height:52px;margin-bottom:.8rem"
-                 onerror="this.style.display='none'">
-            <h2 style="color:#e6edf3;margin:.3rem 0">Upload HDF files to begin</h2>
-            <p style="color:#7d8590;font-size:.84rem;margin:.3rem auto .8rem;max-width:380px">
-                Download CSV exports from the
-                <a href="https://myaccount.esbnetworks.ie/Api/HistoricConsumption" style="color:#58a6ff" target="_blank">smart meter portal</a>
-                and upload them using the sidebar on the left.
-            </p>
-        </div>
+        st.markdown("<br>", unsafe_allow_html=True)
+        # ── Hero ──
+        c1, c2, c3 = st.columns([1, 2, 1])
+        with c2:
+            st.markdown(f"""
+<div style="text-align:center;padding:2rem 1.5rem;background:#161b22;
+            border-radius:16px;border:1px dashed #30363d">
+<img src="{LOGO_URL}" style="height:52px;margin-bottom:.8rem"
+     onerror="this.style.display:none">
+<h2 style="color:#e6edf3;margin:.3rem 0 .5rem">Upload HDF files to begin</h2>
+<p style="color:#7d8590;font-size:.84rem;margin:0 auto;max-width:360px">
+Download CSV exports from the
+<a href="https://myaccount.esbnetworks.ie/Api/HistoricConsumption"
+   style="color:#58a6ff" target="_blank">smart meter portal</a>
+and upload them using the sidebar on the left.
+</p>
+</div>""", unsafe_allow_html=True)
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:1rem;max-width:560px;margin-left:auto;margin-right:auto">
+        st.markdown("<br>", unsafe_allow_html=True)
 
-            <div style="background:linear-gradient(135deg,#1f3a5f,#1c2330);border:1px solid #58a6ff55;
-                        border-left:4px solid #58a6ff;border-radius:12px;padding:1rem">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
-                    <span>⭐</span>
-                    <strong style="color:#58a6ff;font-size:.85rem">calckWh — Start here</strong>
-                </div>
-                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
-                    <code style="color:#e6edf3;font-size:.7rem">HDF_calckWh_…csv</code><br>
-                    30-min kWh intervals with tariff split (Day / Peak / Night).
-                    Powers <strong style="color:#e6edf3">all analysis tabs</strong>,
-                    cost calculations and bill prediction.
-                </div>
-            </div>
+        # ── File type cards ──
+        ca, cb, cc, cd = st.columns(4)
+        for col, icon, color, title, fname, desc in [
+            (ca, "⭐", "#58a6ff", "calckWh",    "HDF_calckWh_…csv",        "30-min kWh · Day/Peak/Night · **required**"),
+            (cb, "⚡", "#39d0d8", "kW Demand",  "HDF_kW_…csv",             "Instantaneous kW · spike detection"),
+            (cc, "🌙", "#bc8cff", "Daily DNP",  "HDF_DailyDNP_kWh_…csv",  "Cumulative registers · invoice check"),
+            (cd, "📅", "#3fb950", "Daily kWh",  "HDF_Daily_kWh_…csv",     "24h total · long-range trend"),
+        ]:
+            with col:
+                st.markdown(f"""
+<div style="background:#161b22;border:1px solid #30363d;
+            border-top:3px solid {color};border-radius:10px;padding:.8rem;height:100%">
+<div style="font-weight:700;font-size:.82rem;color:{color};margin-bottom:.3rem">{icon} {title}</div>
+<div style="font-size:.68rem;color:#7d8590;font-family:monospace;margin-bottom:.4rem">{fname}</div>
+<div style="font-size:.72rem;color:#a0aab4">{desc}</div>
+</div>""", unsafe_allow_html=True)
 
-            <div style="background:#161b22;border:1px solid #30363d;
-                        border-left:4px solid #39d0d8;border-radius:12px;padding:1rem">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
-                    <span>⚡</span>
-                    <strong style="color:#39d0d8;font-size:.85rem">kW — Power demand</strong>
-                </div>
-                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
-                    <code style="color:#e6edf3;font-size:.7rem">HDF_kW_…csv</code><br>
-                    Instantaneous power in kW. Identifies high-draw appliances
-                    and demand spikes. Mathematically derived from calckWh × 2.
-                </div>
-            </div>
-
-            <div style="background:#161b22;border:1px solid #30363d;
-                        border-left:4px solid #bc8cff;border-radius:12px;padding:1rem">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
-                    <span>🌙</span>
-                    <strong style="color:#bc8cff;font-size:.85rem">Daily DNP — Invoice check</strong>
-                </div>
-                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
-                    <code style="color:#e6edf3;font-size:.7rem">HDF_DailyDNP_kWh_…csv</code><br>
-                    Cumulative meter registers by Night / Day / Peak. Used to
-                    cross-verify register readings against your electricity bill.
-                </div>
-            </div>
-
-            <div style="background:#161b22;border:1px solid #30363d;
-                        border-left:4px solid #3fb950;border-radius:12px;padding:1rem">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:.4rem">
-                    <span>📅</span>
-                    <strong style="color:#3fb950;font-size:.85rem">Daily kWh — Long range</strong>
-                </div>
-                <div style="font-size:.75rem;color:#7d8590;line-height:1.5">
-                    <code style="color:#e6edf3;font-size:.7rem">HDF_Daily_kWh_…csv</code><br>
-                    Single 24h cumulative register (no tariff split). Best for
-                    viewing long-range daily consumption trends over many months.
-                </div>
-            </div>
-
-        </div>
-        """, unsafe_allow_html=True)
     st.stop()
 
 # ── Load data — uploaded file takes priority, fallback to persisted ──
