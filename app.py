@@ -569,6 +569,15 @@ def fmt_date(dt, fmt="%d %b %Y") -> str:
 #  TRANSLATIONS
 # ─────────────────────────────────────────────
 TRANSLATIONS = {
+    # ── Month names ──
+    "months_short": {
+        "en": ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+        "pl": ["sty","lut","mar","kwi","maj","cze","lip","sie","wrz","paź","lis","gru"],
+    },
+    "months_long": {
+        "en": ["January","February","March","April","May","June","July","August","September","October","November","December"],
+        "pl": ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"],
+    },
     # ── App shell ──
     "app_title":            {"en": "Smart Meter Dashboard",       "pl": "Panel Licznika"},
     "app_subtitle":         {"en": "Smart Meter HDF Analysis",    "pl": "Analiza plików HDF"},
@@ -1339,7 +1348,7 @@ def _setup_pdf():
         <div style="background:#1c2330;border:1px solid #30363d;
                     border-left:3px solid #58a6ff;border-radius:10px;
                     padding:.7rem 1rem;margin:.4rem 0;font-size:.82rem;color:#e6edf3">
-            🔀 <strong>OpenRouter</strong> — enter the model ID from
+            🔀 <strong>OpenRouter</strong> — {t("openrouter_info")}
             <a href="https://openrouter.ai/models" style="color:#58a6ff" target="_blank">openrouter.ai/models</a>.<br>
             {t("openrouter_free")}<br>
             <code>google/gemini-2.5-flash-lite</code> &nbsp;·&nbsp;
@@ -1414,7 +1423,7 @@ def _setup_pdf():
 
     if pdf_file and api_key:
         if st.button(t("extract_btn")):
-            with st.spinner(f"Analysing invoice with {provider_name}…"):
+            with st.spinner(f"{t('analysing_invoice')} {provider_name}…"):
                 try:
                     pdf_bytes = pdf_file.getvalue()
                     data = parse_invoice_ai(pdf_bytes, provider_code, api_key_effective)
