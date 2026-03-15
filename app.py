@@ -690,12 +690,12 @@ TRANSLATIONS = {
     "upload_dnp_first":     {"en": "Upload <strong>Daily DNP</strong> or <strong>Daily kWh</strong>.", "pl": "Wgraj plik <strong>Daily DNP</strong> lub <strong>Daily kWh</strong>."},
     "incomplete_data":      {"en": "day(s) with incomplete 30-min data", "pl": "dzień/dni z niekompletnymi danymi 30-min"},
     "days_label":           {"en": "days",                        "pl": "dni"},
-    "kwh_day":              {"en": "kWh/day",                     "pl": "kWh/dzień"},
+    "kwh_day":              {"en": t("kwh_day_unit"),                     "pl": "kWh/dzień"},
     "w_standby":            {"en": "W (2–4am)",                   "pl": "W (2–4 rano)"},
     "incl_off":             {"en": "incl. {pct}% off",            "pl": "z rabatem {pct}%"},
     "gross":                {"en": "gross",                       "pl": "brutto"},
-    "days_remaining":       {"en": "days remaining",              "pl": "dni pozostało"},
-    "days_elapsed":         {"en": "days elapsed",                "pl": "dni minęło"},
+    "days_remaining":       {"en": t("days_remaining"),              "pl": "dni pozostało"},
+    "days_elapsed":         {"en": t("days_elapsed"),                "pl": "dni minęło"},
     "period_end":           {"en": "Period End",                  "pl": "Koniec okresu"},
     "consumed_so_far":      {"en": "Consumed so far",             "pl": "Zużyto dotąd"},
     "daily_avg_period":     {"en": "Daily avg (period)",          "pl": "Średnia dzienna (okres)"},
@@ -802,11 +802,11 @@ TRANSLATIONS = {
     "seasonal_model":       {"en": "Seasonal model",               "pl": "Model sezonowy"},
     "rolling_14d":          {"en": "14-day rolling avg",           "pl": "Średnia krocząca 14 dni"},
     "early_estimate":       {"en": "early estimate, wide range",   "pl": "wczesna estymacja, szeroki zakres"},
-    "curr_period_daily":    {"en": "Current period daily avg × remaining days", "pl": "Średnia dzienna bieżącego okresu × pozostałe dni"},
-    "hist_monthly":         {"en": "Historical monthly averages per remaining day", "pl": "Historyczne średnie miesięczne na dzień"},
-    "recent_14d":           {"en": "Recent 14-day trend × remaining days", "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
+    "curr_period_daily":    {"en": t("curr_period_desc"), "pl": "Średnia dzienna bieżącego okresu × pozostałe dni"},
+    "hist_monthly":         {"en": t("hist_monthly_desc"), "pl": "Historyczne średnie miesięczne na dzień"},
+    "recent_14d":           {"en": t("recent_14d_desc"), "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
     "pct_elapsed":          {"en": "elapsed",                      "pl": "minęło"},
-    "total_peak_kwh":       {"en": "Total peak kWh",               "pl": "Łącznie kWh szczytowych"},
+    "total_peak_kwh":       {"en": t("total_peak_kwh"),               "pl": "Łącznie kWh szczytowych"},
     "at_shift_pct":         {"en": "At {pct}% shift",             "pl": "Przy przesunięciu {pct}%"},
     "night_cheaper":        {"en": "night {pct}% cheaper",         "pl": "noc tańsza o {pct}%"},
     "annual_standby":       {"en": "Annual standby kWh",           "pl": "Roczne kWh w standby"},
@@ -821,7 +821,7 @@ TRANSLATIONS = {
     "elec_bill":            {"en": "electricity bill",             "pl": "rachunku za prąd"},
     "days_label2":          {"en": "days",                         "pl": "dni"},
     "data_span_days":       {"en": "days",                         "pl": "dni"},
-    "kwh_day_lbl":          {"en": "kWh/day",                      "pl": "kWh/dzień"},
+    "kwh_day_lbl":          {"en": t("kwh_day_unit"),                      "pl": "kWh/dzień"},
     "per_day":              {"en": "/day",                         "pl": "/dzień"},
     "gross_lbl":            {"en": "gross",                        "pl": "brutto"},
     "energy_charges":       {"en": "Energy charges (gross)",       "pl": "Opłaty za energię (brutto)"},
@@ -830,6 +830,69 @@ TRANSLATIONS = {
     "vat_label":            {"en": "VAT 9%",                       "pl": "VAT 9%"},
     "est_bill":             {"en": "Est. total bill",              "pl": "Szac. rachunek łączny"},
     "incl_off_lbl":         {"en": "incl. {n}% off",              "pl": "z rabatem {n}%"},
+    # Chart trace names
+    "day_off_peak":         {"en": "Day Off-Peak",               "pl": "Dzień poza szczytem"},
+    "seven_day_avg":        {"en": "7-day avg",                  "pl": "śr. 7 dni"},
+    "rolling_avg_label":    {"en": "7-day average",              "pl": "Śr. 7-dniowa"},
+    "trace_avg":            {"en": "Avg",                        "pl": "Śred."},
+    "trace_total":          {"en": "Total",                      "pl": "Łącznie"},
+    "trace_energy":         {"en": "Energy",                     "pl": "Energia"},
+    "trace_simple":         {"en": "Simple interpolation",       "pl": "Prosta interpolacja"},
+    "trace_seasonal":       {"en": "Seasonal model",             "pl": "Model sezonowy"},
+    "trace_14d":            {"en": "14-day rolling avg",         "pl": "Śr. krocząca 14 dni"},
+    "trace_kwh":            {"en": "kWh",                        "pl": "kWh"},
+    "bill_date":            {"en": t("bill_date"),                  "pl": "Data rachunku"},
+    "all_time":             {"en": t("all_time"),                   "pl": "łącznie"},
+    "kwh_year_est":         {"en": t("kwh_year_est"),              "pl": "kWh/rok (est.)"},
+    "kwh_day_unit":         {"en": t("kwh_day_unit"),                    "pl": "kWh/dzień"},
+    "kw_cumulative":        {"en": "kWh (cumulative)",           "pl": "kWh (skumulowane)"},
+    "reading_rank":         {"en": "Reading rank",               "pl": "Pozycja odczytu"},
+    "vs_avg":               {"en": "vs avg",                     "pl": "vs śr."},
+    "mean_2sigma":          {"en": ">mean+2σ",                   "pl": ">śr.+2σ"},
+    "trace_0":              {"en": "kWh",                        "pl": "kWh"},
+    "median":               {"en": "Median",                     "pl": "Mediana"},
+    "predicted_bill_range": {"en": t("predicted_bill_range"),       "pl": "Przewidywany zakres rachunku"},
+    "most_likely":          {"en": t("most_likely"),                "pl": "Najbardziej prawdopodobny"},
+    "range_label":          {"en": t("range_label"),                      "pl": "Zakres"},
+    "projected":            {"en": "projected",                  "pl": "prognoza"},
+    "curr_period_desc":     {"en": t("curr_period_desc"), "pl": "Śr. dzienna bieżącego okresu × pozostałe dni"},
+    "hist_monthly_desc":    {"en": t("hist_monthly_desc"), "pl": "Historyczne średnie miesięczne na dzień"},
+    "recent_14d_desc":      {"en": t("recent_14d_desc"), "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
+    "prediction_accuracy":  {"en": "Prediction accuracy depends on how much of the period has elapsed. Currently {pct}% complete — early estimate, wide range.",
+                             "pl": "Dokładność prognozy zależy od stopnia zaawansowania okresu. Obecnie {pct}% — wczesna estymacja, szeroki zakres."},
+    "simple_extrap":        {"en": t("simple_extrap"),   "pl": "📈 Prosta ekstrapolacja"},
+    "seasonal_m":           {"en": t("seasonal_m"),        "pl": "🌡️ Model sezonowy"},
+    "rolling_14d_m":        {"en": t("rolling_14d_m"),     "pl": "📅 Śr. krocząca 14 dni"},
+    "est_total_due":        {"en": t("est_total_due"),             "pl": "Szac. kwota do zapłaty"},
+    "period_start":         {"en": t("period_start"),               "pl": "Początek okresu"},
+    "cycle_length":         {"en": t("cycle_length"),        "pl": "Długość cyklu (dni)"},
+    "next_bill_expected":   {"en": t("next_bill_expected"),         "pl": "OCZEKIWANA DATA RACHUNKU"},
+    "update_billing":       {"en": t("update_billing"),  "pl": "💾 Aktualizuj okres rozliczeniowy"},
+    "days_elapsed_n":       {"en": "{n} days elapsed",           "pl": "{n} dni minęło"},
+    "days_remaining_n":     {"en": "{n} days remaining",         "pl": "{n} dni pozostało"},
+    "elapsed_pct":          {"en": "elapsed",                    "pl": "minęło"},
+    "day_label_chart":      {"en": "Day",                        "pl": "Dzień"},
+    "peak_label_chart":     {"en": "Peak",                       "pl": "Szczyt"},
+    "night_label_chart":    {"en": "Night",                      "pl": "Noc"},
+    # Weekday names
+    "mon": {"en": "Monday",    "pl": "Poniedziałek"},
+    "tue": {"en": "Tuesday",   "pl": "Wtorek"},
+    "wed": {"en": "Wednesday", "pl": "Środa"},
+    "thu": {"en": "Thursday",  "pl": "Czwartek"},
+    "fri": {"en": "Friday",    "pl": "Piątek"},
+    "sat": {"en": "Saturday",  "pl": "Sobota"},
+    "sun": {"en": "Sunday",    "pl": "Niedziela"},
+    # Misc chart labels
+    "standing_lbl":         {"en": "Standing",                   "pl": "Opłata stała"},
+    "energy_cost_period":   {"en": t("energy_cost_period"), "pl": "Koszt energii wg taryfy"},
+    "cross_val_note":       {"en": t("cross_val_note"),
+                             "pl": "Weryfikacja: kW × 0,5h ≈ calckWh — śr. błąd <0,001 kWh/interwał."},
+    "kw_year_unit":         {"en": t("kwh_year_est"),              "pl": "kWh/rok (est.)"},
+    "night_cheaper_pct":    {"en": "night {pct}% cheaper",       "pl": "noc tańsza o {pct}%"},
+    "at_shift_label":       {"en": "At {pct}% shift",            "pl": "Przy przesunięciu {pct}%"},
+    "date_col":             {"en": "Date",                       "pl": "Data"},
+    "kwh_col":              {"en": "kWh",                        "pl": "kWh"},
+    "vs_avg_col":           {"en": "vs avg",                     "pl": "vs śr."},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
 }
 
@@ -2065,7 +2128,7 @@ with tabs[0]:
         avg_daily_cost = total_cost / days_data
         standby    = df_ov[df_ov["hour"].isin([2,3])]["value"].mean()
         kpis.append(kpi_html(t("total_consumption"),  f"{total_kwh:,.0f}", "kWh", "blue"))
-        kpis.append(kpi_html(t("daily_average"),       f"{avg_daily_kwh:.1f}", "kWh/day", "green"))
+        kpis.append(kpi_html(t("daily_average"),       f"{avg_daily_kwh:.1f}", t("kwh_day_unit"), "green"))
         kpis.append(kpi_html(t("energy_cost"),        f"€{total_cost:,.2f}",
                               f"incl. {DISC_PCT:.0f}% off", "orange"))
         kpis.append(kpi_html(t("avg_daily_cost"),     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
@@ -2095,13 +2158,13 @@ with tabs[0]:
 
         fig = go.Figure()
         for p, color, label in [
-            ("night",COLORS["night"],"🌙 Night"),
-            ("day",  COLORS["day"],  "☀️ Day"),
-            ("peak", COLORS["peak"], "🔥 Peak"),
+            ("night",COLORS["night"],f"🌙 {t('night_label_chart')}"),
+            ("day",  COLORS["day"],  f"☀️ {t('day_label_chart')}"),
+            ("peak", COLORS["peak"], f"🔥 {t('peak_label_chart')}"),
         ]:
             fig.add_trace(go.Bar(x=dpiv["date"], y=dpiv[p], name=label,
                                  marker_color=color, marker_line_width=0))
-        fig.add_trace(go.Scatter(x=dpiv["date"], y=roll7, name="7-day avg", mode="lines",
+        fig.add_trace(go.Scatter(x=dpiv["date"], y=roll7, name=t("seven_day_avg"), mode="lines",
                                  line=dict(color=COLORS["yellow"], width=2, dash="dot")))
         apply_layout(fig, "", height=360)
         fig.update_layout(barmode="stack", yaxis_title="kWh")
@@ -2156,7 +2219,7 @@ with tabs[1]:
     y_label = "kWh"
 
     fig = go.Figure()
-    for p, color, label in [("night",COLORS["night"],"🌙 Night"),("day",COLORS["day"],"☀️ Day"),("peak",COLORS["peak"],"🔥 Peak")]:
+    for p, color, label in [("night",COLORS["night"],f"🌙 {t('night_label_chart')}"),("day",COLORS["day"],f"☀️ {t('day_label_chart')}"),("peak",COLORS["peak"],f"🔥 {t('peak_label_chart')}")]:
         df_p = df_f[df_f["period"]==p]
         fig.add_trace(go.Scatter(x=df_p["datetime"], y=df_p[y_col], mode="lines", name=label,
                                  line=dict(color=color, width=1), fill="tozeroy", fillcolor=_rgba(color, 0.13)))
@@ -2281,7 +2344,7 @@ with tabs[2]:
     fig2 = go.Figure()
     fig2.add_trace(go.Bar(x=ds2["date"], y=ds2["max"], name=t("peak_rate"),
                           marker_color=COLORS["peak"], marker_line_width=0))
-    fig2.add_trace(go.Scatter(x=ds2["date"], y=ds2["mean"], name="Avg",
+    fig2.add_trace(go.Scatter(x=ds2["date"], y=ds2["mean"], name=t("trace_avg"),
                               line=dict(color=COLORS["kw"], width=2, dash="dot")))
     apply_layout(fig2, "", height=280)
     fig2.update_layout(yaxis_title="kW")
@@ -2334,8 +2397,8 @@ with tabs[3]:
         alert("Upload <strong>Daily DNP</strong> or <strong>Daily kWh</strong>.", "info"); st.stop()
 
     col_map = {
-        "Night Import Register (kWh)":        (COLORS["night"], "🌙 Night"),
-        "Day Peak Import Register (kWh)":     (COLORS["peak"],  "🔥 Peak"),
+        "Night Import Register (kWh)":        (COLORS["night"], f"🌙 {t('night_label_chart')}"),
+        "Day Peak Import Register (kWh)":     (COLORS["peak"],  f"🔥 {t('peak_label_chart')}"),
         "Day Off-Peak Import Register (kWh)": (COLORS["day"],   "☀️ Day Off-Peak"),
     }
 
@@ -2365,7 +2428,7 @@ with tabs[3]:
                 fig2.add_trace(go.Scatter(x=pivot["date"], y=pivot[cn], name=label,
                                           line=dict(color=color, width=2)))
         apply_layout(fig2, "", height=280)
-        fig2.update_layout(yaxis_title="kWh (cumulative)")
+        fig2.update_layout(yaxis_title=t("kw_cumulative"))
         st.plotly_chart(fig2, use_container_width=True)
 
     if df_daily is not None:
@@ -2375,14 +2438,14 @@ with tabs[3]:
         df_d["roll7"] = df_d["daily"].rolling(7, min_periods=1).mean()
         fig = go.Figure()
         fig.add_trace(go.Bar(x=df_d["date"], y=df_d["daily"],
-                             marker_color=COLORS["total"], marker_line_width=0, name="kWh"))
-        fig.add_trace(go.Scatter(x=df_d["date"], y=df_d["roll7"], name="7-day avg",
+                             marker_color=COLORS["total"], marker_line_width=0, name=t("trace_kwh")))
+        fig.add_trace(go.Scatter(x=df_d["date"], y=df_d["roll7"], name=t("seven_day_avg"),
                                  line=dict(color=COLORS["yellow"], width=2)))
         fig.add_hline(y=df_d["daily"].mean(), line_dash="dot", line_color=COLORS["muted"],
                       annotation_text=f"Mean: {df_d['daily'].mean():.1f} kWh",
                       annotation_font_color=COLORS["muted"])
         apply_layout(fig, "", height=320)
-        fig.update_layout(yaxis_title="kWh/day")
+        fig.update_layout(yaxis_title=t("kwh_day_unit"))
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -2421,7 +2484,7 @@ with tabs[4]:
         fig_pie.update_layout(
             paper_bgcolor=COLORS["bg"], font=dict(family="Space Grotesk", color=COLORS["text"]),
             showlegend=False, margin=dict(l=10,r=10,t=30,b=10), height=260,
-            title=dict(text="Energy cost by tariff period",
+            title=dict(text=t("energy_cost_period"),
                        font=dict(size=13, color=COLORS["muted"]), x=0.5),
             annotations=[dict(text=f"€{total_cost:.2f}", x=0.5, y=0.5,
                               font_size=20, font_color=COLORS["text"], showarrow=False)],
@@ -2464,10 +2527,10 @@ with tabs[4]:
     mo["total"]    = mo["cost_net"] + mo["standing"] + mo["vat"]
 
     fig_m = go.Figure()
-    fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["cost_net"],  name="Energy",   marker_color=COLORS["day"],   marker_line_width=0))
+    fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["cost_net"],  name=t("trace_energy"),   marker_color=COLORS["day"],   marker_line_width=0))
     fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["standing"],  name=t("standing_charges"), marker_color=COLORS["muted"], marker_line_width=0))
     fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["vat"],       name="VAT 9%",   marker_color=COLORS["peak"],  marker_line_width=0))
-    fig_m.add_trace(go.Scatter(x=mo["month_str"], y=mo["total"], name="Total",
+    fig_m.add_trace(go.Scatter(x=mo["month_str"], y=mo["total"], name=t("trace_total"),
                                mode="lines+markers", line=dict(color=COLORS["total"], width=2),
                                marker=dict(size=7)))
     apply_layout(fig_m, "", height=340)
@@ -2490,7 +2553,7 @@ with tabs[5]:
     fig = go.Figure(go.Bar(x=monthly_avg["month"], y=monthly_avg["avg"],
                            marker_color=bar_colors, marker_line_width=0))
     apply_layout(fig, "", height=260)
-    fig.update_layout(yaxis_title="kWh/day")
+    fig.update_layout(yaxis_title=t("kwh_day_unit"))
     st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
@@ -2530,14 +2593,19 @@ with tabs[5]:
     section("📅", t("weekday_weekend"))
     daily_df = df_calc.groupby("date")["value"].sum().reset_index()
     daily_df["dow"]  = pd.to_datetime(daily_df["date"]).dt.weekday
-    daily_df["name"] = pd.to_datetime(daily_df["date"]).dt.day_name()
+    _wd_en = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    _wd_pl = [t("mon"),t("tue"),t("wed"),t("thu"),t("fri"),t("sat"),t("sun")]
+    _wd_map = dict(zip(_wd_en, _wd_pl))
+    daily_df["name"] = pd.to_datetime(daily_df["date"]).dt.day_name().map(
+        lambda d: _wd_map.get(d, d) if st.session_state.get("lang","en") == "pl" else d
+    )
     dow_avg = daily_df.groupby(["dow","name"])["value"].mean().reset_index().sort_values("dow")
     fig3 = go.Figure(go.Bar(
         x=dow_avg["name"], y=dow_avg["value"],
         marker_color=[COLORS["peak"] if d>=5 else COLORS["day"] for d in dow_avg["dow"]],
         marker_line_width=0))
     apply_layout(fig3, "", height=250)
-    fig3.update_layout(yaxis_title="kWh/day")
+    fig3.update_layout(yaxis_title=t("kwh_day_unit"))
     st.plotly_chart(fig3, use_container_width=True)
 
     st.divider()
@@ -2548,7 +2616,7 @@ with tabs[5]:
     annual_cost = annual_kwh * t_night * disc_factor
     ca, cb, cc = st.columns(3)
     with ca: st.markdown(kpi_html(t("standby_power"),      f"{standby_kw*1000:.0f}", "W (2–4am)", "purple"), unsafe_allow_html=True)
-    with cb: st.markdown(kpi_html(t("annual_standby_kwh"), f"{annual_kwh:.0f}", "kWh/year est.", "blue"),     unsafe_allow_html=True)
+    with cb: st.markdown(kpi_html(t("annual_standby_kwh"), f"{annual_kwh:.0f}", t("kwh_year_est"), "blue"),     unsafe_allow_html=True)
     with cc: st.markdown(kpi_html(t("annual_cost"),        f"€{annual_cost:.2f}", t("at_night_rate"), "orange"), unsafe_allow_html=True)
 
     st.divider()
@@ -2557,10 +2625,10 @@ with tabs[5]:
     max_save = peak_kwh * (t_peak - t_night) * disc_factor
     shift    = st.slider(t("shift_pct_label"), 0, 100, 50, step=5)
     ca, cb, cc = st.columns(3)
-    with ca: st.markdown(kpi_html("Total peak kWh",   f"{peak_kwh:.1f}", "all-time", "orange"),          unsafe_allow_html=True)
+    with ca: st.markdown(kpi_html(t("total_peak_kwh"),   f"{peak_kwh:.1f}", t("all_time"), "orange"),          unsafe_allow_html=True)
     with cb: st.markdown(kpi_html(t("max_saving"),f"€{max_save:.2f}", t("all_to_night"), "green"),       unsafe_allow_html=True)
-    with cc: st.markdown(kpi_html(f"At {shift}% shift",f"€{max_save*shift/100:.2f}",
-                                  f"night {(1-t_night/t_peak)*100:.0f}% cheaper", "cyan"),               unsafe_allow_html=True)
+    with cc: st.markdown(kpi_html(t("at_shift_label").format(pct=shift),f"€{max_save*shift/100:.2f}",
+                                  f"{t('night_label_chart')} {(1-t_night/t_peak)*100:.0f}% {t('at_night_rate')}", "cyan"),               unsafe_allow_html=True)
 
     st.divider()
     section("🚨", t("anomaly_days"))
@@ -2569,20 +2637,20 @@ with tabs[5]:
     thresh = mean_d + 2*std_d
     anom   = daily_all[daily_all["value"]>thresh].sort_values("value", ascending=False).head(10)
     fig5 = go.Figure()
-    fig5.add_trace(go.Bar(x=daily_all["date"], y=daily_all["value"],
+    fig5.add_trace(go.Bar(x=daily_all["date"], y=daily_all["value"], name=t("trace_kwh"),
                           marker_color=COLORS["day"], marker_line_width=0, opacity=0.7))
     fig5.add_trace(go.Scatter(x=anom["date"], y=anom["value"], mode="markers",
-                              name=f">mean+2σ", marker=dict(color=COLORS["red"], size=10)))
+                              name=t("mean_2sigma"), marker=dict(color=COLORS["red"], size=10)))
     fig5.add_hline(y=thresh, line_dash="dash", line_color=COLORS["red"],
                    annotation_text=f"mean+2σ = {thresh:.1f} kWh",
                    annotation_font_color=COLORS["red"])
     apply_layout(fig5, "", height=300)
-    fig5.update_layout(yaxis_title="kWh/day")
+    fig5.update_layout(yaxis_title=t("kwh_day_unit"))
     st.plotly_chart(fig5, use_container_width=True)
     if len(anom):
         st.dataframe(
             anom.rename(columns={"date":"Date","value":"kWh"})
-                .assign(**{"vs avg": lambda d: (d["kWh"]-mean_d).map(lambda x: f"+{x:.1f} kWh")}),
+                .assign(**{t("vs_avg"): lambda d: (d["kWh"]-mean_d).map(lambda x: f"+{x:.1f} kWh")}),
             use_container_width=True, hide_index=True,
         )
 
@@ -2718,16 +2786,13 @@ with tabs[6]:
 
     st.divider()
     section("💰", t("bill_prediction"))
-    alert(f"Prediction accuracy depends on how much of the period has elapsed. "
-          f"Currently <strong>{pct_elapsed:.0f}%</strong> complete — "
-          f"{'early estimate, wide range' if pct_elapsed < 30 else 'good estimate' if pct_elapsed < 70 else 'high confidence'}.",
-          "info" if pct_elapsed < 50 else "good")
+    alert(t("prediction_accuracy").format(pct=f"{pct_elapsed:.0f}"),"info")
 
     c1, c2, c3 = st.columns(3)
     method_data = [
-        (c1, "📈 Simple extrapolation", pred_kwh_simple, total1, "Current period daily avg × remaining days", "blue"),
-        (c2, "🌡️ Seasonal model",       pred_kwh_seasonal,total2,"Historical monthly averages per remaining day","cyan"),
-        (c3, "📅 14-day rolling avg",   pred_kwh_14d,   total3, "Recent 14-day trend × remaining days", "purple"),
+        (c1, t("simple_extrap"), pred_kwh_simple, total1, t("curr_period_desc"), "blue"),
+        (c2, t("seasonal_m"),       pred_kwh_seasonal,total2,t("hist_monthly_desc"),"cyan"),
+        (c3, t("rolling_14d_m"),   pred_kwh_14d,   total3, t("recent_14d_desc"), "purple"),
     ]
     for col, label, kwh, total, desc, color in method_data:
         with col:
@@ -2830,7 +2895,7 @@ with tabs[6]:
     # Period end marker
     fig_proj.add_vline(x=pd.Timestamp(b_end).timestamp() * 1000, line_dash="dot",
                        line_color=COLORS["muted"],
-                       annotation_text="Bill date", annotation_font_color=COLORS["muted"])
+                       annotation_text=t("bill_date"), annotation_font_color=COLORS["muted"])
 
     apply_layout(fig_proj, "", height=380)
     fig_proj.update_layout(yaxis_title="€ (cumulative)")
@@ -2847,7 +2912,7 @@ with tabs[6]:
         (f"Your discount ({DISC_PCT:.0f}%)", f"-€{e/disc_factor - e:.2f}", COLORS["total"]),
         (t("standing_charges_lbl"),        f"€{s:.2f}", COLORS["muted"]),
         ("VAT 9%",                  f"€{v:.2f}", COLORS["peak"]),
-        ("Est. Total Due",          f"€{tot:.2f}", COLORS["text"]),
+        (t("est_total_due"),          f"€{tot:.2f}", COLORS["text"]),
     ]
     for label, val, color in items:
         is_total = label.startswith("Est.")
@@ -2873,8 +2938,8 @@ with tabs[6]:
     section("⚙️", t("billing_period_sett"))
     col_a, col_b = st.columns(2)
     with col_a:
-        new_start = st.date_input("Period start", value=b_start, key="bp_start")
-        new_days  = st.number_input("Cycle length (days)", value=b_days, min_value=14, max_value=120, key="bp_days")
+        new_start = st.date_input(t("period_start"), value=b_start, key="bp_start")
+        new_days  = st.number_input(t("cycle_length"), value=b_days, min_value=14, max_value=120, key="bp_days")
     with col_b:
         new_end = new_start + timedelta(days=int(new_days))
         st.markdown(f"""
@@ -2887,7 +2952,7 @@ with tabs[6]:
             <div style="font-size:.78rem;color:#7d8590">{(new_end - today).days} days from today</div>
         </div>""", unsafe_allow_html=True)
 
-    if st.button("💾 Update billing period"):
+    if st.button(t("update_billing")):
         st.session_state["billing_start"] = new_start
         st.session_state["billing_end"]   = new_end
         st.session_state["billing_days"]  = int(new_days)
