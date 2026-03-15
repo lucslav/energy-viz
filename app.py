@@ -71,7 +71,7 @@ def decrypt_api_key() -> str:
 
 # ── Config persistence ─────────────────────────────
 _CONFIG_KEYS = [
-    "lang", "tariff", "discount_pct", "mprn", "supplier",
+    "lang", "tariff", "mprn", "supplier",
     "api_provider", "billing_start", "billing_end", "billing_days",
 ]
 
@@ -1122,7 +1122,6 @@ def ss(key, default):
 ss("setup_done",       False)
 ss("lang",             "en")          # 🇮🇪 en | 🇵🇱 pl
 ss("tariff",           DEFAULT_TARIFF.copy())
-ss("discount_pct",     0.0)
 ss("mprn",             "")
 ss("supplier",         "")
 ss("api_key",          "")        # legacy single key — kept for backward compat
@@ -1679,7 +1678,6 @@ def _show_extracted_review():
         r_peak  = st.number_input(t("peak_rate_label"),     value=float(data.get("rate_peak")       or DEFAULT_TARIFF["peak"]),    step=0.001, format="%.4f")
         r_night = st.number_input(t("night_rate_label"),    value=float(data.get("rate_night")      or DEFAULT_TARIFF["night"]),   step=0.001, format="%.4f")
         r_stand = st.number_input(t("standing_label"), value=float(data.get("standing_charge") or DEFAULT_TARIFF["standing"]),step=0.001, format="%.4f")
-        disc    = st.number_input(t("discount_label"),           value=float(data.get("discount_pct")   or 0.0),  step=1.0, format="%.1f")
 
     st.markdown(f"#### {t('billing_period_hdr')}")
     alert(f'{t("billing_period_hdr")} — {t("billing_period_start")}', "info")
@@ -1717,7 +1715,6 @@ def _show_extracted_review():
 
     if st.button(t("confirm_continue")):
         st.session_state["tariff"]        = dict(day=r_day, peak=r_peak, night=r_night, standing=r_stand)
-        st.session_state["discount_pct"]  = disc
         st.session_state["mprn"]          = mprn
         st.session_state["supplier"]      = supplier
         st.session_state["billing_start"] = b_start
@@ -1744,8 +1741,7 @@ def _setup_manual(inside_expander=False):
             r_peak  = st.number_input(t("peak_rate_label"),     value=DEFAULT_TARIFF["peak"],     step=0.001, format="%.4f")
             r_night = st.number_input(t("night_rate_label"),    value=DEFAULT_TARIFF["night"],    step=0.001, format="%.4f")
             r_stand = st.number_input(t("standing_label"), value=DEFAULT_TARIFF["standing"], step=0.001, format="%.4f")
-            disc    = st.number_input(t("discount_label"),           value=0.0, step=1.0, format="%.1f")
-
+    
         st.markdown(t("billing_period_opt"))
         from datetime import date as dt_date, timedelta
         b1, b2 = st.columns(2)
@@ -1769,7 +1765,6 @@ def _setup_manual(inside_expander=False):
         if submitted:
             b_end = (b_start + timedelta(days=int(b_days))) if b_start else None
             st.session_state["tariff"]        = dict(day=r_day, peak=r_peak, night=r_night, standing=r_stand)
-            st.session_state["discount_pct"]  = disc
             st.session_state["mprn"]          = mprn
             st.session_state["supplier"]      = supplier
             st.session_state["billing_start"] = b_start
@@ -1795,8 +1790,8 @@ TARIFF_DAY  = T["day"]
 TARIFF_PEAK = T["peak"]
 TARIFF_NIGHT= T["night"]
 STANDING_DAY= T["standing"]
-DISC_PCT    = st.session_state["discount_pct"]
-DISC_FACTOR = 1.0 - DISC_PCT / 100.0
+DISC_PCT    = 0.0
+DISC_FACTOR = 1.0  # rates from invoice are already post-discount
 
 # ─────────────────────────────────────────────
 #  DATA LOADERS
@@ -2265,7 +2260,7 @@ with tabs[0]:
         kpis.append(kpi_html(t("total_consumption"),  f"{total_kwh:,.0f}", "kWh", "blue"))
         kpis.append(kpi_html(t("daily_average"),       f"{avg_daily_kwh:.1f}", t("kwh_day_unit"), "green"))
         kpis.append(kpi_html(t("energy_cost"),        f"€{total_cost:,.2f}",
-                              t("incl_pct_off_lbl").format(pct=f"{DISC_PCT:.0f}"), "orange"))
+                              "", "orange"))
         kpis.append(kpi_html(t("avg_daily_cost"),     f"€{avg_daily_cost:.2f}", t("per_day"), "cyan"))
         kpis.append(kpi_html(t("data_span"),           f"{days_data}", t("days_label"), "purple"))
         kpis.append(kpi_html(t("standby_load"),        f"{standby*2*1000:.0f}", t("w_standby"), "red"))
@@ -2331,7 +2326,7 @@ with tabs[0]:
                     <div style="font-family:'JetBrains Mono',monospace;font-size:1.35rem;
                                 font-weight:700;color:{color}">{v:,.1f} kWh</div>
                     <div style="font-size:.8rem;color:#7d8590">
-                        {v/tot*100:.1f}% · €{v*rate*disc_factor:,.2f} {t("net_label")}
+                        {v/tot*100:.1f}% · €{v*rate:,.2f}
                     </div>
                 </div>""", unsafe_allow_html=True)
 
@@ -2385,7 +2380,7 @@ with tabs[1]:
     k1.metric(t("total_kwh"),   f"{df_f['value'].sum():.2f}")
     k2.metric(t("peak_kwh"),    f"{df_f[df_f['period']=='peak']['value'].sum():.2f}")
     k3.metric(t("gross_cost"),  f"€{df_f['cost'].sum():.2f}")
-    k4.metric(t("net_pct_off").format(pct=f"{DISC_PCT:.0f}"), f"€{df_f['cost_net'].sum():.2f}")
+    k4.metric(t("night_rate"), f"{df_f[df_f['period']=='night']['value'].sum():.2f} kWh")
 
     st.divider()
     section("🌡️", t("heatmap_title"))
@@ -3069,8 +3064,7 @@ with tabs[6]:
     e, s, v, tot = calc_bill(pred_kwh_seasonal, days_total)
     rewards = 5.0  # typical rewards saving (generic)
     items = [
-        (t("energy_charges"),  f"€{e/disc_factor:.2f}", COLORS["day"]),
-        (f"{t('your_discount_lbl').format(pct=f'{DISC_PCT:.0f}')}", f"-€{e/disc_factor - e:.2f}", COLORS["total"]),
+        (t("energy_charges"),  f"€{e:.2f}", COLORS["day"]),
         (t("standing_charges_lbl"),        f"€{s:.2f}", COLORS["muted"]),
         ("VAT 9%",                  f"€{v:.2f}", COLORS["peak"]),
         (t("est_total_due"),          f"€{tot:.2f}", COLORS["text"]),
