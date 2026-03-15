@@ -1004,6 +1004,11 @@ TRANSLATIONS = {
     "next_bill_full":       {"en": "Next bill expected",          "pl": "Następny rachunek"},
     "update_billing_full":  {"en": "💾 Update billing period",   "pl": "💾 Aktualizuj okres"},
     "standby_lbl_pl":       {"en": "Standby",                    "pl": "Czuwanie"},
+    "cons_days":            {"en": "Days in range",              "pl": "Dni w zakresie"},
+    "cons_max_day":         {"en": "Peak day",                    "pl": "Najwyższy dzień"},
+    "cons_min_day":         {"en": "Lowest day",                  "pl": "Najniższy dzień"},
+    "cons_avg_day":         {"en": "Daily avg",                   "pl": "Śred. dzienna"},
+    "total_cost":           {"en": "Total cost",                  "pl": "Koszt łączny"},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
 }
 
@@ -2376,11 +2381,16 @@ with tabs[1]:
         unsafe_allow_html=True,
     )
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric(t("total_kwh"),   f"{df_f['value'].sum():.2f}")
-    k2.metric(t("peak_kwh"),    f"{df_f[df_f['period']=='peak']['value'].sum():.2f}")
-    k3.metric(t("gross_cost"),  f"€{df_f['cost'].sum():.2f}")
-    k4.metric(t("night_rate"), f"{df_f[df_f['period']=='night']['value'].sum():.2f} kWh")
+    # Compute daily stats for the selected range
+    _daily = df_f.groupby("date")["value"].sum()
+    _n_days = _daily.shape[0]
+    _max_day = _daily.max() if _n_days else 0
+    _max_date = _daily.idxmax() if _n_days else ""
+    k1, k2, k3 = st.columns(3)
+    k1.metric(t("total_kwh"),    f"{df_f['value'].sum():.1f} kWh")
+    k2.metric(t("peak_kwh"),     f"{df_f[df_f['period']=='peak']['value'].sum():.1f} kWh")
+    k3.metric(t("cons_max_day"), f"{_max_day:.1f} kWh",
+              str(_max_date) if _max_date else "")
 
     st.divider()
     section("🌡️", t("heatmap_title"))
