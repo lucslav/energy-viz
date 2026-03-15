@@ -693,7 +693,7 @@ TRANSLATIONS = {
     "kwh_day":              {"en": "kWh/day",                     "pl": "kWh/dzień"},
     "w_standby":            {"en": "W (2–4am)",                   "pl": "W (2–4 rano)"},
     "incl_off":             {"en": "incl. {pct}% off",            "pl": "z rabatem {pct}%"},
-    t("gross_label"):                {"en": "gross",                       "pl": "brutto"},
+    "gross_label": {"en": "gross",                       "pl": "brutto"},
     "days_remaining":       {"en": "Days Remaining",              "pl": "dni pozostało"},
     "days_elapsed":         {"en": "Days Elapsed",                "pl": "dni minęło"},
     "period_end":           {"en": "Period End",                  "pl": "Koniec okresu"},
