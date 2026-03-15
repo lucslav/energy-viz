@@ -690,12 +690,12 @@ TRANSLATIONS = {
     "upload_dnp_first":     {"en": "Upload <strong>Daily DNP</strong> or <strong>Daily kWh</strong>.", "pl": "Wgraj plik <strong>Daily DNP</strong> lub <strong>Daily kWh</strong>."},
     "incomplete_data":      {"en": "day(s) with incomplete 30-min data", "pl": "dzień/dni z niekompletnymi danymi 30-min"},
     "days_label":           {"en": "days",                        "pl": "dni"},
-    "kwh_day":              {"en": t("kwh_day_unit"),                     "pl": "kWh/dzień"},
+    "kwh_day":              {"en": "kWh/day",                     "pl": "kWh/dzień"},
     "w_standby":            {"en": "W (2–4am)",                   "pl": "W (2–4 rano)"},
     "incl_off":             {"en": "incl. {pct}% off",            "pl": "z rabatem {pct}%"},
-    "gross":                {"en": "gross",                       "pl": "brutto"},
-    "days_remaining":       {"en": t("days_remaining"),              "pl": "dni pozostało"},
-    "days_elapsed":         {"en": t("days_elapsed"),                "pl": "dni minęło"},
+    t("gross_label"):                {"en": "gross",                       "pl": "brutto"},
+    "days_remaining":       {"en": "Days Remaining",              "pl": "dni pozostało"},
+    "days_elapsed":         {"en": "Days Elapsed",                "pl": "dni minęło"},
     "period_end":           {"en": "Period End",                  "pl": "Koniec okresu"},
     "consumed_so_far":      {"en": "Consumed so far",             "pl": "Zużyto dotąd"},
     "daily_avg_period":     {"en": "Daily avg (period)",          "pl": "Średnia dzienna (okres)"},
@@ -802,16 +802,16 @@ TRANSLATIONS = {
     "seasonal_model":       {"en": "Seasonal model",               "pl": "Model sezonowy"},
     "rolling_14d":          {"en": "14-day rolling avg",           "pl": "Średnia krocząca 14 dni"},
     "early_estimate":       {"en": "early estimate, wide range",   "pl": "wczesna estymacja, szeroki zakres"},
-    "curr_period_daily":    {"en": t("curr_period_desc"), "pl": "Średnia dzienna bieżącego okresu × pozostałe dni"},
-    "hist_monthly":         {"en": t("hist_monthly_desc"), "pl": "Historyczne średnie miesięczne na dzień"},
-    "recent_14d":           {"en": t("recent_14d_desc"), "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
+    "curr_period_daily":    {"en": "Curr Period Daily", "pl": "Średnia dzienna bieżącego okresu × pozostałe dni"},
+    "hist_monthly":         {"en": "Hist Monthly", "pl": "Historyczne średnie miesięczne na dzień"},
+    "recent_14d":           {"en": "Recent 14D", "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
     "pct_elapsed":          {"en": "elapsed",                      "pl": "minęło"},
-    "total_peak_kwh":       {"en": t("total_peak_kwh"),               "pl": "Łącznie kWh szczytowych"},
+    "total_peak_kwh":       {"en": "Total Peak Kwh",               "pl": "Łącznie kWh szczytowych"},
     "at_shift_pct":         {"en": "At {pct}% shift",             "pl": "Przy przesunięciu {pct}%"},
     "night_cheaper":        {"en": "night {pct}% cheaper",         "pl": "noc tańsza o {pct}%"},
     "annual_standby":       {"en": "Annual standby kWh",           "pl": "Roczne kWh w standby"},
     "how_updates_work":     {"en": "How updates work",             "pl": "Jak działają aktualizacje"},
-    "updates_info":         {"en": "ESB always exports your full history (up to 13 months) in each download. Uploading a newer export automatically includes all previous data + new months + any ESB corrections — no manual merging needed. Just upload the latest file.",
+    "updates_info":         {"en": "Updates Info",
                              "pl": "ESB zawsze eksportuje pełną historię (do 13 miesięcy) przy każdym pobraniu. Wgranie nowszego eksportu automatycznie zawiera wszystkie poprzednie dane + nowe miesiące + korekty ESB — bez ręcznego łączenia. Wystarczy wgrać najnowszy plik."},
     "based_on_seasonal":    {"en": "based on seasonal model",      "pl": "oparty na modelu sezonowym"},
     "period_selector":      {"en": "Period",                       "pl": "Okres"},
@@ -821,7 +821,7 @@ TRANSLATIONS = {
     "elec_bill":            {"en": "electricity bill",             "pl": "rachunku za prąd"},
     "days_label2":          {"en": "days",                         "pl": "dni"},
     "data_span_days":       {"en": "days",                         "pl": "dni"},
-    "kwh_day_lbl":          {"en": t("kwh_day_unit"),                      "pl": "kWh/dzień"},
+    "kwh_day_lbl":          {"en": "kWh/day",                      "pl": "kWh/dzień"},
     "per_day":              {"en": "/day",                         "pl": "/dzień"},
     "gross_lbl":            {"en": "gross",                        "pl": "brutto"},
     "energy_charges":       {"en": "Energy charges (gross)",       "pl": "Opłaty za energię (brutto)"},
@@ -841,33 +841,33 @@ TRANSLATIONS = {
     "trace_seasonal":       {"en": "Seasonal model",             "pl": "Model sezonowy"},
     "trace_14d":            {"en": "14-day rolling avg",         "pl": "Śr. krocząca 14 dni"},
     "trace_kwh":            {"en": "kWh",                        "pl": "kWh"},
-    "bill_date":            {"en": t("bill_date"),                  "pl": "Data rachunku"},
-    "all_time":             {"en": t("all_time"),                   "pl": "łącznie"},
-    "kwh_year_est":         {"en": t("kwh_year_est"),              "pl": "kWh/rok (est.)"},
-    "kwh_day_unit":         {"en": t("kwh_day_unit"),                    "pl": "kWh/dzień"},
+    "bill_date":            {"en": "Bill date",                  "pl": "Data rachunku"},
+    "all_time":             {"en": "all-time",                   "pl": "łącznie"},
+    "kwh_year_est":         {"en": "kWh/year est.",              "pl": "kWh/rok (est.)"},
+    "kwh_day_unit":         {"en": "kWh/day",                    "pl": "kWh/dzień"},
     "kw_cumulative":        {"en": "kWh (cumulative)",           "pl": "kWh (skumulowane)"},
     "reading_rank":         {"en": "Reading rank",               "pl": "Pozycja odczytu"},
     "vs_avg":               {"en": "vs avg",                     "pl": "vs śr."},
     "mean_2sigma":          {"en": ">mean+2σ",                   "pl": ">śr.+2σ"},
     "trace_0":              {"en": "kWh",                        "pl": "kWh"},
     "median":               {"en": "Median",                     "pl": "Mediana"},
-    "predicted_bill_range": {"en": t("predicted_bill_range"),       "pl": "Przewidywany zakres rachunku"},
-    "most_likely":          {"en": t("most_likely"),                "pl": "Najbardziej prawdopodobny"},
-    "range_label":          {"en": t("range_label"),                      "pl": "Zakres"},
+    "predicted_bill_range": {"en": "Predicted bill range",       "pl": "Przewidywany zakres rachunku"},
+    "most_likely":          {"en": "Most likely",                "pl": "Najbardziej prawdopodobny"},
+    "range_label":          {"en": "Range",                      "pl": "Zakres"},
     "projected":            {"en": "projected",                  "pl": "prognoza"},
-    "curr_period_desc":     {"en": t("curr_period_desc"), "pl": "Śr. dzienna bieżącego okresu × pozostałe dni"},
-    "hist_monthly_desc":    {"en": t("hist_monthly_desc"), "pl": "Historyczne średnie miesięczne na dzień"},
-    "recent_14d_desc":      {"en": t("recent_14d_desc"), "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
+    "curr_period_desc":     {"en": "Curr Period Daily", "pl": "Śr. dzienna bieżącego okresu × pozostałe dni"},
+    "hist_monthly_desc":    {"en": "Hist Monthly", "pl": "Historyczne średnie miesięczne na dzień"},
+    "recent_14d_desc":      {"en": "Recent 14D", "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
     "prediction_accuracy":  {"en": "Prediction accuracy depends on how much of the period has elapsed. Currently {pct}% complete — early estimate, wide range.",
                              "pl": "Dokładność prognozy zależy od stopnia zaawansowania okresu. Obecnie {pct}% — wczesna estymacja, szeroki zakres."},
-    "simple_extrap":        {"en": t("simple_extrap"),   "pl": "📈 Prosta ekstrapolacja"},
-    "seasonal_m":           {"en": t("seasonal_m"),        "pl": "🌡️ Model sezonowy"},
-    "rolling_14d_m":        {"en": t("rolling_14d_m"),     "pl": "📅 Śr. krocząca 14 dni"},
-    "est_total_due":        {"en": t("est_total_due"),             "pl": "Szac. kwota do zapłaty"},
-    "period_start":         {"en": t("period_start"),               "pl": "Początek okresu"},
-    "cycle_length":         {"en": t("cycle_length"),        "pl": "Długość cyklu (dni)"},
-    "next_bill_expected":   {"en": t("next_bill_expected"),         "pl": "OCZEKIWANA DATA RACHUNKU"},
-    "update_billing":       {"en": t("update_billing"),  "pl": "💾 Aktualizuj okres rozliczeniowy"},
+    "simple_extrap":        {"en": "📈 Simple extrapolation",   "pl": "📈 Prosta ekstrapolacja"},
+    "seasonal_m":           {"en": "🌡️ Seasonal model",        "pl": "🌡️ Model sezonowy"},
+    "rolling_14d_m":        {"en": "📅 14-day rolling avg",     "pl": "📅 Śr. krocząca 14 dni"},
+    "est_total_due":        {"en": "Est. Total Due",             "pl": "Szac. kwota do zapłaty"},
+    "period_start":         {"en": "Period start",               "pl": "Początek okresu"},
+    "cycle_length":         {"en": "Cycle length (days)",        "pl": "Długość cyklu (dni)"},
+    "next_bill_expected":   {"en": "NEXT BILL EXPECTED",         "pl": "OCZEKIWANA DATA RACHUNKU"},
+    "update_billing":       {"en": "💾 Update billing period",  "pl": "💾 Aktualizuj okres rozliczeniowy"},
     "days_elapsed_n":       {"en": "{n} days elapsed",           "pl": "{n} dni minęło"},
     "days_remaining_n":     {"en": "{n} days remaining",         "pl": "{n} dni pozostało"},
     "elapsed_pct":          {"en": "elapsed",                    "pl": "minęło"},
@@ -884,15 +884,78 @@ TRANSLATIONS = {
     "sun": {"en": "Sunday",    "pl": "Niedziela"},
     # Misc chart labels
     "standing_lbl":         {"en": "Standing",                   "pl": "Opłata stała"},
-    "energy_cost_period":   {"en": t("energy_cost_period"), "pl": "Koszt energii wg taryfy"},
-    "cross_val_note":       {"en": t("cross_val_note"),
+    "energy_cost_period":   {"en": "Energy Cost Period", "pl": "Koszt energii wg taryfy"},
+    "cross_val_note":       {"en": "Cross Val Note",
                              "pl": "Weryfikacja: kW × 0,5h ≈ calckWh — śr. błąd <0,001 kWh/interwał."},
-    "kw_year_unit":         {"en": t("kwh_year_est"),              "pl": "kWh/rok (est.)"},
+    "kw_year_unit":         {"en": "kWh/year est.",              "pl": "kWh/rok (est.)"},
     "night_cheaper_pct":    {"en": "night {pct}% cheaper",       "pl": "noc tańsza o {pct}%"},
     "at_shift_label":       {"en": "At {pct}% shift",            "pl": "Przy przesunięciu {pct}%"},
     "date_col":             {"en": "Date",                       "pl": "Data"},
     "kwh_col":              {"en": "kWh",                        "pl": "kWh"},
     "vs_avg_col":           {"en": "vs avg",                     "pl": "vs śr."},
+    # Sidebar
+    "power_demand_short":   {"en": "Power Demand",               "pl": "Pobór mocy"},
+    "daily_dnp_short":      {"en": "Daily DNP",                  "pl": "Dzienne DNP"},
+    "daily_kwh_short":      {"en": "Daily kWh",                  "pl": "Dzienna kWh"},
+    "tariff_split_lbl":     {"en": "Tariff Split Lbl",            "pl": "⚡ PODZIAŁ TARYFY"},
+    # Rangeselector buttons
+    "rs_1d":                {"en": "1d",   "pl": "1d"},
+    "rs_1w":                {"en": "1w",   "pl": "1t"},
+    "rs_2w":                {"en": "2w",   "pl": "2t"},
+    "rs_1m":                {"en": "1m",   "pl": "1m"},
+    "rs_3m":                {"en": "3m",   "pl": "3m"},
+    "rs_1y":                {"en": "1y",   "pl": "1r"},
+    "rs_all":               {"en": "All",  "pl": "Wsz"},
+    # Overview alerts
+    "dst_warning":          {"en": "{n} day(s) with incomplete 30-min data (e.g. DST clock change — {k} intervals). Minor underestimate for those days.",
+                             "pl": "{n} dzień/dni z niekompletnymi danymi 30-min (np. zmiana czasu DST — {k} interwałów). Niewielkie zaniżenie dla tych dni."},
+    "outlier_warning":      {"en": "Daily kWh file: outlier row(s) automatically removed (likely meter rollover artifact).",
+                             "pl": "Plik dzienny kWh: automatycznie usunięto wiersze odstające (prawdopodobnie artefakt przepełnienia licznika)."},
+    # Power Demand metrics
+    "peak_demand_lbl":      {"en": "Peak demand",                "pl": "Szczytowy pobór"},
+    "avg_demand_lbl":       {"en": "Avg demand",                 "pl": "Śred. pobór"},
+    "pct95_lbl":            {"en": "95th pct",                   "pl": "95. percentyl"},
+    "spikes_lbl":           {"en": "Spikes >p99",                "pl": "Skoki >p99"},
+    "kw_all_time":          {"en": "kW all-time",                "pl": "kW (łącznie)"},
+    # Cross validation
+    "cross_val":            {"en": "Cross Val",
+                             "pl": "Weryfikacja: kW × 0,5h ≈ calckWh — śr. błąd <0,001 kWh/interwał."},
+    # Daily Analysis
+    "daily_total_kwh":      {"en": "Daily Total kWh",            "pl": "Dzienne łączne kWh"},
+    "reg_24h":              {"en": "24h register",               "pl": "Rejestr 24h"},
+    "day_off_peak_lbl":     {"en": "Day Off-Peak",               "pl": "Dzień poza szczytem"},
+    # Cost Breakdown chart labels
+    "day_donut":            {"en": "Day",                        "pl": "Dzień"},
+    "peak_donut":           {"en": "Peak",                       "pl": "Szczyt"},
+    "night_donut":          {"en": "Night",                      "pl": "Noc"},
+    # Bill prediction
+    "pct_elapsed_lbl":      {"en": "{pct}% elapsed",             "pl": "{pct}% minęło"},
+    "n_days_elapsed":       {"en": "{n} days elapsed",           "pl": "{n} dni minęło"},
+    "n_days_remaining":     {"en": "{n} days remaining",         "pl": "{n} dni pozostało"},
+    "in_n_days":            {"en": "in {n} days",                "pl": "za {n} dni"},
+    "kwh_projected":        {"en": "~{n} kWh projected",         "pl": "~{n} kWh prognoza"},
+    "your_discount_lbl":    {"en": "Your discount ({pct}%)",     "pl": "Twój rabat ({pct}%)"},
+    "next_bill_exp":        {"en": "Next bill expected",         "pl": "Następny rachunek"},
+    "update_billing_btn":   {"en": "💾 Update billing period",  "pl": "💾 Aktualizuj okres"},
+    # Raw Data quality
+    "dst_slots_kept":       {"en": "{n} DST clock-back slot(s) kept (valid)", "pl": "{n} slot(y) cofnięcia czasu DST (poprawne)"},
+    "dupes_removed":        {"en": "{n} exact duplicate row(s) removed",      "pl": "{n} identyczny/e wiersz(e) usunięty/e"},
+    "outliers_removed_lbl": {"en": "{n} meter rollover outlier(s) removed",   "pl": "{n} artefakt(y) przepełnienia usunięty/e"},
+    "rows_summary":         {"en": "{raw:,} rows in → {clean:,} rows clean",  "pl": "{raw:,} wierszy → {clean:,} po czyszczeniu"},
+    "no_issues":            {"en": "No issues found",            "pl": "Brak problemów"},
+    "how_updates_info":     {"en": "Updates Info",
+                             "pl": "ESB zawsze eksportuje pełną historię (do 13 miesięcy) przy każdym pobraniu. Wgranie nowszego eksportu automatycznie zawiera wszystkie poprzednie dane + nowe miesiące + korekty ESB — bez ręcznego łączenia. Wystarczy wgrać najnowszy plik."},
+    # Misc
+    "primary_badge":        {"en": "PRIMARY",                    "pl": "GŁÓWNY"},
+    "net_label":            {"en": "net",                        "pl": "netto"},
+    "gross_label":          {"en": "gross",                      "pl": "brutto"},
+    "incl_pct_off":         {"en": "incl. {pct}% off",          "pl": "z rabatem {pct}%"},
+    "days_x":               {"en": "{n}d × €{r:.4f}",           "pl": "{n}d × €{r:.4f}"},
+    "auto_checked":         {"en": "auto-checked on every upload", "pl": "sprawdzane przy każdym wgraniu"},
+    "kw_file_badge":        {"en": "kW file",                    "pl": "plik kW"},
+    "dnp_badge":            {"en": "DNP",                        "pl": "DNP"},
+    "register_24h_badge":   {"en": "24h register",               "pl": "rejestr 24h"},
+    "save_badge":           {"en": "Save",                       "pl": "Zapisz"},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
 }
 
@@ -941,13 +1004,13 @@ RANGESLIDER_X = dict(
         bgcolor="#1c2330", bordercolor=COLORS["grid"], borderwidth=1,
         activecolor="#58a6ff", font=dict(color=COLORS["text"], size=11),
         buttons=[
-            dict(count=1,  label="1d",  step="day",   stepmode="backward"),
-            dict(count=7,  label="1w",  step="day",   stepmode="backward"),
-            dict(count=14, label="2w",  step="day",   stepmode="backward"),
-            dict(count=1,  label="1m",  step="month", stepmode="backward"),
-            dict(count=3,  label="3m",  step="month", stepmode="backward"),
-            dict(count=1,  label="1y",  step="year",  stepmode="backward"),
-            dict(step="all", label="All"),
+            dict(count=1,  label=t("rs_1d"), step="day",   stepmode="backward"),
+            dict(count=7,  label=t("rs_1w"), step="day",   stepmode="backward"),
+            dict(count=14, label=t("rs_2w"), step="day",   stepmode="backward"),
+            dict(count=1,  label=t("rs_1m"), step="month", stepmode="backward"),
+            dict(count=3,  label=t("rs_3m"), step="month", stepmode="backward"),
+            dict(count=1,  label=t("rs_1y"), step="year",  stepmode="backward"),
+            dict(step="all", label=t("rs_all")),
         ],
     ),
 )
@@ -2141,10 +2204,10 @@ with tabs[0]:
     if df_calc is not None:
         incomplete = (df_calc.groupby("date").size() < 48).sum()
         if incomplete:
-            alert(f"<strong>{incomplete} day(s)</strong> with incomplete 30-min data "
-                  f"(e.g. DST clock change — 44 intervals). Minor underestimate for those days.", "warn")
+            _dst_msg = t("dst_warning").format(n=f"<strong>{incomplete}</strong>", k=44)
+            alert(_dst_msg, "warn")
     if df_daily is not None and st.session_state.get("_qr_daily", {}).get("outliers_removed"):
-        alert("Daily kWh file: outlier row(s) automatically removed (likely meter rollover artifact).", "red")
+        alert(t("outlier_warning"), "red")
 
     st.divider()
 
@@ -2286,7 +2349,7 @@ with tabs[2]:
     if df_kw is None:
         alert(t("upload_kw_first"), "info"); st.stop()
 
-    section("⚡", t("power_title"), badge="kW file")
+    section("⚡", t("power_title"), badge=t("kw_file_badge"))
     if df_calc is not None:
         alert("Cross-validation: kW × 0.5h ≈ calckWh — mean error <b>&lt;0.001 kWh</b>/interval.", "good")
 
@@ -2307,9 +2370,9 @@ with tabs[2]:
         st.warning(f"⚠️ Peak value {max_val:,.1f} seems very high for a domestic meter. "
                    f"Check you uploaded the correct file — Power Demand expects the "
                    f"`HDF_kW_…csv` file, not the calckWh file.")
-    k1.metric("Peak demand",  f"{df_f['value'].max():.3f} kW")
-    k2.metric("Avg demand",   f"{df_f['value'].mean():.3f} kW")
-    k3.metric("95th pct",     f"{p95:.3f} kW")
+    k1.metric(t("peak_demand_lbl"),  f"{df_f['value'].max():.3f} kW")
+    k2.metric(t("avg_demand_lbl"),   f"{df_f['value'].mean():.3f} kW")
+    k3.metric(t("pct95_lbl"),     f"{p95:.3f} kW")
     k4.metric(t("spikes_p99"),  f"{(df_f['value']>p99).sum()}")
 
     fig = go.Figure()
@@ -2403,7 +2466,7 @@ with tabs[3]:
     }
 
     if df_dnp is not None:
-        section("📅", t("daily_registers"), badge="DNP")
+        section("📅", t("daily_registers"), badge=t("dnp_badge"))
         pivot = df_dnp.pivot_table(index="date", columns="type", values="value", aggfunc="max")
         pivot.columns = [c.strip() for c in pivot.columns]
         pivot = pivot.reset_index().sort_values("date")
@@ -2432,7 +2495,7 @@ with tabs[3]:
         st.plotly_chart(fig2, use_container_width=True)
 
     if df_daily is not None:
-        section("📅", "Daily Total kWh", badge="24h register")
+        section("📅", t("daily_total_kwh"), badge=t("reg_24h"))
         df_d = df_daily[df_daily["daily"].notna() & (df_daily["daily"] > 0)].copy()
         df_d["date"]  = pd.to_datetime(df_d["date"])
         df_d["roll7"] = df_d["daily"].rolling(7, min_periods=1).mean()
@@ -2476,7 +2539,7 @@ with tabs[4]:
     c1, c2 = st.columns([1,1])
     with c1:
         fig_pie = go.Figure(go.Pie(
-            labels=[p.capitalize() for p in by_p["period"]],
+            labels=[{'day': t("day_donut"), 'peak': t("peak_donut"), 'night': t("night_donut")}.get(p, p.capitalize()) for p in by_p["period"]],
             values=by_p["cost_net"].round(2), hole=0.55,
             marker=dict(colors=[cmap.get(p,"#888") for p in by_p["period"]]),
             textinfo="label+percent", textfont=dict(color=COLORS["text"], size=12),
@@ -2909,7 +2972,7 @@ with tabs[6]:
     rewards = 5.0  # typical rewards saving (generic)
     items = [
         (t("energy_charges"),  f"€{e/disc_factor:.2f}", COLORS["day"]),
-        (f"Your discount ({DISC_PCT:.0f}%)", f"-€{e/disc_factor - e:.2f}", COLORS["total"]),
+        (f"{t('your_discount_lbl').format(pct=f'{DISC_PCT:.0f}')}", f"-€{e/disc_factor - e:.2f}", COLORS["total"]),
         (t("standing_charges_lbl"),        f"€{s:.2f}", COLORS["muted"]),
         ("VAT 9%",                  f"€{v:.2f}", COLORS["peak"]),
         (t("est_total_due"),          f"€{tot:.2f}", COLORS["text"]),
@@ -2968,7 +3031,7 @@ with tabs[7]:
     section("📋", t("raw_data"))
 
     # ── Data quality report ──
-    section("🔍", t("quality_report"), badge="auto-checked on every upload")
+    section("🔍", t("quality_report"), badge=t("auto_checked"))
 
     qr_map = {
         "calckWh": st.session_state.get("_qr_calc"),
@@ -2988,13 +3051,13 @@ with tabs[7]:
             icon     = "✅" if status == "good" else "⚠️"
             details  = []
             if dupes:
-                details.append(f"<strong>{dupes}</strong> exact duplicate row(s) removed")
+                details.append(f"{t('dupes_removed').format(n=f'<strong>{dupes}</strong>')}")
             if dst:
-                details.append(f"<strong>{dst//2}</strong> DST clock-back slot(s) kept (valid)")
+                details.append(f"{t('dst_slots_kept').format(n=f'<strong>{dst//2}</strong>')}")
             if outliers:
-                details.append(f"<strong>{outliers}</strong> meter rollover outlier(s) removed")
+                details.append(f"{t('outliers_removed_lbl').format(n=f'<strong>{outliers}</strong>')}")
             if not details:
-                details.append("No issues found")
+                details.append(t("no_issues"))
             st.markdown(f"""
             <div style="display:flex;align-items:flex-start;gap:10px;
                         background:#161b22;border:1px solid #30363d;
