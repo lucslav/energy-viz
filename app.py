@@ -967,7 +967,7 @@ TRANSLATIONS = {
     "range_lbl":            {"en": "Range",                       "pl": "Zakres"},
     "next_bill_lbl":        {"en": "Next bill expected",          "pl": "Następny rachunek"},
     "n_days_from_today":    {"en": "{n} days from today",         "pl": "za {n} dni"},
-    "cross_val_alert":      {"en": "Cross Val Alert", "pl": "Weryfikacja: kW × 0,5h ≈ calckWh — śr. błąd <b>&lt;0,001 kWh</b>/interwał."},
+    "cross_val_alert":      {"en": "Cross-validation: kW × 0.5h ≈ calckWh — mean error <b>&lt;0.001 kWh</b>/interval.", "pl": "Weryfikacja: kW × 0,5h ≈ calckWh — śr. błąd <b>&lt;0,001 kWh</b>/interwał."},
     "trace_simple_short":   {"en": "Simple",                      "pl": "Prosta"},
     "trace_seasonal_short": {"en": "Seasonal",                    "pl": "Sezonowy"},
     "trace_14d_short":      {"en": "14-day",                      "pl": "14-dniowa"},
@@ -1047,9 +1047,10 @@ RANGESLIDER_X = dict(
 
 
 def _inject_pl_month_names():
-    """Inject JS to replace English month abbreviations with Polish in all Plotly charts."""
+    """Inject JS via st.components to patch Plotly month names to Polish."""
     if st.session_state.get("lang", "en") != "pl":
         return
+    import streamlit.components.v1 as components
     pl_map = {
         "Jan": "sty", "Feb": "lut", "Mar": "mar", "Apr": "kwi",
         "May": "maj", "Jun": "cze", "Jul": "lip", "Aug": "sie",
@@ -1060,27 +1061,37 @@ def _inject_pl_month_names():
         "November": "Listopad", "December": "Grudzień",
     }
     replacements_js = ", ".join([f'["{k}", "{v}"]' for k, v in pl_map.items()])
-    st.markdown(f"""
+    components.html(f"""
     <script>
     (function() {{
         const map = new Map([{replacements_js}]);
         function patchPlotly() {{
-            document.querySelectorAll('.xtick text, .ytick text').forEach(el => {{
-                for (const [en, pl] of map) {{
-                    if (el.textContent.includes(en)) {{
-                        el.textContent = el.textContent.replace(en, pl);
-                    }}
-                }}
+            // Target Plotly tick labels in parent frame
+            const frames = [window.parent, window];
+            frames.forEach(w => {{
+                try {{
+                    w.document.querySelectorAll('.xtick text, .ytick text, .infolayer .g-xtitle, .infolayer .g-ytitle').forEach(el => {{
+                        for (const [en, pl] of map) {{
+                            if (el.textContent && el.textContent.includes(en)) {{
+                                el.textContent = el.textContent.replaceAll(en, pl);
+                            }}
+                        }}
+                    }});
+                }} catch(e) {{}}
             }});
         }}
-        // Run after Plotly renders
-        setTimeout(patchPlotly, 500);
-        setTimeout(patchPlotly, 1500);
+        setTimeout(patchPlotly, 800);
+        setTimeout(patchPlotly, 2000);
+        setTimeout(patchPlotly, 4000);
         const obs = new MutationObserver(patchPlotly);
-        obs.observe(document.body, {{childList: true, subtree: true}});
+        try {{
+            obs.observe(window.parent.document.body, {{childList: true, subtree: true}});
+        }} catch(e) {{
+            obs.observe(document.body, {{childList: true, subtree: true}});
+        }}
     }})();
     </script>
-    """, unsafe_allow_html=True)
+    """, height=0, scrolling=False)
 
 # ─────────────────────────────────────────────
 #  SESSION STATE INIT
@@ -2015,10 +2026,10 @@ with st.sidebar:
     # ── Update / reset ──
     st.divider()
     st.markdown(f"##### 🔄 {t('configuration')}")
-    if st.button("📄 Change rates / Re-parse", use_container_width=True):
+    if st.button(t("reparse_btn"), use_container_width=True):
         st.session_state["setup_done"] = False
         st.rerun()
-    if st.button("🗑️ Clear all saved data", use_container_width=True):
+    if st.button(t("clear_btn"), use_container_width=True):
         if st.session_state.get("_confirm_clear"):
             import shutil as _shutil
             _shutil.rmtree(DATA_DIR, ignore_errors=True)
@@ -2131,13 +2142,13 @@ if df_calc is not None:
 if df_calc is not None:
     with sidebar_chart_slot.container():
         st.divider()
-        st.markdown('<p style="color:#7d8590;font-size:.7rem;text-transform:uppercase;'
-                    'letter-spacing:.08em;margin-bottom:4px">⚡ Tariff Split</p>',
+        st.markdown(f'<p style="color:#7d8590;font-size:.7rem;text-transform:uppercase;'
+                    f'letter-spacing:.08em;margin-bottom:4px">⚡ {t("tariff_split_header")}</p>',
                     unsafe_allow_html=True)
         by_p   = df_calc.groupby("period")["value"].sum()
         tot_sb = by_p.sum()
         fig_sb = go.Figure(go.Pie(
-            labels=[p.capitalize() for p in by_p.index],
+            labels=[{'day': t("legend_day"), 'peak': t("legend_peak"), 'night': t("legend_night")}.get(p, p.capitalize()) for p in by_p.index],
             values=by_p.values,
             hole=0.60,
             marker=dict(colors=[COLORS.get(p,"#888") for p in by_p.index],
@@ -2158,13 +2169,15 @@ if df_calc is not None:
             )],
         )
         st.plotly_chart(fig_sb, use_container_width=True, config={"displayModeBar": False})
-        for p, color in [(t("day_rate"),COLORS["day"]),(t("peak_rate"),COLORS["peak"]),(t("night_rate"),COLORS["night"])]:
-            kwh = by_p.get(p.lower(), 0)
+        for p_key, p_lbl, color in [("day", t("legend_day"), COLORS["day"]),
+                                     ("peak", t("legend_peak"), COLORS["peak"]),
+                                     ("night", t("legend_night"), COLORS["night"])]:
+            kwh = by_p.get(p_key, 0)
             pct = kwh / tot_sb * 100 if tot_sb else 0
             st.markdown(
                 f'<div class="tariff-row">'
                 f'<div class="tariff-dot" style="background:{color}"></div>'
-                f'<span style="color:#7d8590">{p}</span>'
+                f'<span style="color:#7d8590">{p_lbl}</span>'
                 f'<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;'
                 f'color:{color}">{pct:.1f}%</span>'
                 f'<span style="color:#7d8590;font-size:.7rem">{kwh:.0f} kWh</span>'
@@ -2328,9 +2341,9 @@ with tabs[1]:
         f'<div style="display:flex;font-size:.8rem;margin-top:-4px;margin-bottom:4px">'
         f'<div style="min-width:55px"></div>'
         f'<div style="display:flex;gap:14px">'
-        f'<span style="color:{COLORS["night"]}">🌙 Night</span>'
-        f'<span style="color:{COLORS["day"]}">☀️ Day</span>'
-        f'<span style="color:{COLORS["peak"]}">🔥 Peak</span>'
+        f'<span style="color:{COLORS["night"]}">🌙 {t("legend_night")}</span>'
+        f'<span style="color:{COLORS["day"]}">☀️ {t("legend_day")}</span>'
+        f'<span style="color:{COLORS["peak"]}">🔥 {t("legend_peak")}</span>'
         f'</div></div>',
         unsafe_allow_html=True,
     )
