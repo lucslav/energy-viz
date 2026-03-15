@@ -1,6 +1,6 @@
 # <img src="https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png" alt="Energy Viz logo" width="32" style="vertical-align:middle"> Energy Viz
 
-[![Version](https://img.shields.io/badge/version-2.0.1-58a6ff?style=flat-square)](https://github.com/lucslav/energy-viz/releases)
+[![Version](https://img.shields.io/badge/version-2.0.2-58a6ff?style=flat-square)](https://github.com/lucslav/energy-viz/releases)
 [![Docker](https://img.shields.io/badge/docker-lucslav%2Fenergy--viz-0db7ed?style=flat-square&logo=docker&logoColor=white)](https://hub.docker.com/r/lucslav/energy-viz)
 [![Built with Streamlit](https://img.shields.io/badge/built%20with-Streamlit-ff4b4b?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![Python](https://img.shields.io/badge/python-3.12-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
