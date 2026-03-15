@@ -98,6 +98,11 @@ def load_config():
 
     from datetime import date
     for k, v in data.items():
+        # lang is always restored from config (overrides default "en")
+        if k == "lang":
+            if v in ("en", "pl"):
+                st.session_state[k] = v
+            continue
         if k not in st.session_state or st.session_state[k] in (None, "", [], {}):
             # Restore dates
             if k in ("billing_start", "billing_end") and isinstance(v, str) and v:
@@ -633,7 +638,7 @@ TRANSLATIONS = {
     "energy_cost":          {"en": "Energy Cost",                 "pl": "Koszt energii"},
     "avg_daily_cost":       {"en": "Avg Daily Cost",              "pl": "Śr. koszt dzienny"},
     "data_span":            {"en": "Data Span",                   "pl": "Zakres danych"},
-    "standby_load":         {"en": "Standby Load",                "pl": "Pobór w standby"},
+    "standby_load":         {"en": "Standby Load",                "pl": "Pobór w czuwaniu"},
     "peak_demand":          {"en": "Peak Demand",                 "pl": "Szczytowy pobór"},
     "daily_energy":         {"en": "Daily Energy by Tariff Period", "pl": "Zużycie dzienne wg taryfy"},
     "tariff_split_full":    {"en": "Full-Period Tariff Split",    "pl": "Podział taryfy — cały okres"},
@@ -662,7 +667,7 @@ TRANSLATIONS = {
     "seasonal_trend":       {"en": "Seasonal & Monthly Trend",    "pl": "Trend sezonowy i miesięczny"},
     "load_profile":         {"en": "Average Daily Load Profile",  "pl": "Średni dobowy profil obciążenia"},
     "weekday_weekend":      {"en": "Weekday vs Weekend",          "pl": "Dni robocze vs weekend"},
-    "standby_baseline":     {"en": "Standby & Baseline Load",     "pl": "Pobór w standby i bazowy"},
+    "standby_baseline":     {"en": "Standby & Baseline Load",     "pl": "Pobór w czuwaniu i bazowy"},
     "peak_shifting":        {"en": "Peak Shifting Calculator",    "pl": "Kalkulator przeniesienia szczytu"},
     "anomaly_days":         {"en": "Anomaly Days",                "pl": "Dni anomalii"},
     # ── Bill Prediction ──
@@ -691,7 +696,7 @@ TRANSLATIONS = {
     "incomplete_data":      {"en": "day(s) with incomplete 30-min data", "pl": "dzień/dni z niekompletnymi danymi 30-min"},
     "days_label":           {"en": "days",                        "pl": "dni"},
     "kwh_day":              {"en": "kWh/day",                     "pl": "kWh/dzień"},
-    "w_standby":            {"en": "W (2–4am)",                   "pl": "W (2–4 rano)"},
+    "w_standby":            {"en": "W Standby",                   "pl": "W (2–4 rano)"},
     "incl_off":             {"en": "incl. {pct}% off",            "pl": "z rabatem {pct}%"},
     "gross_label": {"en": "gross",                       "pl": "brutto"},
     "days_remaining":       {"en": "Days Remaining",              "pl": "dni pozostało"},
@@ -777,9 +782,9 @@ TRANSLATIONS = {
     "standing_charges":     {"en": "Standing",                     "pl": "Opłata stała"},
     "vat_9":                {"en": "VAT 9%",                       "pl": "VAT 9%"},
     "est_total_bill":       {"en": "Est. total bill",              "pl": "Szac. rachunek łączny"},
-    "standby_power":        {"en": "Standby power",                "pl": "Pobór w standby"},
+    "standby_power":        {"en": "Standby Power",                "pl": "Pobór w standby"},
     "at_night_rate":        {"en": "at night rate",                "pl": "po stawce nocnej"},
-    "annual_standby_kwh":   {"en": "Annual standby kWh",           "pl": "Roczne zużycie w standby"},
+    "annual_standby_kwh":   {"en": "Annual Standby Kwh",           "pl": "Roczne zużycie w standby"},
     "annual_cost":          {"en": "Annual cost",                  "pl": "Koszt roczny"},
     "all_to_night":         {"en": "all to night",                 "pl": "wszystko na noc"},
     "max_saving":           {"en": "Max saving (100%)",            "pl": "Maks. oszczędność (100%)"},
@@ -809,7 +814,7 @@ TRANSLATIONS = {
     "total_peak_kwh":       {"en": "Total Peak Kwh",               "pl": "Łącznie kWh szczytowych"},
     "at_shift_pct":         {"en": "At {pct}% shift",             "pl": "Przy przesunięciu {pct}%"},
     "night_cheaper":        {"en": "night {pct}% cheaper",         "pl": "noc tańsza o {pct}%"},
-    "annual_standby":       {"en": "Annual standby kWh",           "pl": "Roczne kWh w standby"},
+    "annual_standby":       {"en": "Annual Standby Kwh",           "pl": "Roczne kWh w standby"},
     "how_updates_work":     {"en": "How updates work",             "pl": "Jak działają aktualizacje"},
     "updates_info":         {"en": "Updates Info",
                              "pl": "ESB zawsze eksportuje pełną historię (do 13 miesięcy) przy każdym pobraniu. Wgranie nowszego eksportu automatycznie zawiera wszystkie poprzednie dane + nowe miesiące + korekty ESB — bez ręcznego łączenia. Wystarczy wgrać najnowszy plik."},
@@ -866,7 +871,7 @@ TRANSLATIONS = {
     "est_total_due":        {"en": "Est. Total Due",             "pl": "Szac. kwota do zapłaty"},
     "period_start":         {"en": "Period start",               "pl": "Początek okresu"},
     "cycle_length":         {"en": "Cycle length (days)",        "pl": "Długość cyklu (dni)"},
-    "next_bill_expected":   {"en": "NEXT BILL EXPECTED",         "pl": "OCZEKIWANA DATA RACHUNKU"},
+    "next_bill_expected":   {"en": "Next bill expected",         "pl": "OCZEKIWANA DATA RACHUNKU"},
     "update_billing":       {"en": "💾 Update billing period",  "pl": "💾 Aktualizuj okres rozliczeniowy"},
     "days_elapsed_n":       {"en": "{n} days elapsed",           "pl": "{n} dni minęło"},
     "days_remaining_n":     {"en": "{n} days remaining",         "pl": "{n} dni pozostało"},
@@ -986,6 +991,19 @@ TRANSLATIONS = {
     "sidebar_primary":      {"en": "PRIMARY",                     "pl": "GŁÓWNY"},
     "sidebar_optional":     {"en": "optional",                    "pl": "opcjonalny"},
     "tariff_split_header":  {"en": "TARIFF SPLIT",                "pl": "PODZIAŁ TARYFY"},
+    "forecast_lbl":         {"en": "Forecast",                    "pl": "Prognoza"},
+    "median_lbl":           {"en": "Median",                      "pl": "Mediana"},
+    "spikes_html":          {"en": "● spikes >p99",               "pl": "● skoki >p99"},
+    "standby_short":        {"en": "standby",                     "pl": "czuwania"},
+    "kwh_year_szac":        {"en": "kWh/year est.",               "pl": "kWh/rok (szac.)"},
+    "days_from_today_lbl":  {"en": "{n} days from today",         "pl": "za {n} dni"},
+    "in_n_days_lbl":        {"en": "in {n} days",                 "pl": "za {n} dni"},
+    "elapsed_lbl":          {"en": "elapsed",                     "pl": "minęło"},
+    "most_likely_full":     {"en": "Most likely",                 "pl": "Najbardziej prawdopodobny"},
+    "range_full":           {"en": "Range",                       "pl": "Zakres"},
+    "next_bill_full":       {"en": "Next bill expected",          "pl": "Następny rachunek"},
+    "update_billing_full":  {"en": "💾 Update billing period",   "pl": "💾 Aktualizuj okres"},
+    "standby_lbl_pl":       {"en": "Standby",                    "pl": "Czuwanie"},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
 }
 
@@ -1827,7 +1845,7 @@ def _dedup_hdf(df: pd.DataFrame, value_col: str = "Read Value") -> tuple[pd.Data
     return df, report
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def load_calc_kwh(file):
     df = pd.read_csv(file)
     df.columns = df.columns.str.strip()
@@ -1855,7 +1873,7 @@ def load_calc_kwh(file):
     return df
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def load_kw(file):
     df = pd.read_csv(file)
     df.columns = df.columns.str.strip()
@@ -2239,7 +2257,7 @@ with tabs[0]:
                               t("incl_pct_off_lbl").format(pct=f"{DISC_PCT:.0f}"), "orange"))
         kpis.append(kpi_html(t("avg_daily_cost"),     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
         kpis.append(kpi_html(t("data_span"),           f"{days_data}", "days", "purple"))
-        kpis.append(kpi_html(t("standby_load"),        f"{standby*2*1000:.0f}", "W (2–4am)", "red"))
+        kpis.append(kpi_html(t("standby_load"),        f"{standby*2*1000:.0f}", t("w_standby"), "red"))
     if df_kw is not None:
         kpis.append(kpi_html(t("peak_demand"), f"{df_kw['value'].max():.2f}", "kW", "red"))
     st.markdown('<div class="kpi-row">' + "".join(kpis) + '</div>', unsafe_allow_html=True)
@@ -2440,7 +2458,7 @@ with tabs[2]:
         f'<div style="min-width:55px"></div>'
         f'<div style="display:flex;gap:14px">'
         f'<span style="color:{COLORS["kw"]}">— kW</span>'
-        f'<span style="color:{COLORS["red"]}">● spikes &gt;p99</span>'
+        f'<span style="color:{COLORS["red"]}">{t("spikes_html")}</span>'
         f'</div></div>',
         unsafe_allow_html=True,
     )
@@ -2461,7 +2479,7 @@ with tabs[2]:
     fig3 = go.Figure(go.Scatter(x=list(range(len(sv))), y=sv, mode="lines", fill="tozeroy",
                                 line=dict(color=COLORS["kw"], width=2),
                                 fillcolor=_rgba(COLORS["kw"], 0.13)))
-    for pv, lbl, col in [(0.50,"Median",COLORS["muted"]),(0.95,"p95",COLORS["peak"])]:
+    for pv, lbl, col in [(0.50,t("median_lbl"),COLORS["muted"]),(0.95,"p95",COLORS["peak"])]:
         idx = int(len(sv)*(1-pv))
         fig3.add_vline(x=idx, line_dash="dot", line_color=col,
                        annotation_text=lbl, annotation_font_color=col)
@@ -2721,7 +2739,7 @@ with tabs[5]:
     annual_kwh  = standby_kw * 8760
     annual_cost = annual_kwh * t_night * disc_factor
     ca, cb, cc = st.columns(3)
-    with ca: st.markdown(kpi_html(t("standby_power"),      f"{standby_kw*1000:.0f}", "W (2–4am)", "purple"), unsafe_allow_html=True)
+    with ca: st.markdown(kpi_html(t("standby_power"),      f"{standby_kw*1000:.0f}", t("w_standby"), "purple"), unsafe_allow_html=True)
     with cb: st.markdown(kpi_html(t("annual_standby_kwh"), f"{annual_kwh:.0f}", t("kwh_year_est"), "blue"),     unsafe_allow_html=True)
     with cc: st.markdown(kpi_html(t("annual_cost"),        f"€{annual_cost:.2f}", t("at_night_rate"), "orange"), unsafe_allow_html=True)
 
