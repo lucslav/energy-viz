@@ -1778,13 +1778,14 @@ with tabs[1]:
         showlegend=False,
     )
     st.plotly_chart(fig, use_container_width=True)
-    # Colour key below chart — avoids all overlap issues
     st.markdown(
-        f'<div style="display:flex;gap:16px;font-size:.78rem;padding:.1rem 0 .4rem;margin-left:52px">'
+        f'<div style="display:flex;font-size:.8rem;margin-top:-4px;margin-bottom:4px">'
+        f'<div style="min-width:55px"></div>'
+        f'<div style="display:flex;gap:14px">'
         f'<span style="color:{COLORS["night"]}">🌙 Night</span>'
         f'<span style="color:{COLORS["day"]}">☀️ Day</span>'
         f'<span style="color:{COLORS["peak"]}">🔥 Peak</span>'
-        f'</div>',
+        f'</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -1863,10 +1864,12 @@ with tabs[2]:
     )
     st.plotly_chart(fig, use_container_width=True)
     st.markdown(
-        f'<div style="display:flex;gap:16px;font-size:.78rem;padding:.1rem 0 .4rem;margin-left:52px">'
+        f'<div style="display:flex;font-size:.8rem;margin-top:-4px;margin-bottom:4px">'
+        f'<div style="min-width:55px"></div>'
+        f'<div style="display:flex;gap:14px">'
         f'<span style="color:{COLORS["kw"]}">— kW</span>'
         f'<span style="color:{COLORS["red"]}">● spikes &gt;p99</span>'
-        f'</div>',
+        f'</div></div>',
         unsafe_allow_html=True,
     )
 
