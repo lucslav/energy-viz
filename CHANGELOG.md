@@ -4,6 +4,23 @@ All notable changes to **energy-viz** are documented here.
 
 ---
 
+## [2.0.2] - 2026-03-15
+
+### Changed
+- **Consumption & Power Demand charts** — removed Plotly legend which conflicted with rangeselector buttons on all screen sizes; replaced with a colour-key row below the chart using a flex spacer (`min-width:55px`) that aligns exactly with the plot area start
+- **All chart titles removed** from inside Plotly figures — section headers above each chart already provide context; removing titles frees space and eliminates overlap with rangeselector buttons on mobile
+- **Consumption tab** — removed kWh/€ per-interval toggle; half-hourly cost in cents-per-slot was confusing; cost analysis belongs in Cost Breakdown tab
+- **Power Demand tab** — default date range changed from last 14 days to full HDF range
+- **Sidebar buttons** — "Re-parse invoice / Change rates" and "Clear all saved data" now use `use_container_width=True` to prevent text wrapping on narrow sidebar
+
+### Fixed
+- `KeyError: 'blue'` / `KeyError: 'cyan'` / `KeyError: 'purple'` — added missing colour aliases to `COLORS` dict
+- Power Demand showing values in thousands of kW (MW range) — was caused by stale `df_f` pointing to `df_calc` from a previous session; added sanity check warning when peak > 50 kW
+- Plotly annotation-based colour key (`xref="paper", y=1.01`) overlapped rangeselector buttons — removed in favour of HTML approach below the chart
+- Average Daily Load Profile x-axis — 48 half-hourly labels overlapping; reduced to hourly ticks with `tickmode="array"` every 4 slots, font size 9, angle −45°
+
+---
+
 ## [2.0.1] - 2026-03-15
 
 ### Fixed
