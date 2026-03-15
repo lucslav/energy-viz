@@ -1910,11 +1910,22 @@ with tabs[2]:
     hourly = df_f.groupby("hour")["value"].mean().reset_index()
     hcol = [COLORS["peak"] if 17<=h<19 else COLORS["night"] if (h>=23 or h<8) else COLORS["day"]
             for h in hourly["hour"]]
-    fig4 = go.Figure(go.Bar(x=hourly["hour"], y=hourly["value"],
+    hourly["hour_str"] = hourly["hour"].apply(lambda h: f"{h:02d}:00")
+    fig4 = go.Figure(go.Bar(x=hourly["hour_str"], y=hourly["value"],
                             marker_color=hcol, marker_line_width=0))
     apply_layout(fig4, "", height=250)
-    fig4.update_layout(xaxis=dict(tickmode="linear", tick0=0, dtick=1, gridcolor=COLORS["grid"]),
-                       yaxis_title="kW")
+    fig4.update_layout(
+        xaxis=dict(
+            tickmode="array",
+            tickvals=[f"{h:02d}:00" for h in range(0, 24)],
+            ticktext=[f"{h:02d}:00" if h % 3 == 0 else "" for h in range(0, 24)],
+            tickfont=dict(size=9, color=COLORS["text"]),
+            tickangle=-45,
+            gridcolor=COLORS["grid"],
+            showticklabels=True,
+        ),
+        yaxis_title="kW",
+    )
     st.plotly_chart(fig4, use_container_width=True)
 
 
@@ -2097,12 +2108,13 @@ with tabs[5]:
     apply_layout(fig2, "", height=300)
     fig2.update_layout(
         xaxis=dict(
-            tickangle=-45,
             tickmode="array",
-            tickvals=[slot_avg["time"].iloc[i] for i in range(0, len(slot_avg), 4)],  # every hour
-            ticktext=[slot_avg["time"].iloc[i] for i in range(0, len(slot_avg), 4)],
+            tickvals=[slot_avg["time"].iloc[i] for i in range(0, len(slot_avg), 2)],  # every hour (2 slots)
+            ticktext=[slot_avg["time"].iloc[i] if i % 6 == 0 else "" for i in range(0, len(slot_avg), 2)],
             tickfont=dict(size=9, color=COLORS["text"]),
+            tickangle=-45,
             gridcolor=COLORS["grid"],
+            showticklabels=True,
         ),
         yaxis_title="avg kWh",
     )
