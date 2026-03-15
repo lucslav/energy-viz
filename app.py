@@ -71,7 +71,7 @@ def decrypt_api_key() -> str:
 
 # ── Config persistence ─────────────────────────────
 _CONFIG_KEYS = [
-    "tariff", "discount_pct", "mprn", "supplier",
+    "lang", "tariff", "discount_pct", "mprn", "supplier",
     "api_provider", "billing_start", "billing_end", "billing_days",
 ]
 
@@ -553,6 +553,163 @@ def _rgba(hex_color: str, alpha: float = 0.15) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
+def fmt_date(dt, fmt="%d %b %Y") -> str:
+    """Format date with localised month name."""
+    s = dt.strftime(fmt)
+    lang = st.session_state.get("lang", "en")
+    if lang == "pl":
+        months_en = TRANSLATIONS["months_short"]["en"]
+        months_pl = TRANSLATIONS["months_short"]["pl"]
+        for en, pl in zip(months_en, months_pl):
+            s = s.replace(en, pl)
+    return s
+
+
+# ─────────────────────────────────────────────
+#  TRANSLATIONS
+# ─────────────────────────────────────────────
+TRANSLATIONS = {
+    # ── App shell ──
+    "app_title":            {"en": "Smart Meter Dashboard",       "pl": "Panel Licznika"},
+    "app_subtitle":         {"en": "Smart Meter HDF Analysis",    "pl": "Analiza plików HDF"},
+    "first_run_title":      {"en": "First Run Setup",             "pl": "Pierwsze uruchomienie"},
+    "welcome_title":        {"en": "Welcome! Let's configure your tariff.", "pl": "Witaj! Skonfigurujmy Twoją taryfę."},
+    "welcome_sub":          {"en": "Your settings will be saved to", "pl": "Ustawienia zostaną zapisane w"},
+    "persist_tariff":       {"en": "Tariff rates — persisted",    "pl": "Taryfa — zapisana"},
+    "persist_hdf":          {"en": "HDF files — persisted",       "pl": "Pliki HDF — zapisane"},
+    "persist_invoice":      {"en": "Invoice PDF — persisted",     "pl": "Faktura PDF — zapisana"},
+    "persist_api":          {"en": "API key — your choice",       "pl": "Klucz API — Twój wybór"},
+    "how_tariff":           {"en": t("how_tariff"), "pl": "Jak chcesz wprowadzić taryfę?"},
+    "upload_pdf_opt":       {"en": "📄 Upload invoice PDF (auto-extract)", "pl": "📄 Wgraj fakturę PDF (auto-odczyt)"},
+    "manual_opt":           {"en": "✏️ Enter rates manually",     "pl": "✏️ Wprowadź stawki ręcznie"},
+    # ── Sidebar ──
+    "hdf_files":            {"en": "HDF Files",                   "pl": "Pliki HDF"},
+    "primary":              {"en": "PRIMARY",                     "pl": "GŁÓWNY"},
+    "optional":             {"en": "optional",                    "pl": "opcjonalny"},
+    "not_loaded":           {"en": "not loaded",                  "pl": "nie załadowany"},
+    "just_uploaded":        {"en": "just uploaded",               "pl": "właśnie wgrany"},
+    "saved_session":        {"en": "saved from previous session", "pl": "zapisany z poprzedniej sesji"},
+    "not_available":        {"en": "not available",               "pl": "niedostępny"},
+    "tariff_rates":         {"en": "Tariff Rates (€/kWh)",        "pl": "Stawki taryfy (€/kWh)"},
+    "day_rate":             {"en": t("day_rate"),                         "pl": "Dzień"},
+    "peak_rate":            {"en": t("peak_rate"),                        "pl": "Szczyt"},
+    "night_rate":           {"en": t("night_rate"),                       "pl": "Noc"},
+    "standing_rate":        {"en": t("standing_rate"),                "pl": "Opłata stała €/d"},
+    "configuration":        {"en": "Configuration",               "pl": "Konfiguracja"},
+    "reparse_btn":          {"en": "Change rates / Re-parse",     "pl": "Zmień stawki / Przebuduj"},
+    "clear_btn":            {"en": "Clear all saved data",        "pl": "Wyczyść wszystkie dane"},
+    "tariff_split":         {"en": "TARIFF SPLIT",                "pl": "PODZIAŁ TARYFY"},
+    # ── Upload welcome screen ──
+    "upload_title":         {"en": "Upload HDF files to begin",   "pl": "Wgraj pliki HDF aby rozpocząć"},
+    "upload_sub":           {"en": "Download CSV exports from the", "pl": "Pobierz eksporty CSV ze"},
+    "upload_portal":        {"en": "smart meter portal",          "pl": "portalu licznika"},
+    "upload_sidebar":       {"en": "and upload them using the sidebar on the left.", "pl": "i wgraj je przez panel po lewej."},
+    # ── Tabs ──
+    "tab_overview":         {"en": "📊 Overview",                 "pl": "📊 Przegląd"},
+    "tab_consumption":      {"en": "🔌 Consumption",              "pl": "🔌 Zużycie"},
+    "tab_power":            {"en": "⚡ Power Demand",             "pl": "⚡ Pobór mocy"},
+    "tab_daily":            {"en": "📅 Daily Analysis",           "pl": "📅 Analiza dzienna"},
+    "tab_cost":             {"en": "💶 Cost Breakdown",           "pl": "💶 Rozliczenie kosztów"},
+    "tab_insights":         {"en": "🔍 Advanced Insights",        "pl": "🔍 Zaawansowane"},
+    "tab_prediction":       {"en": "🔮 Bill Prediction",          "pl": "🔮 Prognoza rachunku"},
+    "tab_raw":              {"en": "📋 Raw Data",                 "pl": "📋 Dane surowe"},
+    # ── Overview ──
+    "key_metrics":          {"en": t("key_metrics"),                 "pl": "Główne wskaźniki"},
+    "period_week":          {"en": "Week",                        "pl": "Tydzień"},
+    "period_month":         {"en": "Month",                       "pl": "Miesiąc"},
+    "period_bill":          {"en": "Bill",                        "pl": "Rachunek"},
+    "period_total":         {"en": "Total",                       "pl": "Całość"},
+    "total_consumption":    {"en": t("total_consumption"),           "pl": "Zużycie łącznie"},
+    "daily_average":        {"en": t("daily_average"),               "pl": "Średnia dzienna"},
+    "energy_cost":          {"en": t("energy_cost"),                 "pl": "Koszt energii"},
+    "avg_daily_cost":       {"en": t("avg_daily_cost"),              "pl": "Śr. koszt dzienny"},
+    "data_span":            {"en": t("data_span"),                   "pl": "Zakres danych"},
+    "standby_load":         {"en": t("standby_load"),                "pl": "Pobór w standby"},
+    "peak_demand":          {"en": t("peak_demand"),                 "pl": "Szczytowy pobór"},
+    "daily_energy":         {"en": t("daily_energy"), "pl": "Zużycie dzienne wg taryfy"},
+    "tariff_split_full":    {"en": t("tariff_split_full"),    "pl": "Podział taryfy — cały okres"},
+    # ── Consumption ──
+    "consumption_title":    {"en": t("consumption_title"), "pl": "Zużycie — interwały 30-min"},
+    "from_label":           {"en": t("from_label"),                        "pl": "Od"},
+    "to_label":             {"en": t("to_label"),                          "pl": "Do"},
+    "total_kwh":            {"en": t("total_kwh"),                   "pl": "Łącznie kWh"},
+    "peak_kwh":             {"en": t("peak_kwh"),                    "pl": "Szczyt kWh"},
+    "gross_cost":           {"en": t("gross_cost"),                  "pl": "Koszt brutto"},
+    "heatmap_title":        {"en": t("heatmap_title"),        "pl": "Mapa zużycia — godziny"},
+    # ── Power Demand ──
+    "power_title":          {"en": t("power_title"),                "pl": "Pobór mocy"},
+    "daily_peak_avg":       {"en": t("daily_peak_avg"),        "pl": "Szczyt i średnia dzienna"},
+    "load_curve":           {"en": t("load_curve"),         "pl": "Krzywa czasu trwania obciążenia"},
+    "avg_demand_hour":      {"en": t("avg_demand_hour"),      "pl": "Średni pobór wg godziny"},
+    # ── Daily Analysis ──
+    "daily_registers":      {"en": t("daily_registers"), "pl": "Rejestry dzienna Noc/Dzień/Szczyt"},
+    "cumulative_registers": {"en": t("cumulative_registers"),  "pl": "Skumulowane wartości rejestrów"},
+    "invoice_check":        {"en": t("invoice_check"),         "pl": "Weryfikacja faktury"},
+    "daily_trend":          {"en": t("daily_trend"),             "pl": "Trend dzienny kWh"},
+    # ── Cost Breakdown ──
+    "cost_breakdown":       {"en": t("cost_breakdown"),              "pl": "Rozliczenie kosztów"},
+    "monthly_bill":         {"en": t("monthly_bill"),       "pl": "Szacunkowy rachunek miesięczny"},
+    # ── Advanced Insights ──
+    "seasonal_trend":       {"en": t("seasonal_trend"),    "pl": "Trend sezonowy i miesięczny"},
+    "load_profile":         {"en": t("load_profile"),  "pl": "Średni dobowy profil obciążenia"},
+    "weekday_weekend":      {"en": t("weekday_weekend"),          "pl": "Dni robocze vs weekend"},
+    "standby_baseline":     {"en": t("standby_baseline"),     "pl": "Pobór w standby i bazowy"},
+    "peak_shifting":        {"en": t("peak_shifting"),    "pl": "Kalkulator przeniesienia szczytu"},
+    "anomaly_days":         {"en": t("anomaly_days"),                "pl": "Dni anomalii"},
+    # ── Bill Prediction ──
+    "current_progress":     {"en": t("current_progress"),     "pl": "Postęp bieżącego okresu"},
+    "bill_prediction":      {"en": t("bill_prediction"),             "pl": "Prognoza rachunku"},
+    "billing_period":       {"en": "Billing Period",              "pl": "Okres rozliczeniowy"},
+    # ── Raw Data ──
+    "raw_data":             {"en": t("raw_data"),           "pl": "Eksplorator danych surowych"},
+    "quality_report":       {"en": t("quality_report"),         "pl": "Raport jakości danych"},
+    # ── Setup ──
+    "ai_parser":            {"en": "AI Invoice Parser",           "pl": "Analizator faktur AI"},
+    "manual_entry":         {"en": "Manual Entry",                "pl": "Wprowadzanie ręczne"},
+    "supplier_name":        {"en": "Supplier name",               "pl": "Nazwa dostawcy"},
+    "billing_period_start": {"en": t("billing_period_start"),        "pl": "Początek bieżącego okresu"},
+    "billing_cycle_days":   {"en": t("billing_cycle_days"),        "pl": "Typowy cykl (dni)"},
+    "confirm_continue":     {"en": t("confirm_continue"),       "pl": "✅ Potwierdź i kontynuuj"},
+    "save_continue":        {"en": t("save_continue"),          "pl": "✅ Zapisz i kontynuuj"},
+    "review_extracted":     {"en": "Review extracted values",     "pl": "Sprawdź wyodrębnione wartości"},
+    "billing_period_hdr":   {"en": "Billing period",              "pl": "Okres rozliczeniowy"},
+    "expected_bill_date":   {"en": t("expected_bill_date"),       "pl": "Oczekiwana data rachunku"},
+    "days_from_today":      {"en": t("days_from_today"),             "pl": "dni od dziś"},
+    # ── Alerts ──
+    "upload_calc_first":    {"en": t("upload_calc_first"), "pl": "Wgraj plik <strong>calckWh</strong>."},
+    "upload_kw_first":      {"en": t("upload_kw_first"),      "pl": "Wgraj plik <strong>kW</strong>."},
+    "upload_dnp_first":     {"en": "Upload <strong>Daily DNP</strong> or <strong>Daily kWh</strong>.", "pl": "Wgraj plik <strong>Daily DNP</strong> lub <strong>Daily kWh</strong>."},
+    "incomplete_data":      {"en": "day(s) with incomplete 30-min data", "pl": "dzień/dni z niekompletnymi danymi 30-min"},
+    "days_label":           {"en": "days",                        "pl": "dni"},
+    "kwh_day":              {"en": "kWh/day",                     "pl": "kWh/dzień"},
+    "w_standby":            {"en": "W (2–4am)",                   "pl": "W (2–4 rano)"},
+    "incl_off":             {"en": "incl. {pct}% off",            "pl": "z rabatem {pct}%"},
+    "gross":                {"en": "gross",                       "pl": "brutto"},
+    "days_remaining":       {"en": t("days_remaining"),              "pl": "dni pozostało"},
+    "days_elapsed":         {"en": t("days_elapsed"),                "pl": "dni minęło"},
+    "period_end":           {"en": t("period_end"),                  "pl": "Koniec okresu"},
+    "consumed_so_far":      {"en": t("consumed_so_far"),             "pl": "Zużyto dotąd"},
+    "daily_avg_period":     {"en": t("daily_avg_period"),          "pl": "Średnia dzienna (okres)"},
+    "api_key_privacy":      {"en": "API Key — Privacy",           "pl": "Klucz API — Prywatność"},
+    "session_only":         {"en": "Session only — not saved to disk (default, most private)", "pl": "Tylko sesja — nie zapisany (domyślnie, najbardziej prywatny)"},
+    "save_to_disk":         {"en": "Save to disk — AES-256 encrypted, survives container restarts", "pl": "Zapisz na dysk — szyfrowanie AES-256, przeżywa restarty"},
+    "extract_btn":          {"en": t("extract_btn"), "pl": "🔍 Wyodrębnij dane taryfy z faktury"},
+    "extraction_ok":        {"en": t("extraction_ok"), "pl": "✅ Faktura przetworzona! Sprawdź i potwierdź wartości poniżej."},
+    "or_manually":          {"en": t("or_manually"), "pl": "Lub wprowadź stawki ręcznie"},
+    "upload_invoice":       {"en": t("upload_invoice"), "pl": "Wgraj rachunek za prąd (PDF)"},
+    "enter_api_key":        {"en": t("enter_api_key"), "pl": "Wprowadź klucz API aby kontynuować."},
+    "upload_pdf_first":     {"en": t("upload_pdf_first"), "pl": "Wgraj fakturę PDF aby kontynuować."},
+    "enter_manually_tip":   {"en": t("enter_manually_tip"), "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
+}
+
+
+def t(key: str) -> str:
+    """Return translation for current language."""
+    lang = st.session_state.get("lang", "en")
+    entry = TRANSLATIONS.get(key, {})
+    return entry.get(lang, entry.get("en", key))
+
+
 
 PLOTLY_BASE = dict(
     paper_bgcolor=COLORS["bg"], plot_bgcolor=COLORS["bg"],
@@ -601,6 +758,43 @@ RANGESLIDER_X = dict(
     ),
 )
 
+
+def _inject_pl_month_names():
+    """Inject JS to replace English month abbreviations with Polish in all Plotly charts."""
+    if st.session_state.get("lang", "en") != "pl":
+        return
+    pl_map = {
+        "Jan": "sty", "Feb": "lut", "Mar": "mar", "Apr": "kwi",
+        "May": "maj", "Jun": "cze", "Jul": "lip", "Aug": "sie",
+        "Sep": "wrz", "Oct": "paź", "Nov": "lis", "Dec": "gru",
+        "January": "Styczeń", "February": "Luty", "March": "Marzec",
+        "April": "Kwiecień", "June": "Czerwiec", "July": "Lipiec",
+        "August": "Sierpień", "September": "Wrzesień", "October": "Październik",
+        "November": "Listopad", "December": "Grudzień",
+    }
+    replacements_js = ", ".join([f'["{k}", "{v}"]' for k, v in pl_map.items()])
+    st.markdown(f"""
+    <script>
+    (function() {{
+        const map = new Map([{replacements_js}]);
+        function patchPlotly() {{
+            document.querySelectorAll('.xtick text, .ytick text').forEach(el => {{
+                for (const [en, pl] of map) {{
+                    if (el.textContent.includes(en)) {{
+                        el.textContent = el.textContent.replace(en, pl);
+                    }}
+                }}
+            }});
+        }}
+        // Run after Plotly renders
+        setTimeout(patchPlotly, 500);
+        setTimeout(patchPlotly, 1500);
+        const obs = new MutationObserver(patchPlotly);
+        obs.observe(document.body, {{childList: true, subtree: true}});
+    }})();
+    </script>
+    """, unsafe_allow_html=True)
+
 # ─────────────────────────────────────────────
 #  SESSION STATE INIT
 #  Defaults first, then overlay with persisted config.
@@ -610,6 +804,7 @@ def ss(key, default):
         st.session_state[key] = default
 
 ss("setup_done",       False)
+ss("lang",             "en")          # 🇮🇪 en | 🇵🇱 pl
 ss("tariff",           DEFAULT_TARIFF.copy())
 ss("discount_pct",     0.0)
 ss("mprn",             "")
@@ -660,6 +855,16 @@ def apply_layout(fig, title="", height=380, has_rangeselector=False):
                       height=height)
     if has_rangeselector:
         fig.update_layout(margin=dict(l=10, r=10, t=80, b=60))
+    # Polish: override datetime axis month names via tickformat
+    # Plotly uses browser locale — we patch with custom ticktext post-hoc
+    if st.session_state.get("lang", "en") == "pl":
+        fig.update_layout(
+            xaxis_tickformatstops=[
+                dict(dtickrange=[None, "M1"],  value="%d %b"),
+                dict(dtickrange=["M1",  "M12"], value="%b %Y"),
+                dict(dtickrange=["M12", None],  value="%Y"),
+            ]
+        )
     return fig
 
 def get_period(hour, minute=0):
@@ -905,14 +1110,36 @@ def setup_screen():
         <img src="{LOGO_URL}" alt="Energy Viz logo" onerror="this.style.display='none'">
         <div class="titles">
             <h1>Energy Viz</h1>
-            <p>Smart Meter Dashboard — First Run Setup</p>
+            <p>{t("app_title")} — {t("first_run_title")}</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Language selector — first thing in setup ──
+    st.markdown(f"""
+    <div style="background:#1c2330;border:1px solid #30363d;border-radius:12px;
+                padding:1rem 1.2rem;margin-bottom:1rem">
+        <div style="font-weight:600;font-size:.9rem;color:#e6edf3;margin-bottom:.6rem">
+            🌐 Language / Język
+        </div>
+    </div>""", unsafe_allow_html=True)
+    lc1, lc2, _ = st.columns([1, 1, 2])
+    with lc1:
+        if st.button("🇮🇪 English", use_container_width=True,
+                     type="primary" if st.session_state.get("lang","en") == "en" else "secondary",
+                     key="setup_lang_en"):
+            st.session_state["lang"] = "en"
+            st.rerun()
+    with lc2:
+        if st.button("🇵🇱 Polski", use_container_width=True,
+                     type="primary" if st.session_state.get("lang","en") == "pl" else "secondary",
+                     key="setup_lang_pl"):
+            st.session_state["lang"] = "pl"
+            st.rerun()
+
     st.markdown(f"""
     <div class="setup-card">
-        <h3 style="margin:0 0 .5rem;color:#e6edf3">Welcome! Let's configure your tariff.</h3>
+        <h3 style="margin:0 0 .5rem;color:#e6edf3">{t("welcome_title")}</h3>
         <p style="color:#7d8590;font-size:.88rem;margin-bottom:.8rem">
             Your settings will be saved to <code style="color:#58a6ff">{DATA_DIR}</code>
             (Docker volume) and survive container restarts and rebuilds.
@@ -920,27 +1147,27 @@ def setup_screen():
         <div style="display:flex;gap:8px;flex-wrap:wrap">
             <div style="background:#1f3a5f22;border:1px solid #58a6ff44;border-radius:8px;
                         padding:.4rem .8rem;font-size:.75rem;color:#58a6ff">
-                💾 Tariff rates — persisted
+                💾 {t("persist_tariff")}
             </div>
             <div style="background:#1f3a5f22;border:1px solid #58a6ff44;border-radius:8px;
                         padding:.4rem .8rem;font-size:.75rem;color:#58a6ff">
-                📁 HDF files — persisted
+                📁 {t("persist_hdf")}
             </div>
             <div style="background:#1f3a5f22;border:1px solid #58a6ff44;border-radius:8px;
                         padding:.4rem .8rem;font-size:.75rem;color:#58a6ff">
-                📄 Invoice PDF — persisted
+                📄 {t("persist_invoice")}
             </div>
             <div style="background:#f0883e22;border:1px solid #f0883e44;border-radius:8px;
                         padding:.4rem .8rem;font-size:.75rem;color:#f0883e">
-                🔑 API key — your choice
+                🔑 {t("persist_api")}
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
     method = st.radio(
-        "How would you like to enter your tariff?",
-        ["📄 Upload invoice PDF (auto-extract)", "✏️ Enter rates manually"],
+        t("how_tariff"),
+        [t("upload_pdf_opt"), t("manual_opt")],
         horizontal=True,
     )
 
@@ -951,7 +1178,7 @@ def setup_screen():
 
 
 def _setup_pdf():
-    st.markdown("#### 🤖 AI Invoice Parser")
+    st.markdown(f"#### 🤖 {t('ai_parser')}")
 
     st.markdown("""
     <div class="alert-box alert-info" style="color:#e6edf3!important">
@@ -1027,8 +1254,8 @@ def _setup_pdf():
     api_storage = st.radio(
         "api_storage_radio",
         [
-            "🔒 Session only — not saved to disk (default, most private)",
-            "💾 Save to disk — AES-256 encrypted, survives container restarts",
+            t("session_only"),
+            t("save_to_disk"),
         ],
         index=1 if already_saved_to_disk else 0,
         label_visibility="collapsed",
@@ -1064,10 +1291,10 @@ def _setup_pdf():
             st.success("Saved API key deleted.")
             st.rerun()
 
-    pdf_file = st.file_uploader("Upload your electricity bill (PDF)", type=["pdf"])
+    pdf_file = st.file_uploader(t("upload_invoice"), type=["pdf"])
 
     if pdf_file and api_key:
-        if st.button("🔍 Extract tariff data from invoice"):
+        if st.button(t("extract_btn")):
             with st.spinner(f"Analysing invoice with {provider_name}…"):
                 try:
                     pdf_bytes = pdf_file.getvalue()
@@ -1094,18 +1321,18 @@ def _setup_pdf():
                         </div>""", unsafe_allow_html=True)
                     else:
                         st.error(f"Extraction failed: {err_msg}")
-                    st.info("💡 You can enter rates manually using the expander below.")
+                    st.info(t("enter_manually_tip"))
     elif pdf_file:
-        st.info("Enter your API key to proceed.")
+        st.info(t("enter_api_key"))
     else:
-        st.info("Upload a PDF invoice to continue.")
+        st.info(t("upload_pdf_first"))
 
     # ── Show review form if extraction succeeded (persists across rerenders) ──
     if st.session_state.get("_show_review") and st.session_state.get("_extracted"):
-        st.success("✅ Invoice parsed! Review and confirm the values below.")
+        st.success(t("extraction_ok"))
         _show_extracted_review()
 
-    with st.expander("Or enter rates manually instead"):
+    with st.expander(t("or_manually")):
         _setup_manual(inside_expander=True)
 
 
@@ -1115,7 +1342,7 @@ def _apply_extracted(data: dict):
 
 def _show_extracted_review():
     data = st.session_state.get("_extracted", {})
-    st.markdown("#### Review extracted values")
+    st.markdown(f"#### {t('review_extracted')}")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -1129,8 +1356,8 @@ def _show_extracted_review():
         r_stand = st.number_input("Standing charge (€/d)", value=float(data.get("standing_charge") or DEFAULT_TARIFF["standing"]),step=0.001, format="%.4f")
         disc    = st.number_input("Discount (%)",           value=float(data.get("discount_pct")   or 0.0),  step=1.0, format="%.1f")
 
-    st.markdown("#### Billing period")
-    alert("Set the <strong>current period start</strong> — used for bill prediction.", "info")
+    st.markdown(f"#### {t('billing_period_hdr')}")
+    alert(f'{t("billing_period_hdr")} — {t("billing_period_start")}', "info")
 
     extracted_end = data.get("billing_period_end")
     default_start = None
@@ -1147,8 +1374,8 @@ def _show_extracted_review():
     today = dt_date.today()
     b1, b2 = st.columns(2)
     with b1:
-        b_start = st.date_input("Current period start", value=default_start or today)
-        b_days  = st.number_input("Typical cycle (days)", value=default_days, min_value=14, max_value=120, step=1)
+        b_start = st.date_input(t("billing_period_start"), value=default_start or today)
+        b_days  = st.number_input(t("billing_cycle_days"), value=default_days, min_value=14, max_value=120, step=1)
     with b2:
         b_end = b_start + timedelta(days=b_days)
         st.markdown(f"""
@@ -1156,14 +1383,14 @@ def _show_extracted_review():
                     padding:1rem;margin-top:1.7rem">
             <div style="font-size:.7rem;text-transform:uppercase;color:#7d8590">Expected billing date</div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:#58a6ff;margin:.3rem 0">
-                {b_end.strftime('%d %b %Y')}
+                {fmt_date(b_end)}
             </div>
             <div style="font-size:.78rem;color:#7d8590">
                 {(b_end - dt_date.today()).days} days from today
             </div>
         </div>""", unsafe_allow_html=True)
 
-    if st.button("✅ Confirm & Continue"):
+    if st.button(t("confirm_continue")):
         st.session_state["tariff"]        = dict(day=r_day, peak=r_peak, night=r_night, standing=r_stand)
         st.session_state["discount_pct"]  = disc
         st.session_state["mprn"]          = mprn
@@ -1179,7 +1406,7 @@ def _show_extracted_review():
 
 def _setup_manual(inside_expander=False):
     if not inside_expander:
-        st.markdown("#### ✏️ Manual Entry")
+        st.markdown(f"#### ✏️ {t('manual_entry')}")
 
     form_key = "manual_setup_expander" if inside_expander else "manual_setup"
     with st.form(form_key):
@@ -1198,9 +1425,9 @@ def _setup_manual(inside_expander=False):
         from datetime import date as dt_date, timedelta
         b1, b2 = st.columns(2)
         with b1:
-            b_start = st.date_input("Current period start", value=None,
+            b_start = st.date_input(t("billing_period_start"), value=None,
                                     help="Leave empty to skip — prediction tab will be unavailable")
-            b_days  = st.number_input("Typical cycle (days)", value=60, min_value=14, max_value=120, step=1)
+            b_days  = st.number_input(t("billing_cycle_days"), value=60, min_value=14, max_value=120, step=1)
         with b2:
             st.markdown("""
             <div style="background:#1c2330;border:1px solid #30363d;border-radius:10px;
@@ -1214,7 +1441,7 @@ def _setup_manual(inside_expander=False):
             ℹ️ Default rates are examples — check your electricity bill for actual rates.
         </div>""", unsafe_allow_html=True)
 
-        submitted = st.form_submit_button("✅ Save & Continue")
+        submitted = st.form_submit_button(t("save_continue"))
         if submitted:
             b_end = (b_start + timedelta(days=int(b_days))) if b_start else None
             st.session_state["tariff"]        = dict(day=r_day, peak=r_peak, night=r_night, standing=r_stand)
@@ -1372,6 +1599,23 @@ def load_daily(file):
 #  SIDEBAR
 # ─────────────────────────────────────────────
 with st.sidebar:
+    # ── Language toggle ──
+    lang_col1, lang_col2 = st.columns(2)
+    with lang_col1:
+        if st.button("🇮🇪 English", use_container_width=True,
+                     type="primary" if st.session_state.get("lang","en") == "en" else "secondary"):
+            st.session_state["lang"] = "en"
+            save_config()
+            st.rerun()
+    with lang_col2:
+        if st.button("🇵🇱 Polski", use_container_width=True,
+                     type="primary" if st.session_state.get("lang","en") == "pl" else "secondary"):
+            st.session_state["lang"] = "pl"
+            save_config()
+            st.rerun()
+
+    st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
+
     # Logo
     st.markdown(f"""
     <div class="sb-logo">
@@ -1383,7 +1627,7 @@ with st.sidebar:
     </div>""", unsafe_allow_html=True)
 
     # ── HDF file uploads — compact design ──
-    st.markdown('<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#7d8590;margin-bottom:.5rem">📂 HDF Files</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#7d8590;margin-bottom:.5rem">📂 {t("hdf_files")}</div>', unsafe_allow_html=True)
 
     # Helper: show persisted file status below each uploader
     def _file_card(slot, color, icon, label, hint, primary=False):
@@ -1413,13 +1657,13 @@ with st.sidebar:
     _file_card("calc",  "#58a6ff", "⭐", "30-min kWh", "HDF_calckWh_…csv", primary=True)
     f_calc = st.file_uploader("calckWh", type="csv", key="calc", label_visibility="collapsed")
 
-    _file_card("kw",    "#39d0d8", "⚡", "Power Demand", "HDF_kW_…csv")
+    _file_card("kw",    "#39d0d8", "⚡", t("power_title"), "HDF_kW_…csv")
     f_kw = st.file_uploader("kW", type="csv", key="kw", label_visibility="collapsed")
 
     _file_card("dnp",   "#bc8cff", "🌙", "Daily DNP", "HDF_DailyDNP_kWh_…csv")
     f_dnp = st.file_uploader("DNP", type="csv", key="dnp", label_visibility="collapsed")
 
-    _file_card("daily", "#3fb950", "📅", "Daily kWh", "HDF_Daily_kWh_…csv")
+    _file_card("daily", "#3fb950", "📅", "kWh", "HDF_Daily_kWh_…csv")
     f_daily = st.file_uploader("Daily", type="csv", key="daily", label_visibility="collapsed")
 
     # ── Upload status summary + persistence ──
@@ -1462,11 +1706,11 @@ with st.sidebar:
     st.divider()
 
     # ── Tariff rates (editable — save on change) ──
-    st.markdown("##### 🧾 Tariff Rates (€/kWh)")
-    t_day   = st.number_input("Day",           value=TARIFF_DAY,   step=0.001, format="%.4f")
-    t_peak  = st.number_input("Peak",          value=TARIFF_PEAK,  step=0.001, format="%.4f")
-    t_night = st.number_input("Night",         value=TARIFF_NIGHT, step=0.001, format="%.4f")
-    t_stand = st.number_input("Standing €/d",  value=STANDING_DAY, step=0.001, format="%.4f")
+    st.markdown(f"##### 🧾 {t('tariff_rates')}")
+    t_day   = st.number_input(t("day_rate"),           value=TARIFF_DAY,   step=0.001, format="%.4f")
+    t_peak  = st.number_input(t("peak_rate"),          value=TARIFF_PEAK,  step=0.001, format="%.4f")
+    t_night = st.number_input(t("night_rate"),         value=TARIFF_NIGHT, step=0.001, format="%.4f")
+    t_stand = st.number_input(t("standing_rate"),  value=STANDING_DAY, step=0.001, format="%.4f")
     # Persist rate edits immediately
     if (t_day   != TARIFF_DAY   or t_peak  != TARIFF_PEAK or
         t_night != TARIFF_NIGHT or t_stand != STANDING_DAY):
@@ -1475,7 +1719,7 @@ with st.sidebar:
 
     # ── Update / reset ──
     st.divider()
-    st.markdown("##### 🔄 Configuration")
+    st.markdown(f"##### 🔄 {t('configuration')}")
     if st.button("📄 Change rates / Re-parse", use_container_width=True):
         st.session_state["setup_done"] = False
         st.rerun()
@@ -1498,24 +1742,27 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 #  HEADER  (with logo)
 # ─────────────────────────────────────────────
-tariff_hint  = "Smart Meter HDF Analysis"
+
 st.markdown(f"""
 <div class="app-header">
     <img src="{LOGO_URL}" alt="Energy Viz" onerror="this.style.display='none'">
     <div class="titles">
-        <h1>Smart Meter Dashboard</h1>
-        <p>{tariff_hint}</p>
+        <h1>{t("app_title")}</h1>
+        <p>{t("app_subtitle")}</p>
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+# Inject Polish month names into Plotly axes if needed
+_inject_pl_month_names()
 
 # ─────────────────────────────────────────────
 #  TABS
 # ─────────────────────────────────────────────
 tabs = st.tabs([
-    "📊 Overview", "🔌 Consumption", "⚡ Power Demand",
-    "📅 Daily Analysis", "💶 Cost Breakdown", "🔍 Advanced Insights",
-    "🔮 Bill Prediction", "📋 Raw Data",
+    t("tab_overview"), t("tab_consumption"), t("tab_power"),
+    t("tab_daily"), t("tab_cost"), t("tab_insights"),
+    t("tab_prediction"), t("tab_raw"),
 ])
 
 # ── Guard: no files (neither uploaded nor persisted) ──
@@ -1548,7 +1795,7 @@ and upload them using the sidebar on the left.
             (ca, "⭐", "#58a6ff", "calckWh",    "HDF_calckWh_…csv",        "30-min kWh · Day/Peak/Night · **required**"),
             (cb, "⚡", "#39d0d8", "kW Demand",  "HDF_kW_…csv",             "Instantaneous kW · spike detection"),
             (cc, "🌙", "#bc8cff", "Daily DNP",  "HDF_DailyDNP_kWh_…csv",  "Cumulative registers · invoice check"),
-            (cd, "📅", "#3fb950", "Daily kWh",  "HDF_Daily_kWh_…csv",     "24h total · long-range trend"),
+            (cd, "📅", "#3fb950", "kWh",  "HDF_Daily_kWh_…csv",     "24h total · long-range trend"),
         ]:
             with col:
                 st.markdown(f"""
@@ -1616,7 +1863,7 @@ if df_calc is not None:
             )],
         )
         st.plotly_chart(fig_sb, use_container_width=True, config={"displayModeBar": False})
-        for p, color in [("Day",COLORS["day"]),("Peak",COLORS["peak"]),("Night",COLORS["night"])]:
+        for p, color in [(t("day_rate"),COLORS["day"]),(t("peak_rate"),COLORS["peak"]),(t("night_rate"),COLORS["night"])]:
             kwh = by_p.get(p.lower(), 0)
             pct = kwh / tot_sb * 100 if tot_sb else 0
             st.markdown(
@@ -1645,20 +1892,24 @@ with tabs[0]:
     # ── Period selector ──
     ov_col1, ov_col2 = st.columns([3, 1])
     with ov_col1:
-        section("📌", "Key Metrics")
+        section("📌", t("key_metrics"))
     with ov_col2:
-        ov_period = st.radio("Period", ["Week", "Month", "Bill", "Total"],
+        ov_period_idx = st.radio("Period",
+                             [t("period_week"), t("period_month"), t("period_bill"), t("period_total")],
                              index=3, horizontal=True, label_visibility="collapsed",
                              key="ov_period")
+        # Map by index position (language-independent)
+        _period_opts = [t("period_week"), t("period_month"), t("period_bill"), t("period_total")]
+        ov_period_i = _period_opts.index(ov_period_idx) if ov_period_idx in _period_opts else 3
 
     # Filter data by selected period
     if df_calc is not None:
         now = df_calc["datetime"].max()
-        if ov_period == "Week":
+        if ov_period_i == 0:    # Week
             ov_cutoff = now - pd.Timedelta(days=7)
-        elif ov_period == "Month":
+        elif ov_period_i == 1:  # Month
             ov_cutoff = now - pd.Timedelta(days=30)
-        elif ov_period == "Bill" and st.session_state.get("billing_start"):
+        elif ov_period_i == 2 and st.session_state.get("billing_start"):  # Bill
             ov_cutoff = pd.Timestamp(st.session_state["billing_start"])
         else:  # Total
             ov_cutoff = df_calc["datetime"].min()
@@ -1674,15 +1925,15 @@ with tabs[0]:
         avg_daily_kwh  = total_kwh / days_data
         avg_daily_cost = total_cost / days_data
         standby    = df_ov[df_ov["hour"].isin([2,3])]["value"].mean()
-        kpis.append(kpi_html("Total Consumption",  f"{total_kwh:,.0f}", "kWh", "blue"))
-        kpis.append(kpi_html("Daily Average",       f"{avg_daily_kwh:.1f}", "kWh/day", "green"))
-        kpis.append(kpi_html("Energy Cost",        f"€{total_cost:,.2f}",
+        kpis.append(kpi_html(t("total_consumption"),  f"{total_kwh:,.0f}", "kWh", "blue"))
+        kpis.append(kpi_html(t("daily_average"),       f"{avg_daily_kwh:.1f}", "kWh/day", "green"))
+        kpis.append(kpi_html(t("energy_cost"),        f"€{total_cost:,.2f}",
                               f"incl. {DISC_PCT:.0f}% off", "orange"))
-        kpis.append(kpi_html("Avg Daily Cost",     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
-        kpis.append(kpi_html("Data Span",           f"{days_data}", "days", "purple"))
-        kpis.append(kpi_html("Standby Load",        f"{standby*2*1000:.0f}", "W (2–4am)", "red"))
+        kpis.append(kpi_html(t("avg_daily_cost"),     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
+        kpis.append(kpi_html(t("data_span"),           f"{days_data}", "days", "purple"))
+        kpis.append(kpi_html(t("standby_load"),        f"{standby*2*1000:.0f}", "W (2–4am)", "red"))
     if df_kw is not None:
-        kpis.append(kpi_html("Peak Demand", f"{df_kw['value'].max():.2f}", "kW all-time", "red"))
+        kpis.append(kpi_html(t("peak_demand"), f"{df_kw['value'].max():.2f}", "kW", "red"))
     st.markdown('<div class="kpi-row">' + "".join(kpis) + '</div>', unsafe_allow_html=True)
 
     if df_calc is not None:
@@ -1696,7 +1947,7 @@ with tabs[0]:
     st.divider()
 
     if df_ov is not None and len(df_ov):
-        section("📈", "Daily Energy by Tariff Period", badge=ov_period)
+        section("📈", t("daily_energy"), badge=ov_period_idx)
         dp = df_ov.groupby(["date","period"])["value"].sum().reset_index()
         dpiv = dp.pivot(index="date", columns="period", values="value").fillna(0).reset_index()
         for c in ["day","peak","night"]:
@@ -1718,7 +1969,7 @@ with tabs[0]:
         st.plotly_chart(fig, use_container_width=True)
 
     if df_calc is not None:
-        section("🎯", "Full-Period Tariff Split")
+        section("🎯", t("tariff_split_full"))
         by_p = df_calc.groupby("period")["value"].sum()
         tot  = by_p.sum()
         c1, c2, c3 = st.columns(3)
@@ -1749,16 +2000,16 @@ with tabs[0]:
 # ════════════════════════════════════════════
 with tabs[1]:
     if df_calc is None:
-        alert("Upload the <strong>calckWh</strong> file.", "info"); st.stop()
+        alert(t("upload_calc_first"), "info"); st.stop()
 
-    section("🔌", "30-Minute Interval Consumption", badge="calckWh")
+    section("🔌", t("consumption_title"), badge="calckWh")
     min_d = df_calc["datetime"].min().date()
     max_d = df_calc["datetime"].max().date()
 
     # Date range
     ca, cb = st.columns(2)
-    with ca: d_from = st.date_input("From", value=min_d, min_value=min_d, max_value=max_d, key="cf")
-    with cb: d_to   = st.date_input("To",   value=max_d, min_value=min_d, max_value=max_d, key="ct")
+    with ca: d_from = st.date_input(t("from_label"), value=min_d, min_value=min_d, max_value=max_d, key="cf")
+    with cb: d_to   = st.date_input(t("to_label"),   value=max_d, min_value=min_d, max_value=max_d, key="ct")
     mask = (df_calc["date"] >= d_from) & (df_calc["date"] <= d_to)
     df_f = df_calc[mask].copy()
 
@@ -1790,13 +2041,13 @@ with tabs[1]:
     )
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total kWh",   f"{df_f['value'].sum():.2f}")
-    k2.metric("Peak kWh",    f"{df_f[df_f['period']=='peak']['value'].sum():.2f}")
-    k3.metric("Gross cost",  f"€{df_f['cost'].sum():.2f}")
+    k1.metric(t("total_kwh"),   f"{df_f['value'].sum():.2f}")
+    k2.metric(t("peak_kwh"),    f"{df_f[df_f['period']=='peak']['value'].sum():.2f}")
+    k3.metric(t("gross_cost"),  f"€{df_f['cost'].sum():.2f}")
     k4.metric(f"Net ({DISC_PCT:.0f}% off)", f"€{df_f['cost_net'].sum():.2f}")
 
     st.divider()
-    section("🌡️", "Hourly Usage Heatmap")
+    section("🌡️", t("heatmap_title"))
     heat = df_f.groupby(["date","hour"])["value"].sum().reset_index()
     heat_piv = heat.pivot(index="date", columns="hour", values="value").fillna(0)
     fig2 = go.Figure(go.Heatmap(
@@ -1807,7 +2058,7 @@ with tabs[1]:
         hoverongaps=False, colorbar=dict(title="kWh", tickfont=dict(color=COLORS["muted"])),
     ))
     fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=_rgba(COLORS["peak"], 0.13), line_width=0,
-                   annotation_text="Peak", annotation_font_color=COLORS["peak"])
+                   annotation_text=t("peak_rate"), annotation_font_color=COLORS["peak"])
     apply_layout(fig2, "", height=max(280, len(heat_piv)*14+60))
     fig2.update_layout(
         yaxis_autorange="reversed",
@@ -1831,17 +2082,17 @@ with tabs[1]:
 # ════════════════════════════════════════════
 with tabs[2]:
     if df_kw is None:
-        alert("Upload the <strong>kW</strong> file.", "info"); st.stop()
+        alert(t("upload_kw_first"), "info"); st.stop()
 
-    section("⚡", "Power Demand", badge="kW file")
+    section("⚡", t("power_title"), badge="kW file")
     if df_calc is not None:
         alert("Cross-validation: kW × 0.5h ≈ calckWh — mean error <b>&lt;0.001 kWh</b>/interval.", "good")
 
     min_d = df_kw["datetime"].min().date()
     max_d = df_kw["datetime"].max().date()
     ka, kb = st.columns(2)
-    with ka: d_from = st.date_input("From", value=min_d, min_value=min_d, max_value=max_d, key="kf")
-    with kb: d_to   = st.date_input("To",   value=max_d, min_value=min_d, max_value=max_d, key="kt")
+    with ka: d_from = st.date_input(t("from_label"), value=min_d, min_value=min_d, max_value=max_d, key="kf")
+    with kb: d_to   = st.date_input(t("to_label"),   value=max_d, min_value=min_d, max_value=max_d, key="kt")
     mask = (df_kw["date"] >= d_from) & (df_kw["date"] <= d_to)
     df_f = df_kw[mask].copy()
     p95  = df_f["value"].quantile(0.95)
@@ -1886,10 +2137,10 @@ with tabs[2]:
         unsafe_allow_html=True,
     )
 
-    section("📊", "Daily Peak & Average")
+    section("📊", t("daily_peak_avg"))
     ds2 = df_f.groupby("date")["value"].agg(["max","mean"]).reset_index()
     fig2 = go.Figure()
-    fig2.add_trace(go.Bar(x=ds2["date"], y=ds2["max"], name="Peak",
+    fig2.add_trace(go.Bar(x=ds2["date"], y=ds2["max"], name=t("peak_rate"),
                           marker_color=COLORS["peak"], marker_line_width=0))
     fig2.add_trace(go.Scatter(x=ds2["date"], y=ds2["mean"], name="Avg",
                               line=dict(color=COLORS["kw"], width=2, dash="dot")))
@@ -1897,7 +2148,7 @@ with tabs[2]:
     fig2.update_layout(yaxis_title="kW")
     st.plotly_chart(fig2, use_container_width=True)
 
-    section("📉", "Load Duration Curve")
+    section("📉", t("load_curve"))
     sv = df_f["value"].sort_values(ascending=False).reset_index(drop=True)
     fig3 = go.Figure(go.Scatter(x=list(range(len(sv))), y=sv, mode="lines", fill="tozeroy",
                                 line=dict(color=COLORS["kw"], width=2),
@@ -1907,10 +2158,10 @@ with tabs[2]:
         fig3.add_vline(x=idx, line_dash="dot", line_color=col,
                        annotation_text=lbl, annotation_font_color=col)
     apply_layout(fig3, "", height=260)
-    fig3.update_layout(xaxis_title="Reading rank", yaxis_title="kW")
+    fig3.update_layout(xaxis_title=t("load_curve"), yaxis_title="kW")
     st.plotly_chart(fig3, use_container_width=True)
 
-    section("🕐", "Average Demand by Hour")
+    section("🕐", t("avg_demand_hour"))
     hourly = df_f.groupby("hour")["value"].mean().reset_index()
     hcol = [COLORS["peak"] if 17<=h<19 else COLORS["night"] if (h>=23 or h<8) else COLORS["day"]
             for h in hourly["hour"]]
@@ -1950,7 +2201,7 @@ with tabs[3]:
     }
 
     if df_dnp is not None:
-        section("📅", "Daily Night/Day/Peak Registers", badge="DNP")
+        section("📅", t("daily_registers"), badge="DNP")
         pivot = df_dnp.pivot_table(index="date", columns="type", values="value", aggfunc="max")
         pivot.columns = [c.strip() for c in pivot.columns]
         pivot = pivot.reset_index().sort_values("date")
@@ -1968,7 +2219,7 @@ with tabs[3]:
         fig.update_layout(barmode="stack", yaxis_title="kWh")
         st.plotly_chart(fig, use_container_width=True)
 
-        section("📈", "Cumulative Register Values")
+        section("📈", t("cumulative_registers"))
         fig2 = go.Figure()
         for cn, (color, label) in col_map.items():
             if cn in pivot.columns:
@@ -1985,7 +2236,7 @@ with tabs[3]:
         df_d["roll7"] = df_d["daily"].rolling(7, min_periods=1).mean()
         fig = go.Figure()
         fig.add_trace(go.Bar(x=df_d["date"], y=df_d["daily"],
-                             marker_color=COLORS["total"], marker_line_width=0, name="Daily kWh"))
+                             marker_color=COLORS["total"], marker_line_width=0, name="kWh"))
         fig.add_trace(go.Scatter(x=df_d["date"], y=df_d["roll7"], name="7-day avg",
                                  line=dict(color=COLORS["yellow"], width=2)))
         fig.add_hline(y=df_d["daily"].mean(), line_dash="dot", line_color=COLORS["muted"],
@@ -2001,9 +2252,9 @@ with tabs[3]:
 # ════════════════════════════════════════════
 with tabs[4]:
     if df_calc is None:
-        alert("Upload the <strong>calckWh</strong> file.", "info"); st.stop()
+        alert(t("upload_calc_first"), "info"); st.stop()
 
-    section("💶", "Cost Breakdown", badge="calckWh")
+    section("💶", t("cost_breakdown"), badge="calckWh")
     by_p = df_calc.groupby("period").agg(kwh=("value","sum"), cost=("cost","sum")).reset_index()
     by_p["cost_net"] = by_p["cost"] * disc_factor
     total_cost       = by_p["cost_net"].sum()
@@ -2058,8 +2309,14 @@ with tabs[4]:
             </div>""", unsafe_allow_html=True)
 
     st.divider()
-    section("📆", "Monthly Bill Estimate")
-    df_calc["month_str"] = df_calc["datetime"].dt.to_period("M").astype(str)
+    section("📆", t("monthly_bill"))
+    if st.session_state.get("lang","en") == "pl":
+        _mn = TRANSLATIONS["months_short"]["pl"]
+        df_calc["month_str"] = df_calc["datetime"].apply(
+            lambda d: f"{_mn[d.month-1]} {d.year}"
+        )
+    else:
+        df_calc["month_str"] = df_calc["datetime"].dt.to_period("M").astype(str)
     mo = df_calc.groupby("month_str").agg(kwh=("value","sum"), cost=("cost","sum")).reset_index()
     mo["cost_net"] = mo["cost"] * disc_factor
     mo["days"]     = df_calc.groupby("month_str")["date"].nunique().values[:len(mo)]
@@ -2084,9 +2341,9 @@ with tabs[4]:
 # ════════════════════════════════════════════
 with tabs[5]:
     if df_calc is None:
-        alert("Upload the <strong>calckWh</strong> file.", "info"); st.stop()
+        alert(t("upload_calc_first"), "info"); st.stop()
 
-    section("🌡️", "Seasonal & Monthly Trend")
+    section("🌡️", t("seasonal_trend"))
     monthly_avg = df_calc.groupby("month")["daily_kwh"].mean().reset_index()
     monthly_avg.columns = ["month","avg"]
     bar_colors = [COLORS["total"] if v<12 else COLORS["yellow"] if v<18 else COLORS["peak"]
@@ -2098,7 +2355,7 @@ with tabs[5]:
     st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
-    section("📊", "Average Daily Load Profile")
+    section("📊", t("load_profile"))
     slot_avg = df_calc.groupby(["hour","minute"])["value"].mean().reset_index()
     slot_avg["time"] = slot_avg["hour"].astype(str).str.zfill(2)+":"+slot_avg["minute"].astype(str).str.zfill(2)
     slot_avg = slot_avg.sort_values(["hour","minute"])
@@ -2109,9 +2366,9 @@ with tabs[5]:
     fig2 = go.Figure(go.Bar(x=slot_avg["time"], y=slot_avg["value"],
                             marker_color=sc, marker_line_width=0))
     fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=_rgba(COLORS["peak"], 0.13), line_width=0,
-                   annotation_text="Peak", annotation_font_color=COLORS["peak"])
+                   annotation_text=t("peak_rate"), annotation_font_color=COLORS["peak"])
     fig2.add_vrect(x0="00:00", x1="07:30", fillcolor=_rgba(COLORS["night"], 0.13), line_width=0,
-                   annotation_text="Night", annotation_font_color=COLORS["night"])
+                   annotation_text=t("night_rate"), annotation_font_color=COLORS["night"])
     apply_layout(fig2, "", height=300)
     fig2.update_layout(
         xaxis=dict(
@@ -2131,7 +2388,7 @@ with tabs[5]:
     st.plotly_chart(fig2, use_container_width=True)
 
     st.divider()
-    section("📅", "Weekday vs Weekend")
+    section("📅", t("weekday_weekend"))
     daily_df = df_calc.groupby("date")["value"].sum().reset_index()
     daily_df["dow"]  = pd.to_datetime(daily_df["date"]).dt.weekday
     daily_df["name"] = pd.to_datetime(daily_df["date"]).dt.day_name()
@@ -2145,7 +2402,7 @@ with tabs[5]:
     st.plotly_chart(fig3, use_container_width=True)
 
     st.divider()
-    section("🔋", "Standby & Baseline Load")
+    section("🔋", t("standby_baseline"))
     standby_avg = df_calc[df_calc["hour"].isin([2,3])]["value"].mean()
     standby_kw  = standby_avg * 2
     annual_kwh  = standby_kw * 8760
@@ -2156,7 +2413,7 @@ with tabs[5]:
     with cc: st.markdown(kpi_html("Annual cost",        f"€{annual_cost:.2f}", "at night rate", "orange"), unsafe_allow_html=True)
 
     st.divider()
-    section("💡", "Peak Shifting Calculator")
+    section("💡", t("peak_shifting"))
     peak_kwh = df_calc[df_calc["period"]=="peak"]["value"].sum()
     max_save = peak_kwh * (t_peak - t_night) * disc_factor
     shift    = st.slider("% of peak shifted to night", 0, 100, 50, step=5)
@@ -2167,7 +2424,7 @@ with tabs[5]:
                                   f"night {(1-t_night/t_peak)*100:.0f}% cheaper", "cyan"),               unsafe_allow_html=True)
 
     st.divider()
-    section("🚨", "Anomaly Days")
+    section("🚨", t("anomaly_days"))
     daily_all = df_calc.groupby("date")["value"].sum().reset_index()
     mean_d = daily_all["value"].mean(); std_d = daily_all["value"].std()
     thresh = mean_d + 2*std_d
@@ -2228,8 +2485,8 @@ with tabs[6]:
     days_remain  = max((b_end - today).days, 0)
     pct_elapsed  = days_elapsed / days_total * 100
 
-    section("🔮", "Current Period Progress",
-            badge=f"{b_start.strftime('%d %b')} → {b_end.strftime('%d %b %Y')}")
+    section("🔮", t("current_progress"),
+            badge=f"{fmt_date(b_start, '%d %b')} → {fmt_date(b_end)}")
 
     # ── Progress bar ──
     st.markdown(f"""
@@ -2237,9 +2494,9 @@ with tabs[6]:
                 padding:1.2rem 1.4rem;margin-bottom:1rem">
         <div style="display:flex;justify-content:space-between;font-size:.78rem;
                     color:#7d8590;margin-bottom:6px">
-            <span>{b_start.strftime('%d %b %Y')}</span>
+            <span>{fmt_date(b_start)}</span>
             <span style="color:#58a6ff;font-weight:600">{pct_elapsed:.0f}% elapsed</span>
-            <span>{b_end.strftime('%d %b %Y')}</span>
+            <span>{fmt_date(b_end)}</span>
         </div>
         <div style="background:#1c2330;border-radius:6px;height:10px;overflow:hidden">
             <div style="height:10px;border-radius:6px;width:{min(pct_elapsed,100):.1f}%;
@@ -2314,14 +2571,14 @@ with tabs[6]:
 
     # ── KPI strip ──
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Consumed so far",    f"{actual_kwh:.1f} kWh",  f"€{actual_cost:.2f} net")
-    k2.metric("Daily avg (period)", f"{daily_avg:.2f} kWh/d")
+    k1.metric(t("consumed_so_far"),    f"{actual_kwh:.1f} kWh",  f"€{actual_cost:.2f} net")
+    k2.metric(t("daily_avg_period"), f"{daily_avg:.2f} kWh/d")
     k3.metric("Days remaining",     f"{days_remain}")
-    k4.metric("Period end",         b_end.strftime("%d %b %Y"),
+    k4.metric("Period end",         fmt_date(b_end),
               f"{'in ' + str(days_remain) + ' days' if days_remain > 0 else 'passed'}")
 
     st.divider()
-    section("💰", "Bill Prediction")
+    section("💰", t("bill_prediction"))
     alert(f"Prediction accuracy depends on how much of the period has elapsed. "
           f"Currently <strong>{pct_elapsed:.0f}%</strong> complete — "
           f"{'early estimate, wide range' if pct_elapsed < 30 else 'good estimate' if pct_elapsed < 70 else 'high confidence'}.",
@@ -2486,7 +2743,7 @@ with tabs[6]:
                     padding:1rem;margin-top:1.8rem">
             <div style="font-size:.7rem;text-transform:uppercase;color:#7d8590">Next bill expected</div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:#58a6ff;margin:.3rem 0">
-                {new_end.strftime('%d %b %Y')}
+                {fmt_date(new_end)}
             </div>
             <div style="font-size:.78rem;color:#7d8590">{(new_end - today).days} days from today</div>
         </div>""", unsafe_allow_html=True)
@@ -2504,10 +2761,10 @@ with tabs[6]:
 #  TAB 7 — RAW DATA
 # ════════════════════════════════════════════
 with tabs[7]:
-    section("📋", "Raw Data Explorer")
+    section("📋", t("raw_data"))
 
     # ── Data quality report ──
-    section("🔍", "Data Quality Report", badge="auto-checked on every upload")
+    section("🔍", t("quality_report"), badge="auto-checked on every upload")
 
     qr_map = {
         "calckWh": st.session_state.get("_qr_calc"),
@@ -2560,8 +2817,8 @@ with tabs[7]:
 
     st.divider()
 
-    ds = st.selectbox("Browse dataset", ["calckWh (30-min)", "kW Demand", "Daily DNP", "Daily kWh"])
-    df_map = {"calckWh (30-min)":df_calc, "kW Demand":df_kw, "Daily DNP":df_dnp, "Daily kWh":df_daily}
+    ds = st.selectbox("Browse dataset", ["calckWh (30-min)", "kW Demand", "Daily DNP", "kWh"])
+    df_map = {"calckWh (30-min)":df_calc, "kW Demand":df_kw, "Daily DNP":df_dnp, "kWh":df_daily}
     df_show = df_map.get(ds)
     if df_show is not None:
         st.dataframe(df_show.head(500), use_container_width=True, height=420)
