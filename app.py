@@ -1711,7 +1711,7 @@ def _show_extracted_review():
                 {fmt_date(b_end)}
             </div>
             <div style="font-size:.78rem;color:#7d8590">
-                {(b_end - dt_date.today()).days} {t("days_from_today")}
+                {t("days_from_today_lbl").format(n=(b_end - dt_date.today()).days)}
             </div>
         </div>""", unsafe_allow_html=True)
 
@@ -2617,12 +2617,13 @@ with tabs[4]:
     with c2:
         for _, row in by_p.iterrows():
             p = row["period"]; color = cmap.get(p,"#888")
+            _p_lbl = {"day": t("legend_day"), "peak": t("legend_peak"), "night": t("legend_night")}.get(p, p.capitalize())
             st.markdown(f"""
             <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;
                         padding:.75rem 1.1rem;margin:.4rem 0;border-left:3px solid {color}">
                 <div style="display:flex;justify-content:space-between;align-items:center">
                     <div>
-                        <div style="font-weight:600;color:{color};text-transform:capitalize">{p}</div>
+                        <div style="font-weight:600;color:{color}">{_p_lbl}</div>
                         <div style="font-size:.78rem;color:#7d8590">{row['kwh']:,.1f} kWh</div>
                     </div>
                     <div style="text-align:right">
@@ -2658,7 +2659,16 @@ with tabs[4]:
                                mode="lines+markers", line=dict(color=COLORS["total"], width=2),
                                marker=dict(size=7)))
     apply_layout(fig_m, "", height=360)
-    fig_m.update_layout(barmode="stack", yaxis_title="€")
+    fig_m.update_layout(
+        barmode="stack", yaxis_title="€",
+        legend=dict(
+            orientation="h", yanchor="top", y=-0.18,
+            xanchor="left", x=0,
+            font=dict(size=10, color=COLORS["text"]),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+        margin=dict(l=10, r=10, t=20, b=80),
+    )
     st.plotly_chart(fig_m, use_container_width=True)
 
 
@@ -2695,6 +2705,8 @@ with tabs[5]:
                    annotation_text=t("peak_rate"), annotation_font_color=COLORS["peak"])
     fig2.add_vrect(x0="00:00", x1="07:30", fillcolor=_rgba(COLORS["night"], 0.13), line_width=0,
                    annotation_text=t("night_rate"), annotation_font_color=COLORS["night"])
+    fig2.add_vrect(x0="08:00", x1="17:00", fillcolor=_rgba(COLORS["day"], 0.07), line_width=0,
+                   annotation_text=t("day_rate"), annotation_font_color=COLORS["day"])
     apply_layout(fig2, "", height=300)
     fig2.update_layout(
         xaxis=dict(
@@ -2826,7 +2838,7 @@ with tabs[6]:
         <div style="display:flex;justify-content:space-between;font-size:.78rem;
                     color:#7d8590;margin-bottom:6px">
             <span>{fmt_date(b_start)}</span>
-            <span style="color:#58a6ff;font-weight:600">{pct_elapsed:.0f}% elapsed</span>
+            <span style="color:#58a6ff;font-weight:600">{pct_elapsed:.0f}% {t("elapsed_lbl")}</span>
             <span>{fmt_date(b_end)}</span>
         </div>
         <div style="background:#1c2330;border-radius:6px;height:10px;overflow:hidden">
@@ -2966,8 +2978,8 @@ with tabs[6]:
             </div>
         </div>
         <div style="text-align:center;margin-top:.5rem;font-size:.78rem;color:#7d8590">
-            Most likely: <strong style="color:#58a6ff">€{mid_bill:.2f}</strong>
-            &nbsp;·&nbsp; Range: €{high_bill-low_bill:.2f}
+            {t("most_likely_full")}: <strong style="color:#58a6ff">€{mid_bill:.2f}</strong>
+            &nbsp;·&nbsp; {t("range_full")}: €{high_bill-low_bill:.2f}
         </div>
     </div>""", unsafe_allow_html=True)
 
@@ -3012,7 +3024,7 @@ with tabs[6]:
         proj_cost_daily = (daily_rate * (t_day * 0.6 + t_peak * 0.1 + t_night * 0.3) * disc_factor + t_stand)
         proj_y = [last_actual_val + proj_cost_daily * i for i in range(len(proj_dates))]
         fig_proj.add_trace(go.Scatter(
-            x=proj_dates, y=proj_y, name=f"Forecast ({label})",
+            x=proj_dates, y=proj_y, name=f"{t('forecast_lbl')} ({label})",
             mode="lines", line=dict(color=color, width=1.5, dash=dash),
         ))
 
@@ -3069,11 +3081,11 @@ with tabs[6]:
         st.markdown(f"""
         <div style="background:#1c2330;border:1px solid #30363d;border-radius:10px;
                     padding:1rem;margin-top:1.8rem">
-            <div style="font-size:.7rem;text-transform:uppercase;color:#7d8590">Next bill expected</div>
+            <div style="font-size:.7rem;text-transform:uppercase;color:#7d8590">{t("next_bill_full")}</div>
             <div style="font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:#58a6ff;margin:.3rem 0">
                 {fmt_date(new_end)}
             </div>
-            <div style="font-size:.78rem;color:#7d8590">{(new_end - today).days} days from today</div>
+            <div style="font-size:.78rem;color:#7d8590">{t("days_from_today_lbl").format(n=(new_end - today).days)}</div>
         </div>""", unsafe_allow_html=True)
 
     if st.button(t("update_billing")):
