@@ -2265,8 +2265,8 @@ with tabs[0]:
         kpis.append(kpi_html(t("daily_average"),       f"{avg_daily_kwh:.1f}", t("kwh_day_unit"), "green"))
         kpis.append(kpi_html(t("energy_cost"),        f"€{total_cost:,.2f}",
                               t("incl_pct_off_lbl").format(pct=f"{DISC_PCT:.0f}"), "orange"))
-        kpis.append(kpi_html(t("avg_daily_cost"),     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
-        kpis.append(kpi_html(t("data_span"),           f"{days_data}", "days", "purple"))
+        kpis.append(kpi_html(t("avg_daily_cost"),     f"€{avg_daily_cost:.2f}", t("per_day"), "cyan"))
+        kpis.append(kpi_html(t("data_span"),           f"{days_data}", t("days_label"), "purple"))
         kpis.append(kpi_html(t("standby_load"),        f"{standby*2*1000:.0f}", t("w_standby"), "red"))
     if df_kw is not None:
         kpis.append(kpi_html(t("peak_demand"), f"{df_kw['value'].max():.2f}", "kW", "red"))
@@ -2305,8 +2305,11 @@ with tabs[0]:
         st.plotly_chart(fig, use_container_width=True)
 
     if df_calc is not None:
-        section("🎯", t("tariff_split_full"))
-        by_p = df_calc.groupby("period")["value"].sum()
+        # Use filtered data matching selected period
+        _split_df = df_ov if df_ov is not None and len(df_ov) else df_calc
+        _split_label = ov_period_idx if ov_period_idx else t("period_total")
+        section("🎯", t("tariff_split_full"), badge=_split_label)
+        by_p = _split_df.groupby("period")["value"].sum()
         tot  = by_p.sum()
         c1, c2, c3 = st.columns(3)
         for col, p, icon, color in [
@@ -2316,17 +2319,18 @@ with tabs[0]:
         ]:
             v    = by_p.get(p, 0)
             rate = {"day":t_day,"peak":t_peak,"night":t_night}[p]
+            _p_name = {"day":t("legend_day"),"peak":t("legend_peak"),"night":t("legend_night")}[p]
             with col:
                 st.markdown(f"""
                 <div style="background:#161b22;border:1px solid #30363d;
                             border-radius:12px;padding:1rem;border-top:3px solid {color}">
                     <div style="font-size:1.3rem">{icon}</div>
                     <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;
-                                color:#7d8590;margin:.3rem 0">{p.upper()}</div>
+                                color:#7d8590;margin:.3rem 0">{_p_name}</div>
                     <div style="font-family:'JetBrains Mono',monospace;font-size:1.35rem;
                                 font-weight:700;color:{color}">{v:,.1f} kWh</div>
                     <div style="font-size:.8rem;color:#7d8590">
-                        {v/tot*100:.1f}% · €{v*rate*disc_factor:,.2f} net
+                        {v/tot*100:.1f}% · €{v*rate*disc_factor:,.2f} {t("net_label")}
                     </div>
                 </div>""", unsafe_allow_html=True)
 
