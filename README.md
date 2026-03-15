@@ -71,8 +71,6 @@ Download your data from the [smart meter portal](https://myaccount.esbnetworks.i
 
 ### Self-hosted NAS / home server
 
-Use the `docker-compose.yml` included in this repo.
-
 Edit `ENERGY_VIZ_SECRET` to a unique random value before first run:
 ```bash
 openssl rand -hex 32
