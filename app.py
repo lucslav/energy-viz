@@ -641,7 +641,7 @@ TRANSLATIONS = {
     "standby_load":         {"en": "Standby Load",                "pl": "Pobór w czuwaniu"},
     "peak_demand":          {"en": "Peak Demand",                 "pl": "Szczytowy pobór"},
     "daily_energy":         {"en": "Daily Energy by Tariff Period", "pl": "Zużycie dzienne wg taryfy"},
-    "tariff_split_full":    {"en": "Full-Period Tariff Split",    "pl": "Podział taryfy — cały okres"},
+    "tariff_split_full":    {"en": "Tariff Split",                "pl": "Podział taryfy"},
     # ── Consumption ──
     "consumption_title":    {"en": "30-Minute Interval Consumption", "pl": "Zużycie — interwały 30-min"},
     "from_label":           {"en": "From",                        "pl": "Od"},
@@ -1849,10 +1849,11 @@ def _dedup_hdf(df: pd.DataFrame, value_col: str = "Read Value") -> tuple[pd.Data
 def _open_hdf(file_or_path):
     """Accept either an uploaded file widget or a path string."""
     if isinstance(file_or_path, str):
-        return open(file_or_path, "rb")
+        # Return BytesIO so file handle is not left open
+        return io.BytesIO(Path(file_or_path).read_bytes())
     return file_or_path  # UploadedFile or BytesIO
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
 def load_calc_kwh(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1880,7 +1881,7 @@ def load_calc_kwh(file):
     return df
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
 def load_kw(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1894,7 +1895,7 @@ def load_kw(file):
     return df
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
 def load_dnp(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1908,7 +1909,7 @@ def load_dnp(file):
     return df
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
 def load_daily(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -2565,8 +2566,17 @@ with tabs[3]:
             if cn in pivot.columns:
                 fig2.add_trace(go.Scatter(x=pivot["date"], y=pivot[cn], name=label,
                                           line=dict(color=color, width=2)))
-        apply_layout(fig2, "", height=280)
-        fig2.update_layout(yaxis_title=t("kw_cumulative"))
+        apply_layout(fig2, "", height=300)
+        fig2.update_layout(
+            yaxis_title=t("kw_cumulative"),
+            legend=dict(
+                orientation="h", yanchor="top", y=-0.18,
+                xanchor="left", x=0,
+                font=dict(size=10, color=COLORS["text"]),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+            margin=dict(l=10, r=10, t=20, b=70),
+        )
         st.plotly_chart(fig2, use_container_width=True)
 
     if df_daily is not None:
@@ -2676,12 +2686,12 @@ with tabs[4]:
     fig_m.update_layout(
         barmode="stack", yaxis_title="€",
         legend=dict(
-            orientation="h", yanchor="top", y=-0.18,
+            orientation="h", yanchor="top", y=-0.20,
             xanchor="left", x=0,
             font=dict(size=10, color=COLORS["text"]),
             bgcolor="rgba(0,0,0,0)",
         ),
-        margin=dict(l=10, r=10, t=20, b=80),
+        margin=dict(l=10, r=10, t=20, b=90),
     )
     st.plotly_chart(fig_m, use_container_width=True)
 
@@ -2720,7 +2730,8 @@ with tabs[5]:
     fig2.add_vrect(x0="00:00", x1="07:30", fillcolor=_rgba(COLORS["night"], 0.13), line_width=0,
                    annotation_text=t("night_rate"), annotation_font_color=COLORS["night"])
     fig2.add_vrect(x0="08:00", x1="17:00", fillcolor=_rgba(COLORS["day"], 0.07), line_width=0,
-                   annotation_text=t("day_rate"), annotation_font_color=COLORS["day"])
+                   annotation_text=t("day_rate"), annotation_font_color=COLORS["day"],
+                   annotation_position="top left")
     apply_layout(fig2, "", height=300)
     fig2.update_layout(
         xaxis=dict(
@@ -2928,11 +2939,11 @@ with tabs[6]:
 
     # ── KPI strip ──
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric(t("consumed_so_far"),    f"{actual_kwh:.1f} kWh",  f"€{actual_cost:.2f} net")
+    k1.metric(t("consumed_so_far"),    f"{actual_kwh:.1f} kWh",  f"€{actual_cost:.2f} {t('net_label')}")
     k2.metric(t("daily_avg_period"), f"{daily_avg:.2f} kWh/d")
     k3.metric(t("days_remaining_lbl"),     f"{days_remain}")
     k4.metric(t("period_end_lbl"),         fmt_date(b_end),
-              f"{'in ' + str(days_remain) + ' days' if days_remain > 0 else 'passed'}")
+              t("in_n_days_lbl").format(n=days_remain) if days_remain > 0 else t("period_passed") if "period_passed" in TRANSLATIONS else "passed")
 
     st.divider()
     section("💰", t("bill_prediction"))
