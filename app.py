@@ -1845,9 +1845,16 @@ def _dedup_hdf(df: pd.DataFrame, value_col: str = "Read Value") -> tuple[pd.Data
     return df, report
 
 
+
+def _open_hdf(file_or_path):
+    """Accept either an uploaded file widget or a path string."""
+    if isinstance(file_or_path, str):
+        return open(file_or_path, "rb")
+    return file_or_path  # UploadedFile or BytesIO
+
 @st.cache_data(show_spinner=False)
 def load_calc_kwh(file):
-    df = pd.read_csv(file)
+    df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
     df = df.sort_values("datetime").reset_index(drop=True)
@@ -1875,7 +1882,7 @@ def load_calc_kwh(file):
 
 @st.cache_data(show_spinner=False)
 def load_kw(file):
-    df = pd.read_csv(file)
+    df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
     df = df.sort_values("datetime").reset_index(drop=True)
@@ -1887,9 +1894,9 @@ def load_kw(file):
     return df
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def load_dnp(file):
-    df = pd.read_csv(file)
+    df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
     df = df.sort_values("datetime").reset_index(drop=True)
@@ -1901,9 +1908,9 @@ def load_dnp(file):
     return df
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def load_daily(file):
-    df = pd.read_csv(file)
+    df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
     df = df.sort_values("datetime").reset_index(drop=True)
@@ -2134,10 +2141,13 @@ and upload them using the sidebar on the left.
 
 # ── Load data — uploaded file takes priority, fallback to persisted ──
 def _resolve(uploaded, slot):
-    """Return uploaded file if present, else load persisted file from disk."""
+    """Return uploaded file if present, else return path string for persisted file."""
     if uploaded is not None:
         return uploaded
-    return load_hdf_file(slot)   # returns BytesIO or None
+    path = HDF_SLOTS[slot]
+    if path.exists():
+        return str(path)   # return path string — stable cache key across restarts
+    return None
 
 src_calc  = _resolve(f_calc,  "calc")
 src_kw    = _resolve(f_kw,    "kw")
