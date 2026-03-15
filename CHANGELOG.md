@@ -4,6 +4,22 @@ All notable changes to **energy-viz** are documented here.
 
 ---
 
+## [2.0.1] - 2026-03-15
+
+### Fixed
+- Welcome screen (no files uploaded) rendered raw HTML instead of cards — replaced large multi-line `st.markdown()` block with small per-column calls that Streamlit renders reliably
+- `KeyError: 'blue'` / `KeyError: 'cyan'` / `KeyError: 'purple'` on Bill Prediction and other tabs — added missing aliases to `COLORS` dict
+- `TypeError: unsupported operand type(s) for +: 'int' and 'str'` on Bill Prediction tab — `add_vline(x=str(b_end))` replaced with millisecond timestamp `pd.Timestamp(b_end).timestamp() * 1000`
+- `TypeError: cannot perform __mul__ with this index type: DatetimeArray` on Bill Prediction / Advanced Insights — vectorised pandas arithmetic replaces `.apply(lambda)` for cumulative standing charge calculation
+- Orphaned "⚙️ Settings" section header and two stacked dividers remaining after discount toggle removal
+- "Apply 0% discount" toggle had no visible effect — removed; discount from tariff config is now always applied via `DISC_FACTOR`
+
+### Changed
+- Sidebar file cards redesigned — persisted filename shown as a custom HTML badge instead of relying on Streamlit's `stFileUploaderFile` component (which rendered on a white background that CSS could not override)
+- `COLORS` dict extended with `blue`, `cyan`, `purple` aliases for forward compatibility
+
+---
+
 ## [2.0.0] - 2026-03-14
 
 Major rewrite. The core app architecture was rebuilt with AI assistance (vibe coding session). Most of the codebase changed.
