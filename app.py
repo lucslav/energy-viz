@@ -938,9 +938,9 @@ TRANSLATIONS = {
     "next_bill_exp":        {"en": "Next bill expected",         "pl": "Następny rachunek"},
     "update_billing_btn":   {"en": "💾 Update billing period",  "pl": "💾 Aktualizuj okres"},
     # Raw Data quality
-    "dst_slots_kept":       {"en": "{n} DST clock-back slot(s) kept (valid)", "pl": "{n} slot(y) cofnięcia czasu DST (poprawne)"},
-    "dupes_removed":        {"en": "{n} exact duplicate row(s) removed",      "pl": "{n} identyczny/e wiersz(e) usunięty/e"},
-    "outliers_removed_lbl": {"en": "{n} meter rollover outlier(s) removed",   "pl": "{n} artefakt(y) przepełnienia usunięty/e"},
+    "dst_slots_kept":       {"en": "{n} DST clock-back slot(s) kept (valid)", "pl": "DST: {n} dodatkowych slotów (poprawne)"},
+    "dupes_removed":        {"en": "{n} exact duplicate row(s) removed",      "pl": "usunięto {n} duplikat(ów)"},
+    "outliers_removed_lbl": {"en": "{n} meter rollover outlier(s) removed",   "pl": "usunięto {n} artefakt(y) przepełnienia"},
     "rows_summary":         {"en": "{raw:,} rows in → {clean:,} rows clean",  "pl": "{raw:,} wierszy → {clean:,} po czyszczeniu"},
     "no_issues":            {"en": "No issues found",            "pl": "Brak problemów"},
     "how_updates_info":     {"en": "Updates Info",
@@ -956,6 +956,36 @@ TRANSLATIONS = {
     "dnp_badge":            {"en": "DNP",                        "pl": "DNP"},
     "register_24h_badge":   {"en": "24h register",               "pl": "rejestr 24h"},
     "save_badge":           {"en": "Save",                       "pl": "Zapisz"},
+    "upload_files_to_see":  {"en": "Upload Files To See", "pl": "Wgraj pliki aby zobaczyć raport jakości danych."},
+    "net_pct_off":          {"en": "Net ({pct}% off)",            "pl": "Netto ({pct}% rabatu)"},
+    "incl_pct_off_lbl":     {"en": "incl. {pct}% off",           "pl": "z rabatem {pct}%"},
+    "weekday_weekend_pl":   {"en": "Weekday vs Weekend",          "pl": "Dni robocze / Weekend"},
+    "avg_kwh_axis":         {"en": "avg kWh",                     "pl": "śred. kWh"},
+    "avg_kw_axis":          {"en": "avg kW",                      "pl": "śred. kW"},
+    "predicted_range":      {"en": "📊 Predicted bill range",     "pl": "📊 Przewidywany zakres rachunku"},
+    "most_likely_lbl":      {"en": "Most likely",                 "pl": "Najbardziej prawdopodobny"},
+    "range_lbl":            {"en": "Range",                       "pl": "Zakres"},
+    "next_bill_lbl":        {"en": "Next bill expected",          "pl": "Następny rachunek"},
+    "n_days_from_today":    {"en": "{n} days from today",         "pl": "za {n} dni"},
+    "cross_val_alert":      {"en": "Cross Val Alert", "pl": "Weryfikacja: kW × 0,5h ≈ calckWh — śr. błąd <b>&lt;0,001 kWh</b>/interwał."},
+    "trace_simple_short":   {"en": "Simple",                      "pl": "Prosta"},
+    "trace_seasonal_short": {"en": "Seasonal",                    "pl": "Sezonowy"},
+    "trace_14d_short":      {"en": "14-day",                      "pl": "14-dniowa"},
+    "kwh_projected_lbl":    {"en": "~{n} kWh projected",         "pl": "~{n} kWh prognoza"},
+    "pct_elapsed_bar":      {"en": "{pct}% elapsed",              "pl": "{pct}% minęło"},
+    "n_elapsed_lbl":        {"en": "{n} days elapsed",            "pl": "{n} dni minęło"},
+    "n_remaining_lbl":      {"en": "{n} days remaining",          "pl": "{n} dni pozostało"},
+    "day_off_peak_dnp":     {"en": "☀️ Day Off-Peak",             "pl": "☀️ Dzień poza szczytem"},
+    "legend_avg":           {"en": "Avg",                         "pl": "Śred."},
+    "legend_day":           {"en": "Day",                         "pl": "Dzień"},
+    "legend_peak":          {"en": "Peak",                        "pl": "Szczyt"},
+    "legend_night":         {"en": "Night",                       "pl": "Noc"},
+    "legend_7d_avg":        {"en": "7-day avg",                   "pl": "śred. 7 dni"},
+    "euro_cumul":           {"en": "€ (cumulative)",              "pl": "€ (skumulowane)"},
+    "daily_dnp_label":      {"en": "Daily DNP",                   "pl": "Dzienne DNP"},
+    "sidebar_primary":      {"en": "PRIMARY",                     "pl": "GŁÓWNY"},
+    "sidebar_optional":     {"en": "optional",                    "pl": "opcjonalny"},
+    "tariff_split_header":  {"en": "TARIFF SPLIT",                "pl": "PODZIAŁ TARYFY"},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
 }
 
@@ -1652,7 +1682,7 @@ def _show_extracted_review():
                 {fmt_date(b_end)}
             </div>
             <div style="font-size:.78rem;color:#7d8590">
-                {(b_end - dt_date.today()).days} days from today
+                {(b_end - dt_date.today()).days} {t("days_from_today")}
             </div>
         </div>""", unsafe_allow_html=True)
 
@@ -1899,7 +1929,7 @@ with st.sidebar:
         info = hdf_file_info(slot)
         border = f"border-left:3px solid {color}"
         bg = "background:linear-gradient(135deg,#1a2a3a,#1c2330)" if primary else "background:#1c2330"
-        badge = f'<span style="font-size:.6rem;background:{color}22;color:{color};padding:1px 5px;border-radius:8px;margin-left:auto;border:1px solid {color}44">{"PRIMARY" if primary else "optional"}</span>'
+        badge = f'<span style="font-size:.6rem;background:{color}22;color:{color};padding:1px 5px;border-radius:8px;margin-left:auto;border:1px solid {color}44">{t("sidebar_primary") if primary else t("sidebar_optional")}</span>'
         # File status line
         if info:
             fname = info["path"].split("/")[-1]
@@ -1925,7 +1955,7 @@ with st.sidebar:
     _file_card("kw",    "#39d0d8", "⚡", t("power_title"), "HDF_kW_…csv")
     f_kw = st.file_uploader("kW", type="csv", key="kw", label_visibility="collapsed")
 
-    _file_card("dnp",   "#bc8cff", "🌙", "Daily DNP", "HDF_DailyDNP_kWh_…csv")
+    _file_card("dnp",   "#bc8cff", "🌙", t("daily_dnp_label"), "HDF_DailyDNP_kWh_…csv")
     f_dnp = st.file_uploader("DNP", type="csv", key="dnp", label_visibility="collapsed")
 
     _file_card("daily", "#3fb950", "📅", "kWh", "HDF_Daily_kWh_…csv")
@@ -2059,7 +2089,7 @@ and upload them using the sidebar on the left.
         for col, icon, color, title, fname, desc in [
             (ca, "⭐", "#58a6ff", "calckWh",    "HDF_calckWh_…csv",        "30-min kWh · Day/Peak/Night · **required**"),
             (cb, "⚡", "#39d0d8", "kW Demand",  "HDF_kW_…csv",             "Instantaneous kW · spike detection"),
-            (cc, "🌙", "#bc8cff", "Daily DNP",  "HDF_DailyDNP_kWh_…csv",  "Cumulative registers · invoice check"),
+            (cc, "🌙", "#bc8cff", t("daily_dnp_label"),  "HDF_DailyDNP_kWh_…csv",  "Cumulative registers · invoice check"),
             (cd, "📅", "#3fb950", "kWh",  "HDF_Daily_kWh_…csv",     "24h total · long-range trend"),
         ]:
             with col:
@@ -2193,7 +2223,7 @@ with tabs[0]:
         kpis.append(kpi_html(t("total_consumption"),  f"{total_kwh:,.0f}", "kWh", "blue"))
         kpis.append(kpi_html(t("daily_average"),       f"{avg_daily_kwh:.1f}", t("kwh_day_unit"), "green"))
         kpis.append(kpi_html(t("energy_cost"),        f"€{total_cost:,.2f}",
-                              f"incl. {DISC_PCT:.0f}% off", "orange"))
+                              t("incl_pct_off_lbl").format(pct=f"{DISC_PCT:.0f}"), "orange"))
         kpis.append(kpi_html(t("avg_daily_cost"),     f"€{avg_daily_cost:.2f}", "/day", "cyan"))
         kpis.append(kpi_html(t("data_span"),           f"{days_data}", "days", "purple"))
         kpis.append(kpi_html(t("standby_load"),        f"{standby*2*1000:.0f}", "W (2–4am)", "red"))
@@ -2309,7 +2339,7 @@ with tabs[1]:
     k1.metric(t("total_kwh"),   f"{df_f['value'].sum():.2f}")
     k2.metric(t("peak_kwh"),    f"{df_f[df_f['period']=='peak']['value'].sum():.2f}")
     k3.metric(t("gross_cost"),  f"€{df_f['cost'].sum():.2f}")
-    k4.metric(f"Net ({DISC_PCT:.0f}% off)", f"€{df_f['cost_net'].sum():.2f}")
+    k4.metric(t("net_pct_off").format(pct=f"{DISC_PCT:.0f}"), f"€{df_f['cost_net'].sum():.2f}")
 
     st.divider()
     section("🌡️", t("heatmap_title"))
@@ -2351,7 +2381,7 @@ with tabs[2]:
 
     section("⚡", t("power_title"), badge=t("kw_file_badge"))
     if df_calc is not None:
-        alert("Cross-validation: kW × 0.5h ≈ calckWh — mean error <b>&lt;0.001 kWh</b>/interval.", "good")
+        alert(t("cross_val_alert"), "good")
 
     min_d = df_kw["datetime"].min().date()
     max_d = df_kw["datetime"].max().date()
@@ -2462,7 +2492,7 @@ with tabs[3]:
     col_map = {
         "Night Import Register (kWh)":        (COLORS["night"], f"🌙 {t('night_label_chart')}"),
         "Day Peak Import Register (kWh)":     (COLORS["peak"],  f"🔥 {t('peak_label_chart')}"),
-        "Day Off-Peak Import Register (kWh)": (COLORS["day"],   "☀️ Day Off-Peak"),
+        "Day Off-Peak Import Register (kWh)": (COLORS["day"],   t("day_off_peak_dnp")),
     }
 
     if df_dnp is not None:
@@ -2596,7 +2626,7 @@ with tabs[4]:
     fig_m.add_trace(go.Scatter(x=mo["month_str"], y=mo["total"], name=t("trace_total"),
                                mode="lines+markers", line=dict(color=COLORS["total"], width=2),
                                marker=dict(size=7)))
-    apply_layout(fig_m, "", height=340)
+    apply_layout(fig_m, "", height=360)
     fig_m.update_layout(barmode="stack", yaxis_title="€")
     st.plotly_chart(fig_m, use_container_width=True)
 
@@ -2648,7 +2678,7 @@ with tabs[5]:
             tickangle=-45,
             gridcolor=COLORS["grid"],
         ),
-        yaxis_title="avg kWh",
+        yaxis_title=t("avg_kwh_axis"),
     )
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -2775,8 +2805,8 @@ with tabs[6]:
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.74rem;
                     color:#7d8590;margin-top:6px">
-            <span>{days_elapsed} days elapsed</span>
-            <span>{days_remain} days remaining</span>
+            <span>{days_elapsed} {t("days_elapsed")}</span>
+            <span>{days_remain} {t("days_remaining")}</span>
         </div>
     </div>""", unsafe_allow_html=True)
 
@@ -2868,7 +2898,7 @@ with tabs[6]:
                 <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;
                             color:#e6edf3">€{total:.2f}</div>
                 <div style="font-size:.78rem;color:#7d8590;margin:.2rem 0">
-                    ~{kwh:.0f} kWh projected
+                    ~{kwh:.0f} {t("projected")}
                 </div>
                 <div style="font-size:.7rem;color:#7d8590;margin-top:.4rem;
                             padding-top:.4rem;border-top:1px solid #30363d">
@@ -2885,7 +2915,7 @@ with tabs[6]:
     <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
                 padding:1.2rem 1.4rem">
         <div style="font-size:.78rem;color:#7d8590;margin-bottom:.8rem">
-            📊 Predicted bill range
+            {t("predicted_range")}
         </div>
         <div style="display:flex;align-items:center;gap:12px">
             <div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:#3fb950">
@@ -2944,8 +2974,8 @@ with tabs[6]:
 
     # Three projection lines
     for label, daily_rate, color, dash in [
-        ("Simple",   daily_avg,  COLORS["blue"],   "dash"),
-        ("Seasonal", remaining_kwh_seasonal/max(days_remain,1), COLORS["cyan"],   "dot"),
+        (t("trace_simple_short"),   daily_avg,  COLORS["blue"],   "dash"),
+        (t("trace_seasonal_short"), remaining_kwh_seasonal/max(days_remain,1), COLORS["cyan"],   "dot"),
         ("14d avg",  daily_14d,  COLORS["purple"], "dashdot"),
     ]:
         proj_cost_daily = (daily_rate * (t_day * 0.6 + t_peak * 0.1 + t_night * 0.3) * disc_factor + t_stand)
@@ -2961,7 +2991,7 @@ with tabs[6]:
                        annotation_text=t("bill_date"), annotation_font_color=COLORS["muted"])
 
     apply_layout(fig_proj, "", height=380)
-    fig_proj.update_layout(yaxis_title="€ (cumulative)")
+    fig_proj.update_layout(yaxis_title=t("euro_cumul"))
     st.plotly_chart(fig_proj, use_container_width=True)
 
     st.divider()
@@ -3066,7 +3096,7 @@ with tabs[7]:
                 <div>
                     <div style="font-weight:600;font-size:.84rem;color:#e6edf3">{fname}</div>
                     <div style="font-size:.76rem;color:#7d8590">
-                        {qr['rows_raw']:,} rows in → {qr['rows_clean']:,} rows clean
+                        {t("rows_summary").format(raw=qr['rows_raw'], clean=qr['rows_clean'])}
                         &nbsp;·&nbsp; {" · ".join(details)}
                     </div>
                 </div>
@@ -3074,18 +3104,15 @@ with tabs[7]:
 
         st.markdown(f"""
         <div class="alert-box alert-info" style="margin-top:.6rem">
-            ℹ️ <strong>How updates work:</strong> ESB always exports your full history
-            (up to 13 months) in each download. Uploading a newer export automatically
-            includes all previous data + new months + any ESB corrections —
-            no manual merging needed. Just upload the latest file.
+            ℹ️ <strong>{t("how_updates_work")}:</strong> {t("how_updates_info")}
         </div>""", unsafe_allow_html=True)
     else:
-        alert("Upload files to see the data quality report.", "info")
+        alert(t("upload_files_to_see"), "info")
 
     st.divider()
 
-    ds = st.selectbox(t("browse_dataset"), ["calckWh (30-min)", "kW Demand", "Daily DNP", "kWh"])
-    df_map = {"calckWh (30-min)":df_calc, "kW Demand":df_kw, "Daily DNP":df_dnp, "kWh":df_daily}
+    ds = st.selectbox(t("browse_dataset"), ["calckWh (30-min)", "kW Demand", t("daily_dnp_label"), "kWh"])
+    df_map = {"calckWh (30-min)":df_calc, "kW Demand":df_kw, t("daily_dnp_label"):df_dnp, "kWh":df_daily}
     df_show = df_map.get(ds)
     if df_show is not None:
         st.dataframe(df_show.head(500), use_container_width=True, height=420)
