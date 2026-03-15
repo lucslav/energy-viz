@@ -4,6 +4,15 @@ All notable changes to **energy-viz** are documented here.
 
 ---
 
+## [2.0.3] - 2026-03-15
+
+### Fixed
+- **Heatmap, Average Daily Load Profile, Average Demand by Hour** — x-axis tick marks now visible for every hour; previously empty string `""` in `ticktext` suppressed tick marks entirely; replaced with `" "` (space) + `ticks="outside"` + `ticklen=4` to force rendering of unlabeled ticks
+- **Average Demand by Hour** — x-axis changed from numeric integers (`0–23`) to string labels (`"00:00"–"23:00"`) to match the same `tickvals` approach as the other two charts
+- All three hourly charts now share identical axis style: tick marks every hour, labels every 3 hours (`00:00, 03:00 … 21:00`), font size 9, angle −45°
+
+---
+
 ## [2.0.2] - 2026-03-15
 
 ### Changed
