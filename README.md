@@ -69,7 +69,7 @@ Download your data from the [smart meter portal](https://myaccount.esbnetworks.i
 
 ## 🛠️ Installation
 
-### CasaOS / ZimaOS
+### Self-hosted NAS / home server
 
 Use the `docker-compose.yml` included in this repo — it follows the CasaOS custom app YAML format with the standard `/DATA/AppData/energy-viz` data path.
 
