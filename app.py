@@ -666,7 +666,7 @@ TRANSLATIONS = {
     # ── Setup ──
     "ai_parser":            {"en": "AI Invoice Parser",           "pl": "Analizator faktur AI"},
     "manual_entry":         {"en": "Manual Entry",                "pl": "Wprowadzanie ręczne"},
-    "supplier_name":        {"en": "Supplier name",               "pl": "Nazwa dostawcy"},
+    "supplier_name":        {"en": t("supplier_name"),               "pl": "Nazwa dostawcy"},
     "billing_period_start": {"en": "Current period start",        "pl": "Początek bieżącego okresu"},
     "billing_cycle_days":   {"en": "Typical cycle (days)",        "pl": "Typowy cykl (dni)"},
     "confirm_continue":     {"en": "✅ Confirm & Continue",       "pl": "✅ Potwierdź i kontynuuj"},
@@ -688,8 +688,8 @@ TRANSLATIONS = {
     "days_remaining":       {"en": "days remaining",              "pl": "dni pozostało"},
     "days_elapsed":         {"en": "days elapsed",                "pl": "dni minęło"},
     "period_end":           {"en": "Period End",                  "pl": "Koniec okresu"},
-    "consumed_so_far":      {"en": "Consumed so far",             "pl": "Zużyto dotąd"},
-    "daily_avg_period":     {"en": "Daily avg (period)",          "pl": "Średnia dzienna (okres)"},
+    "consumed_so_far":      {"en": t("consumed_so_far_lbl"),             "pl": "Zużyto dotąd"},
+    "daily_avg_period":     {"en": t("daily_avg_p"),          "pl": "Średnia dzienna (okres)"},
     "api_key_privacy":      {"en": "API Key — Privacy",           "pl": "Klucz API — Prywatność"},
     "session_only":         {"en": "Session only — not saved to disk (default, most private)", "pl": "Tylko sesja — nie zapisany (domyślnie, najbardziej prywatny)"},
     "save_to_disk":         {"en": "Save to disk — AES-256 encrypted, survives container restarts", "pl": "Zapisz na dysk — szyfrowanie AES-256, przeżywa restarty"},
@@ -699,6 +699,128 @@ TRANSLATIONS = {
     "upload_invoice":       {"en": "Upload your electricity bill (PDF)", "pl": "Wgraj rachunek za prąd (PDF)"},
     "enter_api_key":        {"en": "Enter your API key to proceed.", "pl": "Wprowadź klucz API aby kontynuować."},
     "upload_pdf_first":     {"en": "Upload a PDF invoice to continue.", "pl": "Wgraj fakturę PDF aby kontynuować."},
+    # Setup form fields
+    "mprn_optional":        {"en": "MPRN (optional)",              "pl": "MPRN (opcjonalnie)"},
+    "mprn_placeholder":     {"en": "leave blank if unknown",       "pl": "zostaw puste jeśli nieznany"},
+    "supplier_placeholder": {"en": "e.g. Electric Ireland",        "pl": "np. Electric Ireland"},
+    "day_rate_label":       {"en": "Day rate (€/kWh)",             "pl": "Stawka dzienna (€/kWh)"},
+    "peak_rate_label":      {"en": "Peak rate (€/kWh)",            "pl": "Stawka szczytowa (€/kWh)"},
+    "night_rate_label":     {"en": "Night rate (€/kWh)",           "pl": "Stawka nocna (€/kWh)"},
+    "standing_label":       {"en": "Standing charge (€/d)",        "pl": "Opłata stała (€/dzień)"},
+    "discount_label":       {"en": "Discount (%)",                 "pl": "Rabat (%)"},
+    "tariff_label":         {"en": "Tariff",                       "pl": "Taryfa"},
+    "billing_period_opt":   {"en": "#### 📅 Billing Period *(optional — enables bill prediction)*",
+                             "pl": "#### 📅 Okres rozliczeniowy *(opcjonalnie — włącza prognozę rachunku)*"},
+    "billing_tip":          {"en": "💡 Find your billing period start on the last page of your electricity bill.<br><br>The expected billing date will be calculated automatically.",
+                             "pl": "💡 Znajdź początek okresu rozliczeniowego na ostatniej stronie rachunku za prąd.<br><br>Oczekiwana data rachunku zostanie obliczona automatycznie."},
+    "default_rates_tip":    {"en": "ℹ️ Default rates are examples — check your electricity bill for actual rates.",
+                             "pl": "ℹ️ Domyślne stawki są przykładowe — sprawdź swój rachunek za prąd."},
+    # AI parser
+    "ai_provider":          {"en": "AI Provider",                  "pl": "Dostawca AI"},
+    "api_key_label":        {"en": "API Key",                      "pl": "Klucz API"},
+    "api_key_placeholder":  {"en": "sk-... or AIza... etc.",       "pl": "sk-... lub AIza... itp."},
+    "api_key_privacy_hdr":  {"en": "🔑 API Key — Privacy",        "pl": "🔑 Klucz API — Prywatność"},
+    "api_key_privacy_sub":  {"en": "Choose whether to save your key across container restarts:",
+                             "pl": "Wybierz czy zapisać klucz między restartami kontenera:"},
+    "provider_recs":        {"en": "<strong>Provider recommendations:</strong>",
+                             "pl": "<strong>Rekomendacje dostawców:</strong>"},
+    "provider_anthropic":   {"en": "best PDF support, reliable, from $0.003/invoice",
+                             "pl": "najlepsza obsługa PDF, niezawodny, od $0.003/faktura"},
+    "provider_gemini":      {"en": "good PDF support, free tier available",
+                             "pl": "dobra obsługa PDF, dostępny bezpłatny tier"},
+    "provider_openrouter":  {"en": "one key, access to 200+ models including free ones",
+                             "pl": "jeden klucz, dostęp do 200+ modeli w tym darmowych"},
+    "provider_openai":      {"en": "treats PDF as image, may be less accurate",
+                             "pl": "traktuje PDF jak obraz, może być mniej dokładny"},
+    "api_called_only":      {"en": "The API is called <strong>only when you click the Extract button</strong> — not on upload.",
+                             "pl": "API jest wywoływane <strong>tylko po kliknięciu przycisku Wyodrębnij</strong> — nie przy wgraniu."},
+    "if_429":               {"en": "If you get a <strong>429 error</strong>, your daily free quota is exhausted — try a different model or wait until midnight PT for reset.",
+                             "pl": "Jeśli wystąpi błąd <strong>429</strong>, dzienny limit darmowy jest wyczerpany — spróbuj innego modelu lub poczekaj do północy czasu PT."},
+    "aes_warn":             {"en": "Key will be AES-256 encrypted and stored on this server only. Set the ENERGY_VIZ_SECRET env var for a unique encryption key.",
+                             "pl": "Klucz zostanie zaszyfrowany AES-256 i zapisany tylko na tym serwerze. Ustaw zmienną <code>ENERGY_VIZ_SECRET</code> dla unikalnego klucza szyfrowania."},
+    "session_key_info":     {"en": "Key lives in browser session memory only. Re-entry required after tab close or container restart.",
+                             "pl": "Klucz jest tylko w pamięci sesji przeglądarki. Wymagane ponowne wprowadzenie po zamknięciu karty lub restarcie kontenera."},
+    "delete_api_key":       {"en": "🗑️ Delete saved API key from disk",  "pl": "🗑️ Usuń zapisany klucz API z dysku"},
+    "openrouter_info":      {"en": "enter the model ID from",            "pl": "wprowadź ID modelu z"},
+    "openrouter_free":      {"en": "Recommended free models with PDF support:",
+                             "pl": "Zalecane darmowe modele z obsługą PDF:"},
+    "openrouter_model_id":  {"en": "OpenRouter model ID",               "pl": "ID modelu OpenRouter"},
+    "extract_ok":           {"en": "✅ Invoice parsed! Review and confirm the values below.",
+                             "pl": "✅ Faktura przetworzona! Sprawdź i potwierdź wartości poniżej."},
+    "enter_api_proceed":    {"en": "Enter your API key to proceed.",     "pl": "Wprowadź klucz API aby kontynuować."},
+    "upload_pdf_continue":  {"en": "Upload a PDF invoice to continue.",  "pl": "Wgraj fakturę PDF aby kontynuować."},
+    "manually_tip":         {"en": "💡 You can enter rates manually using the expander below.",
+                             "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
+    "or_manually_exp":      {"en": "Or enter rates manually instead",   "pl": "Lub wprowadź stawki ręcznie"},
+    # Raw data
+    "browse_dataset":       {"en": "Browse dataset",                    "pl": "Przeglądaj zbiór danych"},
+    # Billing period review
+    "set_period_start":     {"en": "Set the current period start — used for bill prediction.",
+                             "pl": "Ustaw <strong>początek bieżącego okresu</strong> — używany do prognozy rachunku."},
+    "days_from_today_lbl":  {"en": "days from today",                   "pl": "dni od dziś"},
+    # Main app misc
+    "download_csv":         {"en": "⬇️ Download CSV",                  "pl": "⬇️ Pobierz CSV"},
+    "press_confirm":        {"en": "Press again to confirm — this deletes ALL saved data.",
+                             "pl": "Naciśnij ponownie aby potwierdzić — usuwa WSZYSTKIE zapisane dane."},
+    "saved_api_deleted":    {"en": "Saved API key deleted.",            "pl": "Zapisany klucz API usunięty."},
+    "spikes_p99":           {"en": t("spikes_p99"),                 "pl": "Skoki >p99"},
+    "energy_net":           {"en": t("energy_net"),                 "pl": "Energia (netto)"},
+    "standing_charges":     {"en": t("standing_charges"),                     "pl": "Opłata stała"},
+    "vat_9":                {"en": "VAT 9%",                       "pl": "VAT 9%"},
+    "est_total_bill":       {"en": t("est_total_bill"),              "pl": "Szac. rachunek łączny"},
+    "standby_power":        {"en": t("standby_power"),                "pl": "Pobór w standby"},
+    "at_night_rate":        {"en": t("at_night_rate"),                "pl": "po stawce nocnej"},
+    "annual_standby_kwh":   {"en": t("annual_standby_kwh"),           "pl": "Roczne zużycie w standby"},
+    "annual_cost":          {"en": t("annual_cost"),                  "pl": "Koszt roczny"},
+    "all_to_night":         {"en": t("all_to_night"),                 "pl": "wszystko na noc"},
+    "max_saving":           {"en": t("max_saving"),            "pl": "Maks. oszczędność (100%)"},
+    "days_remaining_lbl":   {"en": t("days_remaining_lbl"),               "pl": "Pozostało dni"},
+    "period_end_lbl":       {"en": t("period_end_lbl"),                   "pl": "Koniec okresu"},
+    "cumulative_cost":      {"en": t("cumulative_cost"),   "pl": "Prognoza kosztu skumulowanego"},
+    "est_bill_breakdown":   {"en": t("est_bill_breakdown"),     "pl": "Szacunkowy podział rachunku"},
+    "billing_period_sett":  {"en": t("billing_period_sett"),      "pl": "Ustawienia okresu rozliczeniowego"},
+    "period_saved":         {"en": t("period_saved"),        "pl": "Okres rozliczeniowy zapisany."},
+    "analysing_invoice":    {"en": t("analysing_invoice"),           "pl": "Analizowanie faktury…"},
+    "extraction_failed":    {"en": "Extraction failed",            "pl": "Wyodrębnianie nieudane"},
+    "network_error":        {"en": "Network error reaching",       "pl": "Błąd sieci przy połączeniu z"},
+    "unexpected_error":     {"en": "Unexpected error from",        "pl": "Nieoczekiwany błąd z"},
+    "cross_validation":     {"en": "Cross-validation",             "pl": "Weryfikacja krzyżowa"},
+    "consumed_so_far_lbl":  {"en": t("consumed_so_far_lbl"),             "pl": "Zużyto dotąd"},
+    "daily_avg_p":          {"en": t("daily_avg_p"),           "pl": "Śr. dzienna (okres)"},
+    "days_remaining_m":     {"en": t("days_remaining_lbl"),               "pl": "Pozostało dni"},
+    "period_end_m":         {"en": t("period_end_lbl"),                   "pl": "Koniec okresu"},
+    "simple_interp":        {"en": "Simple interpolation",         "pl": "Prosta interpolacja"},
+    "seasonal_model":       {"en": "Seasonal model",               "pl": "Model sezonowy"},
+    "rolling_14d":          {"en": "14-day rolling avg",           "pl": "Średnia krocząca 14 dni"},
+    "early_estimate":       {"en": "early estimate, wide range",   "pl": "wczesna estymacja, szeroki zakres"},
+    "curr_period_daily":    {"en": "Current period daily avg × remaining days", "pl": "Średnia dzienna bieżącego okresu × pozostałe dni"},
+    "hist_monthly":         {"en": "Historical monthly averages per remaining day", "pl": "Historyczne średnie miesięczne na dzień"},
+    "recent_14d":           {"en": "Recent 14-day trend × remaining days", "pl": "Trend z ostatnich 14 dni × pozostałe dni"},
+    "pct_elapsed":          {"en": "elapsed",                      "pl": "minęło"},
+    "total_peak_kwh":       {"en": "Total peak kWh",               "pl": "Łącznie kWh szczytowych"},
+    "at_shift_pct":         {"en": "At {pct}% shift",             "pl": "Przy przesunięciu {pct}%"},
+    "night_cheaper":        {"en": "night {pct}% cheaper",         "pl": "noc tańsza o {pct}%"},
+    "annual_standby":       {"en": t("annual_standby_kwh"),           "pl": "Roczne kWh w standby"},
+    "how_updates_work":     {"en": t("how_updates_work"),             "pl": "Jak działają aktualizacje"},
+    "updates_info":         {"en": "ESB always exports your full history (up to 13 months) in each download. Uploading a newer export automatically includes all previous data + new months + any ESB corrections — no manual merging needed. Just upload the latest file.",
+                             "pl": "ESB zawsze eksportuje pełną historię (do 13 miesięcy) przy każdym pobraniu. Wgranie nowszego eksportu automatycznie zawiera wszystkie poprzednie dane + nowe miesiące + korekty ESB — bez ręcznego łączenia. Wystarczy wgrać najnowszy plik."},
+    "based_on_seasonal":    {"en": t("based_on_seasonal"),      "pl": "oparty na modelu sezonowym"},
+    "period_selector":      {"en": t("period_selector"),                       "pl": "Okres"},
+    "view_label":           {"en": "View",                         "pl": "Widok"},
+    "shift_pct_label":      {"en": t("shift_pct_label"),   "pl": "% szczytu przeniesionego na noc"},
+    "anomaly_threshold":    {"en": "anomaly threshold",            "pl": "próg anomalii"},
+    "elec_bill":            {"en": "electricity bill",             "pl": "rachunku za prąd"},
+    "days_label2":          {"en": "days",                         "pl": "dni"},
+    "data_span_days":       {"en": "days",                         "pl": "dni"},
+    "kwh_day_lbl":          {"en": "kWh/day",                      "pl": "kWh/dzień"},
+    "per_day":              {"en": "/day",                         "pl": "/dzień"},
+    "gross_lbl":            {"en": "gross",                        "pl": "brutto"},
+    "energy_charges":       {"en": t("energy_charges"),       "pl": "Opłaty za energię (brutto)"},
+    "your_discount":        {"en": "Your discount",                "pl": "Twój rabat"},
+    "standing_charges_lbl": {"en": t("standing_charges_lbl"),             "pl": "Opłaty stałe"},
+    "vat_label":            {"en": "VAT 9%",                       "pl": "VAT 9%"},
+    "est_bill":             {"en": t("est_total_bill"),              "pl": "Szac. rachunek łączny"},
+    "incl_off_lbl":         {"en": "incl. {n}% off",              "pl": "z rabatem {n}%"},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
 }
 
@@ -1182,21 +1304,21 @@ def _setup_pdf():
 
     st.markdown("""
     <div class="alert-box alert-info" style="color:#e6edf3!important">
-        ℹ️ The API is called <strong>only when you click the Extract button</strong> — not on upload.<br><br>
-        <strong>Provider recommendations:</strong><br>
-        &nbsp;• <strong>Anthropic Claude</strong> — best PDF support, reliable, from $0.003/invoice<br>
-        &nbsp;• <strong>Google Gemini</strong> — good PDF support, free tier available
+        ℹ️ {t("api_called_only")}<br><br>
+        {t("provider_recs")}<br>
+        &nbsp;• <strong>Anthropic Claude</strong> — {t("provider_anthropic")}<br>
+        &nbsp;• <strong>Google Gemini</strong> — {t("provider_gemini")}
         (<a href="https://aistudio.google.com" style="color:#58a6ff">aistudio.google.com</a>)<br>
-        &nbsp;• <strong>OpenRouter</strong> — one key, access to 200+ models including free ones
+        &nbsp;• <strong>OpenRouter</strong> — {t("provider_openrouter")}
         (<a href="https://openrouter.ai/models" style="color:#58a6ff">openrouter.ai/models</a>)<br>
-        &nbsp;• <strong>OpenAI GPT-4o</strong> — treats PDF as image, may be less accurate<br><br>
+        &nbsp;• <strong>OpenAI GPT-4o</strong> — {t("provider_openai")}<br><br>
         If you get a <strong>429 error</strong>, your daily free quota is exhausted —
         try a different model or wait until midnight PT for reset.
     </div>""", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 1])
     with col1:
-        provider_name = st.selectbox("AI Provider", list(PROVIDERS.keys()))
+        provider_name = st.selectbox(t("ai_provider"), list(PROVIDERS.keys()))
     with col2:
         # Pre-fill from per-provider storage
         saved_keys  = st.session_state.get("api_keys", {})
@@ -1206,8 +1328,8 @@ def _setup_pdf():
             legacy = st.session_state.get("api_key", "")
             default_key = legacy.split("||")[0] if "||" in legacy else legacy
         display_key = default_key.split("||")[0] if "||" in default_key else default_key
-        api_key = st.text_input("API Key", value=display_key, type="password",
-                                placeholder="sk-... or AIza... etc.")
+        api_key = st.text_input(t("api_key_label"), value=display_key, type="password",
+                                placeholder=t("api_key_placeholder"))
 
     # ── OpenRouter model selector ──
     provider_code = PROVIDERS[provider_name]
@@ -1220,7 +1342,7 @@ def _setup_pdf():
                     padding:.7rem 1rem;margin:.4rem 0;font-size:.82rem;color:#e6edf3">
             🔀 <strong>OpenRouter</strong> — enter the model ID from
             <a href="https://openrouter.ai/models" style="color:#58a6ff" target="_blank">openrouter.ai/models</a>.<br>
-            Recommended free models with PDF support:<br>
+            {t("openrouter_free")}<br>
             <code>google/gemini-2.5-flash-lite</code> &nbsp;·&nbsp;
             <code>google/gemini-2.5-pro:free</code> &nbsp;·&nbsp;
             <code>anthropic/claude-3.5-sonnet</code>
@@ -1229,7 +1351,7 @@ def _setup_pdf():
         saved_or_full  = st.session_state.get("api_keys", {}).get("openrouter", "")
         saved_or_model = saved_or_full.split("||")[1] if "||" in saved_or_full else ""
         or_model = st.text_input(
-            "OpenRouter model ID",
+            t("openrouter_model_id"),
             value=saved_or_model or "google/gemini-2.5-flash-lite",
             placeholder="provider/model-name",
         )
@@ -1244,10 +1366,10 @@ def _setup_pdf():
     <div style="background:#1c2330;border:1px solid #30363d;
                 border-radius:10px;padding:.8rem 1rem;margin:.6rem 0">
         <div style="font-weight:600;font-size:.88rem;color:#e6edf3!important;margin-bottom:.4rem">
-            🔑 API Key — Privacy
+            {t("api_key_privacy_hdr")}
         </div>
         <div style="font-size:.78rem;color:#e6edf3!important">
-            Choose whether to save your key across container restarts:
+            {t("api_key_privacy_sub")}
         </div>
     </div>""", unsafe_allow_html=True)
 
@@ -1280,15 +1402,14 @@ def _setup_pdf():
     else:
         st.markdown("""
         <div class="alert-box alert-info" style="color:#e6edf3!important">
-            ℹ️ Key lives in browser session memory only.
-            Re-entry required after tab close or container restart.
+            ℹ️ {t("session_key_info")}
         </div>""", unsafe_allow_html=True)
 
     if already_saved_to_disk:
-        if st.button("🗑️ Delete saved API key from disk"):
+        if st.button(t("delete_api_key")):
             API_KEY_FILE.unlink(missing_ok=True)
             st.session_state["api_key"] = ""
-            st.success("Saved API key deleted.")
+            st.success(t("saved_api_deleted"))
             st.rerun()
 
     pdf_file = st.file_uploader(t("upload_invoice"), type=["pdf"])
@@ -1346,15 +1467,15 @@ def _show_extracted_review():
 
     c1, c2 = st.columns(2)
     with c1:
-        mprn     = st.text_input("MPRN",     value=str(data.get("mprn") or ""))
-        supplier = st.text_input("Supplier", value=str(data.get("supplier") or ""))
-        tariff   = st.text_input("Tariff",   value=str(data.get("tariff_name") or ""))
+        mprn     = st.text_input(t("mprn_optional"),     value=str(data.get("mprn") or ""))
+        supplier = st.text_input(t("supplier_name"), value=str(data.get("supplier") or ""))
+        tariff   = st.text_input(t("tariff_label"),   value=str(data.get("tariff_name") or ""))
     with c2:
-        r_day   = st.number_input("Day rate (€/kWh)",      value=float(data.get("rate_day")        or DEFAULT_TARIFF["day"]),     step=0.001, format="%.4f")
-        r_peak  = st.number_input("Peak rate (€/kWh)",     value=float(data.get("rate_peak")       or DEFAULT_TARIFF["peak"]),    step=0.001, format="%.4f")
-        r_night = st.number_input("Night rate (€/kWh)",    value=float(data.get("rate_night")      or DEFAULT_TARIFF["night"]),   step=0.001, format="%.4f")
-        r_stand = st.number_input("Standing charge (€/d)", value=float(data.get("standing_charge") or DEFAULT_TARIFF["standing"]),step=0.001, format="%.4f")
-        disc    = st.number_input("Discount (%)",           value=float(data.get("discount_pct")   or 0.0),  step=1.0, format="%.1f")
+        r_day   = st.number_input(t("day_rate_label"),      value=float(data.get("rate_day")        or DEFAULT_TARIFF["day"]),     step=0.001, format="%.4f")
+        r_peak  = st.number_input(t("peak_rate_label"),     value=float(data.get("rate_peak")       or DEFAULT_TARIFF["peak"]),    step=0.001, format="%.4f")
+        r_night = st.number_input(t("night_rate_label"),    value=float(data.get("rate_night")      or DEFAULT_TARIFF["night"]),   step=0.001, format="%.4f")
+        r_stand = st.number_input(t("standing_label"), value=float(data.get("standing_charge") or DEFAULT_TARIFF["standing"]),step=0.001, format="%.4f")
+        disc    = st.number_input(t("discount_label"),           value=float(data.get("discount_pct")   or 0.0),  step=1.0, format="%.1f")
 
     st.markdown(f"#### {t('billing_period_hdr')}")
     alert(f'{t("billing_period_hdr")} — {t("billing_period_start")}', "info")
@@ -1412,16 +1533,16 @@ def _setup_manual(inside_expander=False):
     with st.form(form_key):
         c1, c2 = st.columns(2)
         with c1:
-            mprn     = st.text_input("MPRN (optional)", placeholder="leave blank if unknown")
-            supplier = st.text_input("Supplier name",   placeholder="e.g. Electric Ireland")
+            mprn     = st.text_input(t("mprn_optional"), placeholder=t("mprn_placeholder"))
+            supplier = st.text_input(t("supplier_name"),   placeholder=t("supplier_placeholder"))
         with c2:
-            r_day   = st.number_input("Day rate (€/kWh)",      value=DEFAULT_TARIFF["day"],      step=0.001, format="%.4f")
-            r_peak  = st.number_input("Peak rate (€/kWh)",     value=DEFAULT_TARIFF["peak"],     step=0.001, format="%.4f")
-            r_night = st.number_input("Night rate (€/kWh)",    value=DEFAULT_TARIFF["night"],    step=0.001, format="%.4f")
-            r_stand = st.number_input("Standing charge (€/d)", value=DEFAULT_TARIFF["standing"], step=0.001, format="%.4f")
-            disc    = st.number_input("Discount (%)",           value=0.0, step=1.0, format="%.1f")
+            r_day   = st.number_input(t("day_rate_label"),      value=DEFAULT_TARIFF["day"],      step=0.001, format="%.4f")
+            r_peak  = st.number_input(t("peak_rate_label"),     value=DEFAULT_TARIFF["peak"],     step=0.001, format="%.4f")
+            r_night = st.number_input(t("night_rate_label"),    value=DEFAULT_TARIFF["night"],    step=0.001, format="%.4f")
+            r_stand = st.number_input(t("standing_label"), value=DEFAULT_TARIFF["standing"], step=0.001, format="%.4f")
+            disc    = st.number_input(t("discount_label"),           value=0.0, step=1.0, format="%.1f")
 
-        st.markdown("#### 📅 Billing Period *(optional — enables bill prediction)*")
+        st.markdown(t("billing_period_opt"))
         from datetime import date as dt_date, timedelta
         b1, b2 = st.columns(2)
         with b1:
@@ -1432,13 +1553,12 @@ def _setup_manual(inside_expander=False):
             st.markdown("""
             <div style="background:#1c2330;border:1px solid #30363d;border-radius:10px;
                         padding:1rem;margin-top:1.7rem;font-size:.82rem;color:#7d8590">
-                💡 Find your billing period start on the last page of your electricity bill.<br><br>
-                The expected billing date will be calculated automatically.
+                {t("billing_tip")}
             </div>""", unsafe_allow_html=True)
 
         st.markdown("""
         <div class="alert-box alert-info" style="margin-top:.5rem">
-            ℹ️ Default rates are examples — check your electricity bill for actual rates.
+            {t("default_rates_tip")}
         </div>""", unsafe_allow_html=True)
 
         submitted = st.form_submit_button(t("save_continue"))
@@ -1503,14 +1623,14 @@ def _dedup_hdf(df: pd.DataFrame, value_col: str = "Read Value") -> tuple[pd.Data
 
     # Drop rows where MPRN + timestamp + raw value are 100% identical
     df = df.drop_duplicates(
-        subset=["MPRN", "Read Date and End Time", value_col], keep="first"
+        subset=[t("mprn_optional"), "Read Date and End Time", value_col], keep="first"
     ).reset_index(drop=True)
 
     after  = len(df)
     removed = before - after
 
     # Count remaining timestamp duplicates (these are legitimate DST slots)
-    ts_dupes = df.duplicated(subset=["MPRN", "Read Date and End Time"], keep=False).sum()
+    ts_dupes = df.duplicated(subset=[t("mprn_optional"), "Read Date and End Time"], keep=False).sum()
 
     report = {
         "rows_raw":     before,
@@ -1734,7 +1854,7 @@ with st.sidebar:
             st.rerun()
         else:
             st.session_state["_confirm_clear"] = True
-            st.warning("Press again to confirm — this deletes ALL saved data.")
+            st.warning(t("press_confirm"))
 
     # ── Tariff donut placeholder ──
     sidebar_chart_slot = st.empty()
@@ -1894,7 +2014,7 @@ with tabs[0]:
     with ov_col1:
         section("📌", t("key_metrics"))
     with ov_col2:
-        ov_period_idx = st.radio("Period",
+        ov_period_idx = st.radio(t("period_selector"),
                              [t("period_week"), t("period_month"), t("period_bill"), t("period_total")],
                              index=3, horizontal=True, label_visibility="collapsed",
                              key="ov_period")
@@ -2108,7 +2228,7 @@ with tabs[2]:
     k1.metric("Peak demand",  f"{df_f['value'].max():.3f} kW")
     k2.metric("Avg demand",   f"{df_f['value'].mean():.3f} kW")
     k3.metric("95th pct",     f"{p95:.3f} kW")
-    k4.metric("Spikes >p99",  f"{(df_f['value']>p99).sum()}")
+    k4.metric(t("spikes_p99"),  f"{(df_f['value']>p99).sum()}")
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df_f["datetime"], y=df_f["value"], mode="lines", name="kW",
@@ -2264,10 +2384,10 @@ with tabs[4]:
     bill_total       = total_cost + standing_total + vat_total
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Energy (net)",    f"€{total_cost:.2f}")
-    k2.metric("Standing",        f"€{standing_total:.2f}", f"{days_total}d × €{t_stand:.4f}")
+    k1.metric(t("energy_net"),    f"€{total_cost:.2f}")
+    k2.metric(t("standing_charges"),        f"€{standing_total:.2f}", f"{days_total}d × €{t_stand:.4f}")
     k3.metric("VAT 9%",          f"€{vat_total:.2f}")
-    k4.metric("Est. total bill", f"€{bill_total:.2f}")
+    k4.metric(t("est_total_bill"), f"€{bill_total:.2f}")
 
     st.divider()
     cmap = {"day":COLORS["day"],"peak":COLORS["peak"],"night":COLORS["night"]}
@@ -2326,7 +2446,7 @@ with tabs[4]:
 
     fig_m = go.Figure()
     fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["cost_net"],  name="Energy",   marker_color=COLORS["day"],   marker_line_width=0))
-    fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["standing"],  name="Standing", marker_color=COLORS["muted"], marker_line_width=0))
+    fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["standing"],  name=t("standing_charges"), marker_color=COLORS["muted"], marker_line_width=0))
     fig_m.add_trace(go.Bar(x=mo["month_str"], y=mo["vat"],       name="VAT 9%",   marker_color=COLORS["peak"],  marker_line_width=0))
     fig_m.add_trace(go.Scatter(x=mo["month_str"], y=mo["total"], name="Total",
                                mode="lines+markers", line=dict(color=COLORS["total"], width=2),
@@ -2408,18 +2528,18 @@ with tabs[5]:
     annual_kwh  = standby_kw * 8760
     annual_cost = annual_kwh * t_night * disc_factor
     ca, cb, cc = st.columns(3)
-    with ca: st.markdown(kpi_html("Standby power",      f"{standby_kw*1000:.0f}", "W (2–4am)", "purple"), unsafe_allow_html=True)
-    with cb: st.markdown(kpi_html("Annual standby kWh", f"{annual_kwh:.0f}", "kWh/year est.", "blue"),     unsafe_allow_html=True)
-    with cc: st.markdown(kpi_html("Annual cost",        f"€{annual_cost:.2f}", "at night rate", "orange"), unsafe_allow_html=True)
+    with ca: st.markdown(kpi_html(t("standby_power"),      f"{standby_kw*1000:.0f}", "W (2–4am)", "purple"), unsafe_allow_html=True)
+    with cb: st.markdown(kpi_html(t("annual_standby_kwh"), f"{annual_kwh:.0f}", "kWh/year est.", "blue"),     unsafe_allow_html=True)
+    with cc: st.markdown(kpi_html(t("annual_cost"),        f"€{annual_cost:.2f}", t("at_night_rate"), "orange"), unsafe_allow_html=True)
 
     st.divider()
     section("💡", t("peak_shifting"))
     peak_kwh = df_calc[df_calc["period"]=="peak"]["value"].sum()
     max_save = peak_kwh * (t_peak - t_night) * disc_factor
-    shift    = st.slider("% of peak shifted to night", 0, 100, 50, step=5)
+    shift    = st.slider(t("shift_pct_label"), 0, 100, 50, step=5)
     ca, cb, cc = st.columns(3)
     with ca: st.markdown(kpi_html("Total peak kWh",   f"{peak_kwh:.1f}", "all-time", "orange"),          unsafe_allow_html=True)
-    with cb: st.markdown(kpi_html("Max saving (100%)",f"€{max_save:.2f}", "all to night", "green"),       unsafe_allow_html=True)
+    with cb: st.markdown(kpi_html(t("max_saving"),f"€{max_save:.2f}", t("all_to_night"), "green"),       unsafe_allow_html=True)
     with cc: st.markdown(kpi_html(f"At {shift}% shift",f"€{max_save*shift/100:.2f}",
                                   f"night {(1-t_night/t_peak)*100:.0f}% cheaper", "cyan"),               unsafe_allow_html=True)
 
@@ -2573,8 +2693,8 @@ with tabs[6]:
     k1, k2, k3, k4 = st.columns(4)
     k1.metric(t("consumed_so_far"),    f"{actual_kwh:.1f} kWh",  f"€{actual_cost:.2f} net")
     k2.metric(t("daily_avg_period"), f"{daily_avg:.2f} kWh/d")
-    k3.metric("Days remaining",     f"{days_remain}")
-    k4.metric("Period end",         fmt_date(b_end),
+    k3.metric(t("days_remaining_lbl"),     f"{days_remain}")
+    k4.metric(t("period_end_lbl"),         fmt_date(b_end),
               f"{'in ' + str(days_remain) + ' days' if days_remain > 0 else 'passed'}")
 
     st.divider()
@@ -2646,7 +2766,7 @@ with tabs[6]:
     st.divider()
 
     # ── Day-by-day projection chart ──
-    section("📈", "Cumulative Cost Projection")
+    section("📈", t("cumulative_cost"))
 
     # Actual cumulative cost by day
     daily_cost = df_period.groupby("date")["cost_net"].sum().reset_index()
@@ -2700,13 +2820,13 @@ with tabs[6]:
     st.divider()
 
     # ── Bill breakdown estimate ──
-    section("🧾", "Estimated Bill Breakdown", badge="based on seasonal model")
+    section("🧾", t("est_bill_breakdown"), badge=t("based_on_seasonal"))
     e, s, v, tot = calc_bill(pred_kwh_seasonal, days_total)
     rewards = 5.0  # typical rewards saving (generic)
     items = [
-        ("Energy charges (gross)",  f"€{e/disc_factor:.2f}", COLORS["day"]),
+        (t("energy_charges"),  f"€{e/disc_factor:.2f}", COLORS["day"]),
         (f"Your discount ({DISC_PCT:.0f}%)", f"-€{e/disc_factor - e:.2f}", COLORS["total"]),
-        ("Standing charges",        f"€{s:.2f}", COLORS["muted"]),
+        (t("standing_charges_lbl"),        f"€{s:.2f}", COLORS["muted"]),
         ("VAT 9%",                  f"€{v:.2f}", COLORS["peak"]),
         ("Est. Total Due",          f"€{tot:.2f}", COLORS["text"]),
     ]
@@ -2731,7 +2851,7 @@ with tabs[6]:
 
     # ── Update billing period in sidebar ──
     st.divider()
-    section("⚙️", "Billing Period Settings")
+    section("⚙️", t("billing_period_sett"))
     col_a, col_b = st.columns(2)
     with col_a:
         new_start = st.date_input("Period start", value=b_start, key="bp_start")
@@ -2753,7 +2873,7 @@ with tabs[6]:
         st.session_state["billing_end"]   = new_end
         st.session_state["billing_days"]  = int(new_days)
         save_config()
-        st.success("Billing period saved.")
+        st.success(t("period_saved"))
         st.rerun()
 
 
@@ -2817,12 +2937,12 @@ with tabs[7]:
 
     st.divider()
 
-    ds = st.selectbox("Browse dataset", ["calckWh (30-min)", "kW Demand", "Daily DNP", "kWh"])
+    ds = st.selectbox(t("browse_dataset"), ["calckWh (30-min)", "kW Demand", "Daily DNP", "kWh"])
     df_map = {"calckWh (30-min)":df_calc, "kW Demand":df_kw, "Daily DNP":df_dnp, "kWh":df_daily}
     df_show = df_map.get(ds)
     if df_show is not None:
         st.dataframe(df_show.head(500), use_container_width=True, height=420)
-        st.download_button("⬇️ Download CSV",
+        st.download_button(t("download_csv"),
                            df_show.to_csv(index=False).encode("utf-8"),
                            f"{ds.replace(' ','_')}_export.csv", "text/csv")
     else:
