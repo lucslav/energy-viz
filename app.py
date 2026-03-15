@@ -2354,45 +2354,6 @@ with tabs[1]:
     mask = (df_calc["date"] >= d_from) & (df_calc["date"] <= d_to)
     df_f = df_calc[mask].copy()
 
-    y_col   = "value"
-    y_label = "kWh"
-
-    fig = go.Figure()
-    for p, color, label in [("night",COLORS["night"],f"🌙 {t('night_label_chart')}"),("day",COLORS["day"],f"☀️ {t('day_label_chart')}"),("peak",COLORS["peak"],f"🔥 {t('peak_label_chart')}")]:
-        df_p = df_f[df_f["period"]==p]
-        fig.add_trace(go.Scatter(x=df_p["datetime"], y=df_p[y_col], mode="lines", name=label,
-                                 line=dict(color=color, width=1), fill="tozeroy", fillcolor=_rgba(color, 0.13)))
-    apply_layout(fig, "", height=400)
-    fig.update_layout(
-        yaxis_title="kWh",
-        xaxis=RANGESLIDER_X,
-        margin=dict(l=10, r=10, t=40, b=10),
-        showlegend=False,
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown(
-        f'<div style="display:flex;font-size:.8rem;margin-top:-4px;margin-bottom:4px">'
-        f'<div style="min-width:55px"></div>'
-        f'<div style="display:flex;gap:14px">'
-        f'<span style="color:{COLORS["night"]}">🌙 {t("legend_night")}</span>'
-        f'<span style="color:{COLORS["day"]}">☀️ {t("legend_day")}</span>'
-        f'<span style="color:{COLORS["peak"]}">🔥 {t("legend_peak")}</span>'
-        f'</div></div>',
-        unsafe_allow_html=True,
-    )
-
-    # Compute daily stats for the selected range
-    _daily = df_f.groupby("date")["value"].sum()
-    _n_days = _daily.shape[0]
-    _max_day = _daily.max() if _n_days else 0
-    _max_date = _daily.idxmax() if _n_days else ""
-    k1, k2, k3 = st.columns(3)
-    k1.metric(t("total_kwh"),    f"{df_f['value'].sum():.1f} kWh")
-    k2.metric(t("peak_kwh"),     f"{df_f[df_f['period']=='peak']['value'].sum():.1f} kWh")
-    k3.metric(t("cons_max_day"), f"{_max_day:.1f} kWh",
-              str(_max_date) if _max_date else "")
-
-    st.divider()
     section("🌡️", t("heatmap_title"))
     heat = df_f.groupby(["date","hour"])["value"].sum().reset_index()
     heat_piv = heat.pivot(index="date", columns="hour", values="value").fillna(0)
