@@ -1302,7 +1302,7 @@ def setup_screen():
 def _setup_pdf():
     st.markdown(f"#### 🤖 {t('ai_parser')}")
 
-    st.markdown("""
+    st.markdown(f"""
     <div class="alert-box alert-info" style="color:#e6edf3!important">
         ℹ️ {t("api_called_only")}<br><br>
         {t("provider_recs")}<br>
@@ -1312,8 +1312,7 @@ def _setup_pdf():
         &nbsp;• <strong>OpenRouter</strong> — {t("provider_openrouter")}
         (<a href="https://openrouter.ai/models" style="color:#58a6ff">openrouter.ai/models</a>)<br>
         &nbsp;• <strong>OpenAI GPT-4o</strong> — {t("provider_openai")}<br><br>
-        If you get a <strong>429 error</strong>, your daily free quota is exhausted —
-        try a different model or wait until midnight PT for reset.
+        {t("if_429")}
     </div>""", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 1])
@@ -1336,7 +1335,7 @@ def _setup_pdf():
     or_model = ""
     # ── OpenRouter model info ──
     if provider_code == "openrouter":
-        st.markdown("""
+        st.markdown(f"""
         <div style="background:#1c2330;border:1px solid #30363d;
                     border-left:3px solid #58a6ff;border-radius:10px;
                     padding:.7rem 1rem;margin:.4rem 0;font-size:.82rem;color:#e6edf3">
@@ -1362,7 +1361,7 @@ def _setup_pdf():
     # ── API key storage toggle ──────────────────────
     already_saved_to_disk = API_KEY_FILE.exists()
 
-    st.markdown("""
+    st.markdown(f"""
     <div style="background:#1c2330;border:1px solid #30363d;
                 border-radius:10px;padding:.8rem 1rem;margin:.6rem 0">
         <div style="font-weight:600;font-size:.88rem;color:#e6edf3!important;margin-bottom:.4rem">
@@ -1387,10 +1386,9 @@ def _setup_pdf():
     if save_api_to_disk:
         fernet_ok = _fernet() is not None
         if fernet_ok:
-            st.markdown("""
+            st.markdown(f"""
             <div class="alert-box alert-warn">
-                ⚠️ Key will be AES-256 encrypted and stored on this server only.
-                Set the <code>ENERGY_VIZ_SECRET</code> env var for a unique encryption key.
+                ⚠️ {t("aes_warn")}
             </div>""", unsafe_allow_html=True)
         else:
             st.markdown("""
@@ -1400,7 +1398,7 @@ def _setup_pdf():
             </div>""", unsafe_allow_html=True)
             save_api_to_disk = False
     else:
-        st.markdown("""
+        st.markdown(f"""
         <div class="alert-box alert-info" style="color:#e6edf3!important">
             ℹ️ {t("session_key_info")}
         </div>""", unsafe_allow_html=True)
@@ -1747,7 +1745,7 @@ with st.sidebar:
     </div>""", unsafe_allow_html=True)
 
     # ── HDF file uploads — compact design ──
-    st.markdown('<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#7d8590;margin-bottom:.5rem">📂 {t("hdf_files")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#7d8590;margin-bottom:.5rem">📂 {t("hdf_files")}</div>', unsafe_allow_html=True)
 
     # Helper: show persisted file status below each uploader
     def _file_card(slot, color, icon, label, hint, primary=False):
