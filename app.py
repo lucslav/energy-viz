@@ -1809,7 +1809,16 @@ with tabs[1]:
     fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=_rgba(COLORS["peak"], 0.13), line_width=0,
                    annotation_text="Peak", annotation_font_color=COLORS["peak"])
     apply_layout(fig2, "", height=max(280, len(heat_piv)*14+60))
-    fig2.update_layout(xaxis_nticks=24, yaxis_autorange="reversed")
+    fig2.update_layout(
+        yaxis_autorange="reversed",
+        xaxis=dict(
+            tickmode="array",
+            tickvals=[f"{h:02d}:00" for h in range(0, 24, 3)],
+            ticktext=[f"{h:02d}:00" for h in range(0, 24, 3)],
+            tickfont=dict(size=9, color=COLORS["text"]),
+            tickangle=-45,
+        ),
+    )
     st.plotly_chart(fig2, use_container_width=True)
 
 
