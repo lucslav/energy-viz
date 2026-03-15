@@ -1813,8 +1813,8 @@ with tabs[1]:
         yaxis_autorange="reversed",
         xaxis=dict(
             tickmode="array",
-            tickvals=[f"{h:02d}:00" for h in range(0, 24, 3)],
-            ticktext=[f"{h:02d}:00" for h in range(0, 24, 3)],
+            tickvals=[f"{h:02d}:00" for h in range(0, 24)],
+            ticktext=[f"{h:02d}:00" if h % 3 == 0 else "" for h in range(0, 24)],
             tickfont=dict(size=9, color=COLORS["text"]),
             tickangle=-45,
         ),
