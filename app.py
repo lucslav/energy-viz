@@ -666,7 +666,7 @@ TRANSLATIONS = {
     # ── Advanced Insights ──
     "seasonal_trend":       {"en": "Seasonal & Monthly Trend",    "pl": "Trend sezonowy i miesięczny"},
     "load_profile":         {"en": "Average Daily Load Profile",  "pl": "Średni dobowy profil obciążenia"},
-    "weekday_weekend":      {"en": "Weekday vs Weekend",          "pl": "Dni robocze vs weekend"},
+    "weekday_weekend":      {"en": "Weekday vs Weekend",          "pl": "Dni robocze / Weekend"},
     "standby_baseline":     {"en": "Standby & Baseline Load",     "pl": "Pobór w czuwaniu i bazowy"},
     "peak_shifting":        {"en": "Peak Shifting Calculator",    "pl": "Kalkulator przeniesienia szczytu"},
     "anomaly_days":         {"en": "Anomaly Days",                "pl": "Dni anomalii"},
@@ -696,7 +696,7 @@ TRANSLATIONS = {
     "incomplete_data":      {"en": "day(s) with incomplete 30-min data", "pl": "dzień/dni z niekompletnymi danymi 30-min"},
     "days_label":           {"en": "days",                        "pl": "dni"},
     "kwh_day":              {"en": "kWh/day",                     "pl": "kWh/dzień"},
-    "w_standby":            {"en": "W Standby",                   "pl": "W (2–4 rano)"},
+    "w_standby":            {"en": "W (2–4am)",                   "pl": "W (2–4 rano)"},
     "incl_off":             {"en": "incl. {pct}% off",            "pl": "z rabatem {pct}%"},
     "gross_label": {"en": "gross",                       "pl": "brutto"},
     "days_remaining":       {"en": "Days Remaining",              "pl": "dni pozostało"},
@@ -782,9 +782,9 @@ TRANSLATIONS = {
     "standing_charges":     {"en": "Standing",                     "pl": "Opłata stała"},
     "vat_9":                {"en": "VAT 9%",                       "pl": "VAT 9%"},
     "est_total_bill":       {"en": "Est. total bill",              "pl": "Szac. rachunek łączny"},
-    "standby_power":        {"en": "Standby Power",                "pl": "Pobór w standby"},
+    "standby_power":        {"en": "Standby power",                "pl": "Pobór w czuwaniu"},
     "at_night_rate":        {"en": "at night rate",                "pl": "po stawce nocnej"},
-    "annual_standby_kwh":   {"en": "Annual Standby Kwh",           "pl": "Roczne zużycie w standby"},
+    "annual_standby_kwh":   {"en": "Annual Standby Kwh",           "pl": "Roczne zużycie w czuwaniu"},
     "annual_cost":          {"en": "Annual cost",                  "pl": "Koszt roczny"},
     "all_to_night":         {"en": "all to night",                 "pl": "wszystko na noc"},
     "max_saving":           {"en": "Max saving (100%)",            "pl": "Maks. oszczędność (100%)"},
@@ -814,7 +814,7 @@ TRANSLATIONS = {
     "total_peak_kwh":       {"en": "Total Peak Kwh",               "pl": "Łącznie kWh szczytowych"},
     "at_shift_pct":         {"en": "At {pct}% shift",             "pl": "Przy przesunięciu {pct}%"},
     "night_cheaper":        {"en": "night {pct}% cheaper",         "pl": "noc tańsza o {pct}%"},
-    "annual_standby":       {"en": "Annual Standby Kwh",           "pl": "Roczne kWh w standby"},
+    "annual_standby":       {"en": "Annual Standby Kwh",           "pl": "Roczne kWh w czuwaniu"},
     "how_updates_work":     {"en": "How updates work",             "pl": "Jak działają aktualizacje"},
     "updates_info":         {"en": "Updates Info",
                              "pl": "ESB zawsze eksportuje pełną historię (do 13 miesięcy) przy każdym pobraniu. Wgranie nowszego eksportu automatycznie zawiera wszystkie poprzednie dane + nowe miesiące + korekty ESB — bez ręcznego łączenia. Wystarczy wgrać najnowszy plik."},
@@ -2686,12 +2686,12 @@ with tabs[4]:
     fig_m.update_layout(
         barmode="stack", yaxis_title="€",
         legend=dict(
-            orientation="h", yanchor="top", y=-0.20,
+            orientation="h", yanchor="top", y=-0.22,
             xanchor="left", x=0,
             font=dict(size=10, color=COLORS["text"]),
             bgcolor="rgba(0,0,0,0)",
         ),
-        margin=dict(l=10, r=10, t=20, b=90),
+        margin=dict(l=10, r=10, t=20, b=100),
     )
     st.plotly_chart(fig_m, use_container_width=True)
 
