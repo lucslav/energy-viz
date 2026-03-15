@@ -2343,18 +2343,16 @@ with tabs[1]:
     if df_calc is None:
         alert(t("upload_calc_first"), "info"); st.stop()
 
-    section("🔌", t("consumption_title"), badge="calckWh")
     min_d = df_calc["datetime"].min().date()
     max_d = df_calc["datetime"].max().date()
 
-    # Date range
+    section("🌡️", t("heatmap_title"), badge="calckWh")
     ca, cb = st.columns(2)
     with ca: d_from = st.date_input(t("from_label"), value=min_d, min_value=min_d, max_value=max_d, key="cf")
     with cb: d_to   = st.date_input(t("to_label"),   value=max_d, min_value=min_d, max_value=max_d, key="ct")
     mask = (df_calc["date"] >= d_from) & (df_calc["date"] <= d_to)
     df_f = df_calc[mask].copy()
 
-    section("🌡️", t("heatmap_title"))
     heat = df_f.groupby(["date","hour"])["value"].sum().reset_index()
     heat_piv = heat.pivot(index="date", columns="hour", values="value").fillna(0)
     fig2 = go.Figure(go.Heatmap(
