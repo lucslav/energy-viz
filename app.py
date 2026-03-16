@@ -1178,17 +1178,57 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                                                        "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
                 page = ctx.new_page()
 
-                # ── Login ──
+                # ── Login — ESB uses Azure AD B2C, renders async ──
                 page.goto(_ESB_BASE_URL, timeout=30_000)
                 page.wait_for_load_state("networkidle", timeout=30_000)
+
+                # Accept cookies banner if present
                 try:
                     page.click("#onetrust-accept-btn-handler", timeout=5_000)
+                    page.wait_for_load_state("networkidle", timeout=10_000)
                 except PWTimeout:
                     pass
 
-                page.fill('input[type="email"], #email', email, timeout=10_000)
-                page.fill('input[type="password"], #password', password, timeout=10_000)
-                page.click('button[type="submit"]', timeout=10_000)
+                # Wait for email field (Azure AD B2C renders it async)
+                page.wait_for_selector(
+                    'input[name="loginfmt"], input[type="email"], #email, [id*="signInName"]',
+                    timeout=20_000, state="visible"
+                )
+                for sel in ['input[name="loginfmt"]', '[id*="signInName"]',
+                            'input[type="email"]', '#email']:
+                    try:
+                        page.fill(sel, email, timeout=3_000); break
+                    except PWTimeout:
+                        continue
+
+                # Some Azure AD flows split email/password onto two pages
+                for sel in ['#idSIButton9', 'input[value="Next"]',
+                            '[id*="next"]', 'button[type="submit"]']:
+                    try:
+                        page.click(sel, timeout=3_000)
+                        page.wait_for_load_state("networkidle", timeout=10_000)
+                        break
+                    except PWTimeout:
+                        continue
+
+                # Wait for password field
+                page.wait_for_selector(
+                    'input[type="password"], [name="passwd"], [id*="Password"]',
+                    timeout=15_000, state="visible"
+                )
+                for sel in ['input[type="password"]', '[name="passwd"]', '[id*="Password"]']:
+                    try:
+                        page.fill(sel, password, timeout=3_000); break
+                    except PWTimeout:
+                        continue
+
+                for sel in ['#idSIButton9', 'input[value="Sign in"]',
+                            'button[type="submit"]', '[id*="next"]']:
+                    try:
+                        page.click(sel, timeout=3_000); break
+                    except PWTimeout:
+                        continue
+
                 page.wait_for_load_state("networkidle", timeout=30_000)
 
                 content = page.content().lower()
@@ -2045,7 +2085,7 @@ def _open_hdf(file_or_path):
         return io.BytesIO(Path(file_or_path).read_bytes())
     return file_or_path  # UploadedFile or BytesIO
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_calc_kwh(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -2073,7 +2113,7 @@ def load_calc_kwh(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_kw(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -2087,7 +2127,7 @@ def load_kw(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_dnp(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -2101,7 +2141,7 @@ def load_dnp(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_daily(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
