@@ -1135,6 +1135,180 @@ def _inject_pl_month_names():
     """, height=0, scrolling=False)
 
 # Start background scheduler (once per container process)
+
+# ─────────────────────────────────────────────
+#  ESB AUTO-SYNC  (APScheduler + Playwright)
+# ─────────────────────────────────────────────
+import threading as _threading
+
+_SCHEDULER_STARTED = False
+
+_ESB_LOGIN_URL    = "https://myaccount.esbnetworks.ie"
+_ESB_DOWNLOAD_URL = "https://myaccount.esbnetworks.ie/Api/HistoricConsumption"
+_ESB_FILE_PREFIXES = {
+    "calc":  "HDF_calckWh",
+    "kw":    "HDF_kW",
+    "dnp":   "HDF_DailyDNP",
+    "daily": "HDF_Daily_kWh",
+}
+
+
+def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Download all HDF files from ESB Networks via Playwright headless Chromium."""
+    import datetime as _dt
+    status = {
+        "last_attempt": _dt.datetime.now().isoformat(),
+        "success": False, "error": None, "files_updated": [],
+    }
+
+    f = fernet_fn()
+    if f is None:
+        status["error"] = "encryption_unavailable"
+        status_file.write_text(json.dumps(status, indent=2, default=str))
+        return status
+
+    if not creds_file.exists():
+        status["error"] = "no_credentials"
+        status_file.write_text(json.dumps(status, indent=2, default=str))
+        return status
+
+    try:
+        creds = json.loads(f.decrypt(creds_file.read_bytes()).decode())
+        email    = creds.get("email", "")
+        password = creds.get("password", "")
+    except Exception as e:
+        status["error"] = f"decrypt_failed: {e}"
+        status_file.write_text(json.dumps(status, indent=2, default=str))
+        return status
+
+    if not email or not password:
+        status["error"] = "empty_credentials"
+        status_file.write_text(json.dumps(status, indent=2, default=str))
+        return status
+
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        status["error"] = "playwright_not_installed"
+        status_file.write_text(json.dumps(status, indent=2, default=str))
+        return status
+
+    import tempfile, shutil as _shutil
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        try:
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage",
+                          "--disable-gpu", "--single-process"],
+                )
+                ctx = browser.new_context(
+                    accept_downloads=True,
+                    viewport={"width": 1280, "height": 800},
+                    user_agent=(
+                        "Mozilla/5.0 (X11; Linux x86_64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                )
+                page = ctx.new_page()
+
+                # Login
+                page.goto(_ESB_LOGIN_URL, timeout=30_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+                try:
+                    page.click("#onetrust-accept-btn-handler", timeout=5_000)
+                except PWTimeout:
+                    pass
+
+                page.fill('input[type="email"], #email', email, timeout=10_000)
+                page.fill('input[type="password"], #password', password, timeout=10_000)
+                page.click('button[type="submit"]', timeout=10_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+
+                content = page.content().lower()
+                if "captcha" in content or "too many" in content:
+                    status["error"] = "rate_limited"
+                    browser.close()
+                    status_file.write_text(json.dumps(status, indent=2, default=str))
+                    return status
+
+                if "login" in page.url.lower() or "signin" in page.url.lower():
+                    status["error"] = "login_failed"
+                    browser.close()
+                    status_file.write_text(json.dumps(status, indent=2, default=str))
+                    return status
+
+                # Download each file
+                for slot, dest_path in hdf_slots.items():
+                    try:
+                        with page.expect_download(timeout=60_000) as dl_info:
+                            page.goto(
+                                f"{_ESB_DOWNLOAD_URL}?mprn=&type={_ESB_FILE_PREFIXES[slot]}",
+                                timeout=30_000,
+                            )
+                        download = dl_info.value
+                        tmp_path = Path(tmp_dir) / f"{slot}.csv"
+                        download.save_as(str(tmp_path))
+                        if tmp_path.exists() and tmp_path.stat().st_size > 100:
+                            _shutil.copy2(str(tmp_path), str(dest_path))
+                            status["files_updated"].append(slot)
+                    except Exception as e:
+                        if status.get("partial_errors") is None:
+                            status["partial_errors"] = {}
+                        status["partial_errors"][slot] = str(e)
+
+                browser.close()
+
+        except Exception as e:
+            status["error"] = str(e)
+            status_file.write_text(json.dumps(status, indent=2, default=str))
+            return status
+
+    status["success"] = len(status["files_updated"]) > 0
+    if not status["success"] and not status.get("error"):
+        status["error"] = "no_files_downloaded"
+    status_file.write_text(json.dumps(status, indent=2, default=str))
+    return status
+
+
+def _start_scheduler(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Start APScheduler background thread — once per process."""
+    global _SCHEDULER_STARTED
+    if _SCHEDULER_STARTED:
+        return
+    _SCHEDULER_STARTED = True
+
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.interval import IntervalTrigger
+        import datetime as _dt
+    except ImportError:
+        return  # APScheduler not installed — skip silently
+
+    scheduler = BackgroundScheduler(daemon=True)
+    # Run immediately on first start if no sync history, otherwise weekly
+    first_run = (
+        _dt.datetime.now() + _dt.timedelta(seconds=30)
+        if not status_file.exists() and creds_file.exists()
+        else None
+    )
+    scheduler.add_job(
+        func=esb_sync_now,
+        trigger=IntervalTrigger(weeks=1),
+        kwargs=dict(
+            data_dir=data_dir, hdf_slots=hdf_slots,
+            creds_file=creds_file, status_file=status_file,
+            fernet_fn=fernet_fn,
+        ),
+        id="esb_weekly_sync",
+        replace_existing=True,
+        next_run_time=first_run,
+    )
+    scheduler.start()
+
+
 _start_scheduler(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
 
 # ─────────────────────────────────────────────
