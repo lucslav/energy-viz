@@ -203,6 +203,66 @@ st.set_page_config(
 # ─────────────────────────────────────────────
 #  GLOBAL CSS
 # ─────────────────────────────────────────────
+#  THEME COLORS
+# ─────────────────────────────────────────────
+_THEME_DARK = dict(
+    bg="#161b22", bg2="#1c2330", bg3="#0d1117",
+    card="#161b22", card2="#1c2330",
+    border="#30363d", border2="#21262d",
+    text="#e6edf3", muted="#7d8590", muted2="#a0aab4",
+    input_bg="#1c2330", hover_bg="#21262d",
+)
+_THEME_LIGHT = dict(
+    bg="#f6f8fa", bg2="#ffffff", bg3="#eaeef2",
+    card="#ffffff", card2="#f0f2f5",
+    border="#d0d7de", border2="#d8dee4",
+    text="#1f2328", muted="#636c76", muted2="#57606a",
+    input_bg="#ffffff", hover_bg="#f3f4f6",
+)
+
+def _get_theme():
+    """Detect Streamlit theme. Returns 'dark' or 'light'."""
+    try:
+        base = st.get_option("theme.base")
+        return "light" if base == "light" else "dark"
+    except Exception:
+        return "dark"
+
+def _build_colors():
+    """Build COLORS dict — data colors stay consistent, UI colors follow theme."""
+    T = _THEME_LIGHT if _get_theme() == "light" else _THEME_DARK
+    return dict(
+        # Data colors — same in both themes
+        day="#388bfd", peak="#e8610a", night="#8250df",
+        total="#2da44e", kw="#1b8b93", red="#cf222e",
+        yellow="#b08800", green="#2da44e",
+        # Aliases
+        blue="#388bfd", cyan="#1b8b93", purple="#8250df",
+        orange="#e8610a",
+        # UI colors — theme-aware
+        bg=T["bg"], bg2=T["bg2"], bg3=T["bg3"],
+        card=T["card"], card2=T["card2"],
+        border=T["border"], border2=T["border2"],
+        text=T["text"], muted=T["muted"], muted2=T["muted2"],
+        grid=T["border"], input_bg=T["input_bg"],
+    ) if _get_theme() == "light" else dict(
+        # Data colors — slightly brighter for dark bg
+        day="#58a6ff", peak="#f0883e", night="#bc8cff",
+        total="#3fb950", kw="#39d0d8", red="#f85149",
+        yellow="#d29922", green="#3fb950",
+        # Aliases
+        blue="#58a6ff", cyan="#39d0d8", purple="#bc8cff",
+        orange="#f0883e",
+        # UI colors
+        bg=T["bg"], bg2=T["bg2"], bg3=T["bg3"],
+        card=T["card"], card2=T["card2"],
+        border=T["border"], border2=T["border2"],
+        text=T["text"], muted=T["muted"], muted2=T["muted2"],
+        grid=T["border"], input_bg=T["input_bg"],
+    )
+
+COLORS = _build_colors()
+
 # ─────────────────────────────────────────────
 #  THEME-AWARE CSS
 # ─────────────────────────────────────────────
@@ -480,63 +540,6 @@ DISCOUNT       = 0.30
 LOGO_URL       = "https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png"
 
 # ── Theme-aware color palettes ──
-_THEME_DARK = dict(
-    bg="#161b22", bg2="#1c2330", bg3="#0d1117",
-    card="#161b22", card2="#1c2330",
-    border="#30363d", border2="#21262d",
-    text="#e6edf3", muted="#7d8590", muted2="#a0aab4",
-    input_bg="#1c2330", hover_bg="#21262d",
-)
-_THEME_LIGHT = dict(
-    bg="#f6f8fa", bg2="#ffffff", bg3="#eaeef2",
-    card="#ffffff", card2="#f0f2f5",
-    border="#d0d7de", border2="#d8dee4",
-    text="#1f2328", muted="#636c76", muted2="#57606a",
-    input_bg="#ffffff", hover_bg="#f3f4f6",
-)
-
-def _get_theme():
-    """Detect Streamlit theme. Returns 'dark' or 'light'."""
-    try:
-        base = st.get_option("theme.base")
-        return "light" if base == "light" else "dark"
-    except Exception:
-        return "dark"
-
-def _build_colors():
-    """Build COLORS dict — data colors stay consistent, UI colors follow theme."""
-    T = _THEME_LIGHT if _get_theme() == "light" else _THEME_DARK
-    return dict(
-        # Data colors — same in both themes
-        day="#388bfd", peak="#e8610a", night="#8250df",
-        total="#2da44e", kw="#1b8b93", red="#cf222e",
-        yellow="#b08800", green="#2da44e",
-        # Aliases
-        blue="#388bfd", cyan="#1b8b93", purple="#8250df",
-        orange="#e8610a",
-        # UI colors — theme-aware
-        bg=T["bg"], bg2=T["bg2"], bg3=T["bg3"],
-        card=T["card"], card2=T["card2"],
-        border=T["border"], border2=T["border2"],
-        text=T["text"], muted=T["muted"], muted2=T["muted2"],
-        grid=T["border"], input_bg=T["input_bg"],
-    ) if _get_theme() == "light" else dict(
-        # Data colors — slightly brighter for dark bg
-        day="#58a6ff", peak="#f0883e", night="#bc8cff",
-        total="#3fb950", kw="#39d0d8", red="#f85149",
-        yellow="#d29922", green="#3fb950",
-        # Aliases
-        blue="#58a6ff", cyan="#39d0d8", purple="#bc8cff",
-        orange="#f0883e",
-        # UI colors
-        bg=T["bg"], bg2=T["bg2"], bg3=T["bg3"],
-        card=T["card"], card2=T["card2"],
-        border=T["border"], border2=T["border2"],
-        text=T["text"], muted=T["muted"], muted2=T["muted2"],
-        grid=T["border"], input_bg=T["input_bg"],
-    )
-
-COLORS = _build_colors()
 
 def _rgba(hex_color: str, alpha: float = 0.15) -> str:
     """Convert #rrggbb hex to rgba() string for Plotly fillcolor."""
