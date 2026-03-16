@@ -20,10 +20,9 @@ DATA_DIR   = Path(os.environ.get("ENERGY_VIZ_DATA", "/app/data"))
 HDF_DIR    = DATA_DIR / "hdf"
 CONFIG_FILE    = DATA_DIR / "config.json"
 API_KEY_FILE   = DATA_DIR / "api_key.enc"
-INVOICE_FILE   = DATA_DIR / "invoice.pdf"
-
+ESB_CREDS_FILE = DATA_DIR / "esb_creds.enc"
 SYNC_STATUS_FILE = DATA_DIR / "esb_sync.json"
-ESB_CREDS_FILE   = DATA_DIR / "esb_creds.enc"
+INVOICE_FILE   = DATA_DIR / "invoice.pdf"
 
 # Create dirs on startup (safe if already exist)
 for d in [DATA_DIR, HDF_DIR]:
@@ -72,7 +71,38 @@ def decrypt_api_key() -> str:
         return ""
 
 
-# ── Config persistence ─────────────────────────────
+def encrypt_esb_creds(email: str, password: str) -> bytes | None:
+    """Encrypt ESB credentials as JSON using Fernet (same key as API key)."""
+    f = _fernet()
+    if f is None or not email or not password:
+        return None
+    return f.encrypt(json.dumps({"email": email, "password": password}).encode())
+
+
+def decrypt_esb_creds() -> tuple[str, str]:
+    """Return (email, password) or ('', '') if not stored."""
+    if not ESB_CREDS_FILE.exists():
+        return "", ""
+    f = _fernet()
+    if f is None:
+        return "", ""
+    try:
+        data = json.loads(f.decrypt(ESB_CREDS_FILE.read_bytes()).decode())
+        return data.get("email", ""), data.get("password", "")
+    except Exception:
+        return "", ""
+
+
+def read_sync_status() -> dict:
+    if not SYNC_STATUS_FILE.exists():
+        return {}
+    try:
+        return json.loads(SYNC_STATUS_FILE.read_text())
+    except Exception:
+        return {}
+
+
+
 _CONFIG_KEYS = [
     "lang", "tariff", "mprn", "supplier",
     "api_provider", "billing_start", "billing_end", "billing_days",
@@ -89,45 +119,6 @@ def save_config():
         data[k] = v
     CONFIG_FILE.write_text(json.dumps(data, indent=2))
 
-
-
-
-def encrypt_esb_creds(email: str, password: str) -> bytes | None:
-    """Encrypt ESB credentials as JSON using Fernet."""
-    f = _fernet()
-    if f is None:
-        return None
-    payload = json.dumps({"email": email, "password": password})
-    return f.encrypt(payload.encode())
-
-
-def decrypt_esb_creds() -> tuple[str, str]:
-    """Return (email, password) or ('', '')."""
-    if not ESB_CREDS_FILE.exists():
-        return "", ""
-    f = _fernet()
-    if f is None:
-        return "", ""
-    try:
-        data = json.loads(f.decrypt(ESB_CREDS_FILE.read_bytes()).decode())
-        return data.get("email", ""), data.get("password", "")
-    except Exception:
-        return "", ""
-
-
-def read_sync_status() -> dict:
-    """Read last sync status from disk."""
-    if not SYNC_STATUS_FILE.exists():
-        return {}
-    try:
-        return json.loads(SYNC_STATUS_FILE.read_text())
-    except Exception:
-        return {}
-
-
-def write_sync_status(status: dict):
-    """Write sync status to disk."""
-    SYNC_STATUS_FILE.write_text(json.dumps(status, indent=2, default=str))
 
 def load_config():
     """Load persisted config into session state (only if not already set)."""
@@ -203,333 +194,378 @@ st.set_page_config(
 # ─────────────────────────────────────────────
 #  GLOBAL CSS
 # ─────────────────────────────────────────────
-#  THEME COLORS
-# ─────────────────────────────────────────────
-_THEME_DARK = dict(
-    bg="#161b22", bg2="#1c2330", bg3="#0d1117",
-    card="#161b22", card2="#1c2330",
-    border="#30363d", border2="#21262d",
-    text="#e6edf3", muted="#7d8590", muted2="#a0aab4",
-    input_bg="#1c2330", hover_bg="#21262d",
-)
-_THEME_LIGHT = dict(
-    bg="#f6f8fa", bg2="#ffffff", bg3="#eaeef2",
-    card="#ffffff", card2="#f0f2f5",
-    border="#d0d7de", border2="#d8dee4",
-    text="#1f2328", muted="#636c76", muted2="#57606a",
-    input_bg="#ffffff", hover_bg="#f3f4f6",
-)
-
-def _get_theme():
-    """Detect Streamlit theme. Returns 'dark' or 'light'."""
-    try:
-        base = st.get_option("theme.base")
-        return "light" if base == "light" else "dark"
-    except Exception:
-        return "dark"
-
-def _build_colors():
-    """Build COLORS dict — data colors stay consistent, UI colors follow theme."""
-    T = _THEME_LIGHT if _get_theme() == "light" else _THEME_DARK
-    return dict(
-        # Data colors — same in both themes
-        day="#388bfd", peak="#e8610a", night="#8250df",
-        total="#2da44e", kw="#1b8b93", red="#cf222e",
-        yellow="#b08800", green="#2da44e",
-        # Aliases
-        blue="#388bfd", cyan="#1b8b93", purple="#8250df",
-        orange="#e8610a",
-        # UI colors — theme-aware
-        bg=T["bg"], bg2=T["bg2"], bg3=T["bg3"],
-        card=T["card"], card2=T["card2"],
-        border=T["border"], border2=T["border2"],
-        text=T["text"], muted=T["muted"], muted2=T["muted2"],
-        grid=T["border"], input_bg=T["input_bg"],
-    ) if _get_theme() == "light" else dict(
-        # Data colors — slightly brighter for dark bg
-        day="#58a6ff", peak="#f0883e", night="#bc8cff",
-        total="#3fb950", kw="#39d0d8", red="#f85149",
-        yellow="#d29922", green="#3fb950",
-        # Aliases
-        blue="#58a6ff", cyan="#39d0d8", purple="#bc8cff",
-        orange="#f0883e",
-        # UI colors
-        bg=T["bg"], bg2=T["bg2"], bg3=T["bg3"],
-        card=T["card"], card2=T["card2"],
-        border=T["border"], border2=T["border2"],
-        text=T["text"], muted=T["muted"], muted2=T["muted2"],
-        grid=T["border"], input_bg=T["input_bg"],
-    )
-
-COLORS = _build_colors()
-
-# ─────────────────────────────────────────────
-#  THEME-AWARE CSS
-# ─────────────────────────────────────────────
-def _inject_css():
-    _theme = _get_theme()
-    is_dark = _theme == "dark"
-    T = _THEME_DARK if is_dark else _THEME_LIGHT
-    C = COLORS
-
-    # Data highlight colors (consistent)
-    _day    = C["day"]
-    _peak   = C["peak"]
-    _night  = C["night"]
-    _blue   = C["blue"]
-
-    # Metric background in light mode needs a border
-    _metric_bg     = T["card"]
-    _metric_border = T["border"]
-    _text          = T["text"]
-    _muted         = T["muted"]
-    _muted2        = T["muted2"]
-    _bg            = T["bg"]
-    _bg2           = T["bg2"]
-    _bg3           = T["bg3"]
-    _card          = T["card"]
-    _card2         = T["card2"]
-    _border        = T["border"]
-    _border2       = T["border2"]
-    _input_bg      = T["input_bg"]
-    _hover_bg      = T["hover_bg"]
-    _scrollbar     = T["border"]
-
-    # Alert colors - same in both themes, just background opacity differs
-    _alert_info_bg  = "#388bfd18" if not is_dark else "#58a6ff18"
-    _alert_warn_bg  = "#e8610a18" if not is_dark else "#f0883e18"
-    _alert_good_bg  = "#2da44e18" if not is_dark else "#3fb95018"
-    _alert_red_bg   = "#cf222e18" if not is_dark else "#f8514918"
-    _alert_info_c   = "#0969da"   if not is_dark else "#58a6ff"
-    _alert_warn_c   = "#bc4c00"   if not is_dark else "#f0883e"
-    _alert_good_c   = "#1a7f37"   if not is_dark else "#3fb950"
-    _alert_red_c    = "#cf222e"   if not is_dark else "#f85149"
-
-    # Gradient title
-    _grad_start = "#0969da" if not is_dark else "#58a6ff"
-    _grad_end   = "#1b8b93" if not is_dark else "#39d0d8"
-
-    st.markdown(f"""
+st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
-html, body, [data-testid="stAppViewContainer"] {{
-    background: {_bg} !important;
-    color: {_text} !important;
-    font-family: 'Space Grotesk', sans-serif !important;
-}}
-[data-testid="stHeader"]  {{ background: transparent !important; }}
-[data-testid="stSidebar"] {{
-    background: {_card} !important;
-    border-right: 1px solid {_border} !important;
-}}
-[data-testid="stSidebar"] * {{ color: {_text} !important; }}
+:root {
+    --bg-base:     #0d1117;
+    --bg-card:     #161b22;
+    --bg-card2:    #1c2330;
+    --border:      #30363d;
+    --text:        #e6edf3;
+    --text-muted:  #7d8590;
+    --blue:        #58a6ff;
+    --cyan:        #39d0d8;
+    --green:       #3fb950;
+    --yellow:      #d29922;
+    --orange:      #f0883e;
+    --red:         #f85149;
+    --purple:      #bc8cff;
+}
 
-/* ── file uploader ── */
+html, body, [data-testid="stAppViewContainer"] {
+    background: var(--bg-base) !important;
+    color: var(--text) !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+}
+[data-testid="stHeader"]  { background: transparent !important; }
+[data-testid="stSidebar"] {
+    background: var(--bg-card) !important;
+    border-right: 1px solid var(--border) !important;
+}
+[data-testid="stSidebar"] * { color: var(--text) !important; }
+
+/* ── file uploader — sidebar and main ── */
 section[data-testid="stSidebar"] [data-testid="stFileUploader"],
-[data-testid="stFileUploader"] {{
-    background: {_card2} !important;
-    border: 1px dashed {_border} !important;
+[data-testid="stFileUploader"] {
+    background: var(--bg-card2) !important;
+    border: 1px dashed var(--border) !important;
     border-radius: 10px !important;
     padding: 6px !important;
-}}
+}
+/* Dropzone area — override white background everywhere including sidebar */
 section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
-[data-testid="stFileUploaderDropzone"] {{
-    background: {_card2} !important;
-    border: 1px dashed {_border} !important;
+[data-testid="stFileUploaderDropzone"] {
+    background: #1c2330 !important;
+    border: 1px dashed #30363d !important;
     border-radius: 8px !important;
-}}
+}
+/* ALL text inside uploader */
 [data-testid="stFileUploader"] *,
 [data-testid="stFileUploaderDropzone"] *,
-[data-testid="stFileUploaderDropzoneInstructions"] * {{
-    color: {_text} !important;
+[data-testid="stFileUploaderDropzoneInstructions"] * {
+    color: #e6edf3 !important;
     opacity: 1 !important;
-}}
-[data-testid="stFileUploaderDropzoneInstructions"] span {{
-    color: {_text} !important;
+}
+/* "Drag and drop" heading */
+[data-testid="stFileUploaderDropzoneInstructions"] span {
+    color: #e6edf3 !important;
     font-weight: 600 !important;
-}}
+}
+/* "Limit 200MB" — slightly muted but still visible */
 [data-testid="stFileUploaderDropzoneInstructions"] small,
-[data-testid="stFileUploader"] small {{
-    color: {_muted} !important;
+[data-testid="stFileUploader"] small {
+    color: #7d8590 !important;
     opacity: 1 !important;
-}}
+}
+/* Uploaded filename */
+[data-testid="stFileUploaderFileName"],
+[data-testid="stFileUploaderFile"] * {
+    color: #e6edf3 !important;
+}
+/* Browse files button */
 [data-testid="stFileUploaderDropzone"] button,
-[data-testid="stFileUploader"] button {{
-    background: {_hover_bg} !important;
-    color: {_text} !important;
-    border: 1px solid {_border} !important;
+[data-testid="stFileUploader"] button {
+    background: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
     border-radius: 6px !important;
-}}
+}
+[data-testid="stFileUploader"] button:hover {
+    background: #30363d !important;
+    border-color: #58a6ff !important;
+}
+/* Label above uploader */
+[data-testid="stFileUploader"] > label,
+[data-testid="stFileUploader"] > label * {
+    color: #e6edf3 !important;
+}
 
 /* ── buttons ── */
-.stButton > button {{
+.stButton > button {
     background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
     color:#fff !important; border:none !important;
     border-radius:8px !important;
     font-family:'Space Grotesk',sans-serif !important;
     font-weight:600 !important; padding:.45rem 1.1rem !important;
     transition: opacity .2s !important;
-}}
-.stButton > button:hover {{ opacity:.85 !important; }}
+}
+.stButton > button:hover { opacity:.85 !important; }
 
 /* ── metrics ── */
-[data-testid="stMetric"] {{
-    background:{_metric_bg} !important;
-    border:1px solid {_metric_border} !important;
+[data-testid="stMetric"] {
+    background:#161b22 !important;
+    border:1px solid #30363d !important;
     border-radius:12px !important;
     padding:1rem 1.2rem !important;
-}}
-[data-testid="stMetricLabel"]  {{ color:{_muted2}!important;font-size:.78rem!important;text-transform:uppercase!important;letter-spacing:.07em!important; }}
-[data-testid="stMetricValue"]  {{ font-family:'JetBrains Mono',monospace!important;font-size:1.5rem!important;font-weight:600!important;color:{_text}!important; }}
-[data-testid="stMetricDelta"]  {{ font-size:.78rem!important; }}
+}
+[data-testid="stMetricLabel"]  { color:#a0aab4!important;font-size:.78rem!important;text-transform:uppercase!important;letter-spacing:.07em!important; }
+[data-testid="stMetricValue"]  { font-family:'JetBrains Mono',monospace!important;font-size:1.5rem!important;font-weight:600!important;color:#ffffff!important; }
+[data-testid="stMetricDelta"]  { font-size:.78rem!important; }
 
 /* ── tabs ── */
-[data-testid="stTabs"] button {{ font-family:'Space Grotesk',sans-serif!important;font-weight:500!important;color:{_muted}!important; }}
-[data-testid="stTabs"] button[aria-selected="true"] {{ color:{_blue}!important;border-bottom:2px solid {_blue}!important; }}
+[data-testid="stTabs"] button { font-family:'Space Grotesk',sans-serif!important;font-weight:500!important;color:var(--text-muted)!important; }
+[data-testid="stTabs"] button[aria-selected="true"] { color:var(--blue)!important;border-bottom:2px solid var(--blue)!important; }
 
-hr {{ border-color:{_border}!important; }}
+hr { border-color:var(--border)!important; }
 
 /* ── section headers ── */
-.sec {{ display:flex;align-items:center;gap:10px;padding:.5rem 0 .4rem;border-bottom:1px solid {_border};margin-bottom:1rem; }}
-.sec .icon  {{ font-size:1.2rem; }}
-.sec .title {{ font-size:1.05rem;font-weight:600;color:{_text};margin:0; }}
-.sec .badge {{ font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:20px;background:{_card2};color:{_muted};margin-left:auto;border:1px solid {_border}; }}
+.sec { display:flex;align-items:center;gap:10px;padding:.5rem 0 .4rem;border-bottom:1px solid var(--border);margin-bottom:1rem; }
+.sec .icon  { font-size:1.2rem; }
+.sec .title { font-size:1.05rem;font-weight:600;color:var(--text);margin:0; }
+.sec .badge { font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--bg-card2);color:var(--text-muted);margin-left:auto;border:1px solid var(--border); }
 
 /* ── KPI cards ── */
-.kpi-row  {{ display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap; }}
-.kpi-card {{ flex:1;min-width:130px;background:{_card};border:1px solid {_border};border-radius:12px;padding:1rem 1.1rem;position:relative;overflow:hidden; }}
-.kpi-card::before {{ content:'';position:absolute;top:0;left:0;right:0;height:3px; }}
-.kpi-card.blue::before   {{ background:linear-gradient(90deg,#388bfd,#1b8b93); }}
-.kpi-card.green::before  {{ background:linear-gradient(90deg,#2da44e,#1a7f37); }}
-.kpi-card.orange::before {{ background:linear-gradient(90deg,#e8610a,#b08800); }}
-.kpi-card.purple::before {{ background:linear-gradient(90deg,#8250df,#388bfd); }}
-.kpi-card.red::before    {{ background:linear-gradient(90deg,#cf222e,#e8610a); }}
-.kpi-card.cyan::before   {{ background:linear-gradient(90deg,#1b8b93,#2da44e); }}
-.kpi-label {{ font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:{_muted2};margin-bottom:3px; }}
-.kpi-value {{ font-family:'JetBrains Mono',monospace;font-size:1.45rem;font-weight:600;color:{_text};line-height:1.2; }}
-.kpi-sub   {{ font-size:.76rem;color:{_muted2};margin-top:3px; }}
+.kpi-row  { display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap; }
+.kpi-card { flex:1;min-width:130px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.1rem;position:relative;overflow:hidden; }
+.kpi-card::before { content:'';position:absolute;top:0;left:0;right:0;height:3px; }
+.kpi-card.blue::before   { background:linear-gradient(90deg,#58a6ff,#39d0d8); }
+.kpi-card.green::before  { background:linear-gradient(90deg,#3fb950,#2ea043); }
+.kpi-card.orange::before { background:linear-gradient(90deg,#f0883e,#d29922); }
+.kpi-card.purple::before { background:linear-gradient(90deg,#bc8cff,#58a6ff); }
+.kpi-card.red::before    { background:linear-gradient(90deg,#f85149,#f0883e); }
+.kpi-card.cyan::before   { background:linear-gradient(90deg,#39d0d8,#3fb950); }
+.kpi-label { font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#a0aab4;margin-bottom:3px; }
+.kpi-value { font-family:'JetBrains Mono',monospace;font-size:1.45rem;font-weight:600;color:#ffffff;line-height:1.2; }
+.kpi-sub   { font-size:.76rem;color:#a0aab4;margin-top:3px; }
 
 /* ── alert boxes ── */
-.alert-box {{ border-radius:10px;padding:.75rem 1rem;border-left:3px solid;margin:.5rem 0;font-size:.86rem; }}
-.alert-info  {{ background:{_alert_info_bg};border-color:{_alert_info_c};color:{_alert_info_c}; }}
-.alert-warn  {{ background:{_alert_warn_bg};border-color:{_alert_warn_c};color:{_alert_warn_c}; }}
-.alert-good  {{ background:{_alert_good_bg};border-color:{_alert_good_c};color:{_alert_good_c}; }}
-.alert-red   {{ background:{_alert_red_bg};border-color:{_alert_red_c};color:{_alert_red_c}; }}
+.alert-box { border-radius:10px;padding:.75rem 1rem;border-left:3px solid;margin:.5rem 0;font-size:.86rem; }
+.alert-info  { background:#1f3a5f22;border-color:#58a6ff;color:#58a6ff; }
+.alert-warn  { background:#f0883e22;border-color:#f0883e;color:#f0883e; }
+.alert-good  { background:#3fb95022;border-color:#3fb950;color:#3fb950; }
+.alert-red   { background:#f8514922;border-color:#f85149;color:#f85149; }
 
-/* ── radio buttons ── */
+/* ── radio buttons — force visible text on dark theme ── */
 [data-testid="stRadio"] label,
 [data-testid="stRadio"] label *,
+[data-testid="stRadio"] label p,
+[data-testid="stRadio"] label span,
 div[role="radiogroup"] label,
-div[role="radiogroup"] label p {{
-    color: {_text} !important;
+div[role="radiogroup"] label p,
+div[role="radiogroup"] label span {
+    color: #e6edf3 !important;
     font-size: .88rem !important;
     opacity: 1 !important;
-}}
+}
+/* selected radio option */
 [data-testid="stRadio"] label:has(input:checked),
-[data-testid="stRadio"] label:has(input:checked) p {{
-    color: {_blue} !important;
+[data-testid="stRadio"] label:has(input:checked) p,
+[data-testid="stRadio"] label:has(input:checked) span {
+    color: #58a6ff !important;
     font-weight: 600 !important;
-}}
-[data-testid="stRadio"] input[type="radio"] {{ accent-color: {_blue} !important; }}
+}
+/* radio circle itself */
+[data-testid="stRadio"] input[type="radio"] {
+    accent-color: #58a6ff !important;
+}
 
-/* ── inputs ── */
-[data-testid="stSelectbox"] label, [data-testid="stTextInput"] label,
-[data-testid="stNumberInput"] label, [data-testid="stDateInput"] label,
-[data-testid="stSelectbox"] label *, [data-testid="stTextInput"] label *,
-[data-testid="stNumberInput"] label *, [data-testid="stDateInput"] label * {{
-    color: {_text} !important; opacity: 1 !important;
-}}
-[data-testid="stSelectbox"] > div > div,
-[data-testid="stTextInput"] input,
-[data-testid="stNumberInput"] input,
-[data-testid="stDateInput"] input,
-[data-testid="stTextArea"] textarea {{
-    background: {_input_bg} !important;
-    border-color: {_border} !important;
-    color: {_text} !important;
-}}
-[data-testid="stTextInput"] input::placeholder {{ color: {_muted} !important; opacity: 1 !important; }}
-[data-testid="stNumberInput"] button {{
-    background: {_hover_bg} !important;
-    color: {_text} !important;
-    border-color: {_border} !important;
-}}
-[data-testid="stSelectbox"] * {{ color: {_text} !important; }}
+/* ── input / selectbox labels ── */
+[data-testid="stSelectbox"] label,
+[data-testid="stSelectbox"] label *,
+[data-testid="stTextInput"] label,
+[data-testid="stTextInput"] label *,
+[data-testid="stNumberInput"] label,
+[data-testid="stNumberInput"] label *,
+[data-testid="stDateInput"] label,
+[data-testid="stDateInput"] label * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+/* Selectbox dropdown background */
+[data-testid="stSelectbox"] > div > div {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+/* Text input field */
+[data-testid="stTextInput"] input {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+[data-testid="stTextInput"] input::placeholder { color: #7d8590 !important; opacity: 1 !important; }
+
+/* Number input */
+[data-testid="stNumberInput"] input {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+[data-testid="stNumberInput"] button {
+    background: #21262d !important;
+    color: #e6edf3 !important;
+    border-color: #30363d !important;
+}
+
+/* Date input */
+[data-testid="stDateInput"] input {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+
+/* Textarea */
+[data-testid="stTextArea"] textarea {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+    color: #e6edf3 !important;
+}
+
+/* ── st.form submit button — different from stButton ── */
+[data-testid="stFormSubmitButton"] button {
+    background: linear-gradient(135deg, #1f6feb, #388bfd) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 600 !important;
+    padding: .45rem 1.1rem !important;
+    opacity: 1 !important;
+    min-width: 160px !important;
+}
+[data-testid="stFormSubmitButton"] button:hover {
+    opacity: .85 !important;
+    background: linear-gradient(135deg, #388bfd, #58a6ff) !important;
+}
+[data-testid="stFormSubmitButton"] button p,
+[data-testid="stFormSubmitButton"] button span {
+    color: #ffffff !important;
+}
+
+/* ── toggle / checkbox ── */
+[data-testid="stToggle"] label,
+[data-testid="stToggle"] label * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] label * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+
+/* ── selectbox option text ── */
+[data-testid="stSelectbox"] * {
+    color: #e6edf3 !important;
+}
 
 /* ── expander ── */
 [data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary * {{ color: {_text} !important; }}
-[data-testid="stExpander"] {{
-    border-color: {_border} !important;
-    background: {_card} !important;
-}}
+[data-testid="stExpander"] summary * {
+    color: #e6edf3 !important;
+}
+[data-testid="stExpander"] {
+    border-color: #30363d !important;
+    background: #161b22 !important;
+}
 
-/* ── sliders / toggles ── */
-[data-testid="stSlider"] label, [data-testid="stSlider"] label *, [data-testid="stSlider"] p,
-[data-testid="stToggle"] label, [data-testid="stToggle"] label *,
-[data-testid="stCheckbox"] label, [data-testid="stCheckbox"] label * {{
-    color: {_text} !important; opacity: 1 !important;
-}}
+/* ── global fallback: any p/span/label still grey ── */
+p, label, span {
+    opacity: 1 !important;
+}
 
-/* ── global ── */
-p, label, span {{ opacity: 1 !important; }}
-.stMarkdown p {{ color: {_text} !important; }}
-div[class*="stRadio"] > label > div > p {{ color: {_text} !important; }}
+/* ── slider label ── */
+[data-testid="stSlider"] label,
+[data-testid="stSlider"] label *,
+[data-testid="stSlider"] p {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+/* slider track value */
+[data-testid="stSlider"] [data-testid="stTickBarMin"],
+[data-testid="stSlider"] [data-testid="stTickBarMax"] {
+    color: #7d8590 !important;
+}
 
-/* ── form submit ── */
-[data-testid="stFormSubmitButton"] button {{
-    background: linear-gradient(135deg, #1f6feb, #388bfd) !important;
-    color: #ffffff !important; border: none !important;
-    border-radius: 8px !important; font-weight: 600 !important;
-    padding: .45rem 1.1rem !important; min-width: 160px !important;
-}}
-[data-testid="stFormSubmitButton"] button p,
-[data-testid="stFormSubmitButton"] button span {{ color: #ffffff !important; }}
+/* ── toggle label ── */
+[data-testid="stToggle"] > label > div > p {
+    color: #e6edf3 !important;
+}
 
-/* ── setup card ── */
-.setup-card {{
-    background:{_card};border:1px solid {_border};border-radius:16px;
+/* ── all widget labels globally ── */
+.stMarkdown p { color: #e6edf3 !important; }
+div[class*="stRadio"] > label > div > p { color: #e6edf3 !important; }
+div[class*="stCheckbox"] > label > div > p { color: #e6edf3 !important; }
+.setup-card {
+    background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
     padding:2rem;max-width:640px;margin:2rem auto;
-}}
-.step-num {{ width:24px;height:24px;border-radius:50%;background:{_blue};color:#fff;
-            font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px; }}
+}
+.setup-step { display:flex;align-items:flex-start;gap:12px;margin:.8rem 0; }
+.step-num { width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;
+            font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px; }
 
 /* ── header logo ── */
-.app-header {{ display:flex;align-items:center;gap:14px;padding:.8rem 0 .4rem; }}
-.app-header img {{ height:42px;width:auto; }}
-.app-header .titles h1 {{ margin:0;font-size:1.6rem;font-weight:700;
-    background:linear-gradient(90deg,{_grad_start},{_grad_end});
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent; }}
-.app-header .titles p  {{ margin:0;color:{_muted};font-size:.84rem; }}
+.app-header { display:flex;align-items:center;gap:14px;padding:.8rem 0 .4rem; }
+.app-header img { height:42px;width:auto; }
+.app-header .titles h1 { margin:0;font-size:1.6rem;font-weight:700;
+    background:linear-gradient(90deg,#58a6ff,#39d0d8);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent; }
+.app-header .titles p  { margin:0;color:#7d8590;font-size:.84rem; }
 
 /* ── sidebar logo ── */
-.sb-logo {{ display:flex;align-items:center;gap:10px;padding:.5rem 0 1rem;border-bottom:1px solid {_border};margin-bottom:1rem; }}
-.sb-logo img {{ height:36px;width:auto; }}
-.sb-logo .lname {{ font-size:1.1rem;font-weight:700;color:{_text}; }}
-.sb-logo .lsub  {{ font-size:.7rem;color:{_muted}; }}
+.sb-logo { display:flex;align-items:center;gap:10px;padding:.5rem 0 1rem;border-bottom:1px solid var(--border);margin-bottom:1rem; }
+.sb-logo img { height:36px;width:auto; }
+.sb-logo .lname { font-size:1.1rem;font-weight:700;color:var(--text); }
+.sb-logo .lsub  { font-size:.7rem;color:var(--text-muted); }
 
-/* ── tariff row ── */
-.tariff-row {{ display:flex;align-items:center;gap:8px;font-size:.78rem;padding:3px 0; }}
-.tariff-dot {{ width:8px;height:8px;border-radius:50%;flex-shrink:0; }}
+/* ── tariff badge row ── */
+.tariff-row { display:flex;align-items:center;gap:8px;font-size:.78rem;padding:3px 0; }
+.tariff-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
 
-/* ── mobile ── */
-@media (max-width: 640px) {{
-    .kpi-card {{ min-width:calc(50% - 5px) !important; }}
-    .app-header img {{ height:32px; }}
-    .app-header .titles h1 {{ font-size:1.2rem; }}
-}}
+/* mobile: stack KPI cards */
+@media (max-width: 640px) {
+    .kpi-card { min-width:calc(50% - 5px) !important; }
+    .app-header img { height:32px; }
+    .app-header .titles h1 { font-size:1.2rem; }
+}
 
-[data-testid="stDataFrame"] {{ background:{_card}!important;border-radius:10px!important; }}
-::-webkit-scrollbar {{ width:6px;height:6px; }}
-::-webkit-scrollbar-track {{ background:{_bg}; }}
-::-webkit-scrollbar-thumb {{ background:{_scrollbar};border-radius:3px; }}
-.stApp {{ background:{_bg}!important; }}
+[data-testid="stDataFrame"] { background:var(--bg-card)!important;border-radius:10px!important; }
+::-webkit-scrollbar { width:6px;height:6px; }
+::-webkit-scrollbar-track { background:var(--bg-base); }
+::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
+.stApp { background:var(--bg-base)!important; }
+/* ── Sidebar file uploader explicit overrides ── */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    background: #1c2330 !important;
+    border: 1px dashed #30363d !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] * {
+    color: #e6edf3 !important;
+    opacity: 1 !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] small {
+    color: #7d8590 !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] button {
+    background: #21262d !important;
+    color: #e6edf3 !important;
+    border: 1px solid #30363d !important;
+}
+/* Filename text in sidebar uploader */
+section[data-testid="stSidebar"] [data-testid="stFileUploaderFileName"] {
+    color: #e6edf3 !important;
+    background: transparent !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
+    background: #1c2330 !important;
+    border-color: #30363d !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] * {
+    color: #e6edf3 !important;
+}
+/* Nuclear option: any white/light backgrounds inside sidebar uploader */
+section[data-testid="stSidebar"] [data-testid^="stFileUploader"] > div,
+section[data-testid="stSidebar"] [data-testid^="stFileUploader"] li,
+section[data-testid="stSidebar"] [data-testid^="stFileUploader"] ul {
+    background: #1c2330 !important;
+    background-color: #1c2330 !important;
+    color: #e6edf3 !important;
+}
 
 </style>
 """, unsafe_allow_html=True)
-
-_inject_css()
 
 # ─────────────────────────────────────────────
 #  CONSTANTS  (defaults — overridden by user)
@@ -539,7 +575,14 @@ VAT_RATE       = 0.09
 DISCOUNT       = 0.30
 LOGO_URL       = "https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png"
 
-# ── Theme-aware color palettes ──
+COLORS = dict(
+    day="#58a6ff", peak="#f0883e", night="#bc8cff",
+    total="#3fb950", kw="#39d0d8", bg="#161b22",
+    grid="#30363d", text="#e6edf3", muted="#7d8590",
+    red="#f85149", yellow="#d29922",
+    # aliases
+    blue="#58a6ff", cyan="#39d0d8", purple="#bc8cff",
+)
 
 def _rgba(hex_color: str, alpha: float = 0.15) -> str:
     """Convert #rrggbb hex to rgba() string for Plotly fillcolor."""
@@ -999,27 +1042,25 @@ TRANSLATIONS = {
     "cons_min_day":         {"en": "Lowest day",                  "pl": "Najniższy dzień"},
     "cons_avg_day":         {"en": "Daily avg",                   "pl": "Śred. dzienna"},
     "total_cost":           {"en": "Total cost",                  "pl": "Koszt łączny"},
-    # ESB Auto-sync
-    "esb_sync_title":       {"en": "ESB Auto-Sync",               "pl": "Auto-synchronizacja ESB"},
+    "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
+    # ── ESB Auto-Sync ──
+    "esb_sync_title":       {"en": "ESB Auto-Sync",               "pl": "Auto-sync ESB"},
     "esb_sync_email":       {"en": "ESB account email",           "pl": "Email konta ESB"},
     "esb_sync_password":    {"en": "ESB account password",        "pl": "Hasło konta ESB"},
-    "esb_sync_save":        {"en": "💾 Save credentials",         "pl": "💾 Zapisz dane logowania"},
-    "esb_sync_clear":       {"en": "🗑️ Clear credentials",        "pl": "🗑️ Usuń dane logowania"},
+    "esb_sync_save":        {"en": "💾 Save & enable",            "pl": "💾 Zapisz i włącz"},
+    "esb_sync_clear":       {"en": "🗑️ Remove",                   "pl": "🗑️ Usuń"},
     "esb_sync_now":         {"en": "🔄 Sync now",                 "pl": "🔄 Synchronizuj teraz"},
-    "esb_sync_status":      {"en": "Last sync",                   "pl": "Ostatnia synchronizacja"},
-    "esb_sync_ok":          {"en": "✅ Sync successful",          "pl": "✅ Synchronizacja udana"},
-    "esb_sync_fail":        {"en": "⚠️ Sync failed",              "pl": "⚠️ Synchronizacja nieudana"},
+    "esb_sync_ok":          {"en": "Sync successful",             "pl": "Synchronizacja udana"},
+    "esb_sync_files":       {"en": "Updated",                     "pl": "Zaktualizowano"},
+    "esb_sync_running":     {"en": "Syncing with ESB…",           "pl": "Synchronizuję z ESB…"},
     "esb_sync_never":       {"en": "Never synced",                "pl": "Brak synchronizacji"},
-    "esb_sync_files":       {"en": "Files updated",               "pl": "Zaktualizowane pliki"},
-    "esb_sync_running":     {"en": "🔄 Syncing…",                 "pl": "🔄 Synchronizuję…"},
-    "esb_sync_no_creds":    {"en": "Enter ESB credentials to enable auto-sync.", "pl": "Wpisz dane ESB aby włączyć auto-synchronizację."},
-    "esb_sync_rate_limit":  {"en": "⚠️ ESB rate limit hit (max 2 logins/24h). Next attempt after midnight.", "pl": "⚠️ Limit logowań ESB (max 2/24h). Kolejna próba po północy."},
-    "esb_sync_login_fail":  {"en": "⚠️ Login failed — check your ESB email and password.", "pl": "⚠️ Błąd logowania — sprawdź email i hasło ESB."},
-    "esb_sync_creds_saved": {"en": "Credentials saved. First sync runs within 10 seconds.", "pl": "Dane zapisane. Pierwsza synchronizacja za 10 sekund."},
-    "esb_sync_weekly":      {"en": "Syncs automatically every week.", "pl": "Synchronizacja automatyczna co tydzień."},
-    "esb_sync_next":        {"en": "Next sync",                   "pl": "Następna synchronizacja"},
-    "esb_creds_stored":     {"en": "🔒 Credentials stored (AES-256)", "pl": "🔒 Dane zapisane (AES-256)"},
-    "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
+    "esb_sync_no_creds":    {"en": "Enter credentials to enable weekly auto-sync.", "pl": "Wpisz dane aby włączyć auto-sync co tydzień."},
+    "esb_sync_weekly":      {"en": "✅ Auto-sync active — every week.", "pl": "✅ Auto-sync aktywny — co tydzień."},
+    "esb_sync_rate_limit":  {"en": "Rate limit hit — max 2 logins/24h. Resets at midnight.", "pl": "Limit logowań ESB (max 2/24h). Reset o północy."},
+    "esb_sync_login_fail":  {"en": "Login failed — check email and password.", "pl": "Błąd logowania — sprawdź email i hasło ESB."},
+    "esb_sync_creds_saved": {"en": "Saved. First sync starts in ~30 seconds.", "pl": "Zapisano. Pierwsza synchronizacja za ~30 sekund."},
+    "esb_creds_stored":     {"en": "🔒 Credentials saved (AES-256)", "pl": "🔒 Dane zapisane (AES-256)"},
+    "esb_sync_fail":        {"en": "Sync failed",                 "pl": "Błąd synchronizacji"},
 }
 
 
@@ -1031,60 +1072,193 @@ def t(key: str) -> str:
 
 
 
-def _build_plotly_base():
-    C = COLORS
-    return dict(
-        paper_bgcolor=C["bg"], plot_bgcolor=C["bg"],
-        font=dict(family="Space Grotesk, sans-serif", color=C["text"], size=12),
-        xaxis=dict(
-            gridcolor=C["grid"], linecolor=C["grid"],
-            showgrid=True, zeroline=False,
-            tickfont=dict(color=C["text"], size=11),
-            title_font=dict(color=C["text"]),
-        ),
-        yaxis=dict(
-            gridcolor=C["grid"], linecolor=C["grid"],
-            showgrid=True, zeroline=False,
-            tickfont=dict(color=C["text"], size=11),
-            title_font=dict(color=C["text"]),
-        ),
-        legend=dict(
-            bgcolor=C["card2"], bordercolor=C["grid"], borderwidth=1,
-            font=dict(size=11, color=C["text"]),
-            orientation="h", yanchor="top", y=-0.15, xanchor="left", x=0,
-        ),
-        margin=dict(l=10, r=10, t=40, b=50),
-        hovermode="x unified",
-        hoverlabel=dict(
-            bgcolor=C["card2"], bordercolor=C["grid"],
-            font=dict(color=C["text"], size=12),
-        ),
+PLOTLY_BASE = dict(
+    paper_bgcolor=COLORS["bg"], plot_bgcolor=COLORS["bg"],
+    font=dict(family="Space Grotesk, sans-serif", color=COLORS["text"], size=12),
+    xaxis=dict(
+        gridcolor=COLORS["grid"], linecolor=COLORS["grid"],
+        showgrid=True, zeroline=False,
+        tickfont=dict(color=COLORS["text"], size=11),
+        title_font=dict(color=COLORS["text"]),
+    ),
+    yaxis=dict(
+        gridcolor=COLORS["grid"], linecolor=COLORS["grid"],
+        showgrid=True, zeroline=False,
+        tickfont=dict(color=COLORS["text"], size=11),
+        title_font=dict(color=COLORS["text"]),
+    ),
+    legend=dict(
+        bgcolor="#1c2330", bordercolor=COLORS["grid"], borderwidth=1,
+        font=dict(size=11, color=COLORS["text"]),
+        orientation="h", yanchor="top", y=-0.15, xanchor="left", x=0,
+    ),
+    margin=dict(l=10, r=10, t=40, b=50),
+    hovermode="x unified",
+    hoverlabel=dict(
+        bgcolor="#1c2330", bordercolor=COLORS["grid"],
+        font=dict(color=COLORS["text"], size=12),
+    ),
+)
+
+RANGESLIDER_X = dict(
+    gridcolor=COLORS["grid"], linecolor=COLORS["grid"], showgrid=True, zeroline=False,
+    rangeslider=dict(visible=True, thickness=0.08, bgcolor="#1c2330",
+                     bordercolor=COLORS["grid"], borderwidth=1),
+    rangeselector=dict(
+        bgcolor="#1c2330", bordercolor=COLORS["grid"], borderwidth=1,
+        activecolor="#58a6ff", font=dict(color=COLORS["text"], size=11),
+        buttons=[
+            dict(count=1,  label=t("rs_1d"), step="day",   stepmode="backward"),
+            dict(count=7,  label=t("rs_1w"), step="day",   stepmode="backward"),
+            dict(count=14, label=t("rs_2w"), step="day",   stepmode="backward"),
+            dict(count=1,  label=t("rs_1m"), step="month", stepmode="backward"),
+            dict(count=3,  label=t("rs_3m"), step="month", stepmode="backward"),
+            dict(count=1,  label=t("rs_1y"), step="year",  stepmode="backward"),
+            dict(step="all", label=t("rs_all")),
+        ],
+    ),
+)
+
+
+
+# ─────────────────────────────────────────────
+#  ESB AUTO-SYNC  (APScheduler + Playwright)
+# ─────────────────────────────────────────────
+_SCHEDULER_STARTED = False
+_ESB_BASE_URL      = "https://myaccount.esbnetworks.ie"
+_ESB_DOWNLOAD_URL  = "https://myaccount.esbnetworks.ie/Api/HistoricConsumption"
+_ESB_FILE_TYPES    = {
+    "calc":  "HDF_calckWh",
+    "kw":    "HDF_kW",
+    "dnp":   "HDF_DailyDNP",
+    "daily": "HDF_Daily_kWh",
+}
+
+
+def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Download all HDF files from ESB Networks via Playwright headless Chromium."""
+    import datetime as _dt, tempfile, shutil as _sh
+    status = {"last_attempt": _dt.datetime.now().isoformat(),
+               "success": False, "error": None, "files_updated": []}
+
+    def _save(s):
+        status_file.write_text(json.dumps(s, indent=2, default=str))
+
+    f = fernet_fn()
+    if f is None:
+        status["error"] = "encryption_unavailable"; _save(status); return status
+    if not creds_file.exists():
+        status["error"] = "no_credentials";         _save(status); return status
+
+    try:
+        creds    = json.loads(f.decrypt(creds_file.read_bytes()).decode())
+        email    = creds.get("email", "")
+        password = creds.get("password", "")
+    except Exception as e:
+        status["error"] = f"decrypt_failed: {e}"; _save(status); return status
+
+    if not email or not password:
+        status["error"] = "empty_credentials"; _save(status); return status
+
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        status["error"] = "playwright_not_installed"; _save(status); return status
+
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--single-process"],
+                )
+                ctx  = browser.new_context(accept_downloads=True,
+                                            viewport={"width":1280,"height":800},
+                                            user_agent="Mozilla/5.0 (X11; Linux x86_64) "
+                                                       "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+                page = ctx.new_page()
+
+                # ── Login ──
+                page.goto(_ESB_BASE_URL, timeout=30_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+                try:
+                    page.click("#onetrust-accept-btn-handler", timeout=5_000)
+                except PWTimeout:
+                    pass
+
+                page.fill('input[type="email"], #email', email, timeout=10_000)
+                page.fill('input[type="password"], #password', password, timeout=10_000)
+                page.click('button[type="submit"]', timeout=10_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+
+                content = page.content().lower()
+                if "captcha" in content or "too many" in content:
+                    status["error"] = "rate_limited"
+                    browser.close(); _save(status); return status
+                if "login" in page.url.lower() or "signin" in page.url.lower():
+                    status["error"] = "login_failed"
+                    browser.close(); _save(status); return status
+
+                # ── Download each file ──
+                for slot, dest in hdf_slots.items():
+                    try:
+                        with page.expect_download(timeout=60_000) as dl:
+                            page.goto(f"{_ESB_DOWNLOAD_URL}?mprn=&type={_ESB_FILE_TYPES[slot]}",
+                                      timeout=30_000)
+                        tmp_path = Path(tmp) / f"{slot}.csv"
+                        dl.value.save_as(str(tmp_path))
+                        if tmp_path.exists() and tmp_path.stat().st_size > 100:
+                            _sh.copy2(str(tmp_path), str(dest))
+                            status["files_updated"].append(slot)
+                    except Exception as e:
+                        status.setdefault("partial_errors", {})[slot] = str(e)
+
+                browser.close()
+
+        except Exception as e:
+            status["error"] = str(e); _save(status); return status
+
+    status["success"] = len(status["files_updated"]) > 0
+    if not status["success"] and not status.get("error"):
+        status["error"] = "no_files_downloaded"
+    _save(status)
+    return status
+
+
+def _start_scheduler(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Start APScheduler background daemon — once per container process."""
+    global _SCHEDULER_STARTED
+    if _SCHEDULER_STARTED:
+        return
+    _SCHEDULER_STARTED = True
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.interval import IntervalTrigger
+        import datetime as _dt
+    except ImportError:
+        return  # APScheduler not installed — skip silently
+
+    sched = BackgroundScheduler(daemon=True)
+    # Run immediately on first start if credentials exist but no sync history
+    first_run = (
+        _dt.datetime.now() + _dt.timedelta(seconds=30)
+        if creds_file.exists() and not status_file.exists() else None
     )
-
-PLOTLY_BASE = _build_plotly_base()
-
-def _build_rangeslider_x():
-    C = COLORS
-    return dict(
-        gridcolor=C["grid"], linecolor=C["grid"], showgrid=True, zeroline=False,
-        rangeslider=dict(visible=True, thickness=0.08, bgcolor=C["card2"],
-                         bordercolor=C["grid"], borderwidth=1),
-        rangeselector=dict(
-            bgcolor=C["card2"], bordercolor=C["grid"], borderwidth=1,
-            activecolor=C["day"], font=dict(color=C["text"], size=11),
-            buttons=[
-                dict(count=1,  label=t("rs_1d"), step="day",   stepmode="backward"),
-                dict(count=7,  label=t("rs_1w"), step="day",   stepmode="backward"),
-                dict(count=14, label=t("rs_2w"), step="day",   stepmode="backward"),
-                dict(count=1,  label=t("rs_1m"), step="month", stepmode="backward"),
-                dict(count=3,  label=t("rs_3m"), step="month", stepmode="backward"),
-                dict(count=1,  label=t("rs_1y"), step="year",  stepmode="backward"),
-                dict(step="all", label=t("rs_all")),
-            ],
-        ),
+    sched.add_job(
+        func=esb_sync_now,
+        trigger=IntervalTrigger(weeks=1),
+        kwargs=dict(data_dir=data_dir, hdf_slots=hdf_slots,
+                    creds_file=creds_file, status_file=status_file,
+                    fernet_fn=fernet_fn),
+        id="esb_weekly_sync",
+        replace_existing=True,
+        next_run_time=first_run,
     )
+    sched.start()
 
-RANGESLIDER_X = _build_rangeslider_x()
+
+# Kick off scheduler at container start (daemon thread — survives reruns)
+_start_scheduler(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
 
 
 def _inject_pl_month_names():
@@ -1133,183 +1307,6 @@ def _inject_pl_month_names():
     }})();
     </script>
     """, height=0, scrolling=False)
-
-# Start background scheduler (once per container process)
-
-# ─────────────────────────────────────────────
-#  ESB AUTO-SYNC  (APScheduler + Playwright)
-# ─────────────────────────────────────────────
-import threading as _threading
-
-_SCHEDULER_STARTED = False
-
-_ESB_LOGIN_URL    = "https://myaccount.esbnetworks.ie"
-_ESB_DOWNLOAD_URL = "https://myaccount.esbnetworks.ie/Api/HistoricConsumption"
-_ESB_FILE_PREFIXES = {
-    "calc":  "HDF_calckWh",
-    "kw":    "HDF_kW",
-    "dnp":   "HDF_DailyDNP",
-    "daily": "HDF_Daily_kWh",
-}
-
-
-def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
-    """Download all HDF files from ESB Networks via Playwright headless Chromium."""
-    import datetime as _dt
-    status = {
-        "last_attempt": _dt.datetime.now().isoformat(),
-        "success": False, "error": None, "files_updated": [],
-    }
-
-    f = fernet_fn()
-    if f is None:
-        status["error"] = "encryption_unavailable"
-        status_file.write_text(json.dumps(status, indent=2, default=str))
-        return status
-
-    if not creds_file.exists():
-        status["error"] = "no_credentials"
-        status_file.write_text(json.dumps(status, indent=2, default=str))
-        return status
-
-    try:
-        creds = json.loads(f.decrypt(creds_file.read_bytes()).decode())
-        email    = creds.get("email", "")
-        password = creds.get("password", "")
-    except Exception as e:
-        status["error"] = f"decrypt_failed: {e}"
-        status_file.write_text(json.dumps(status, indent=2, default=str))
-        return status
-
-    if not email or not password:
-        status["error"] = "empty_credentials"
-        status_file.write_text(json.dumps(status, indent=2, default=str))
-        return status
-
-    try:
-        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
-    except ImportError:
-        status["error"] = "playwright_not_installed"
-        status_file.write_text(json.dumps(status, indent=2, default=str))
-        return status
-
-    import tempfile, shutil as _shutil
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        try:
-            with sync_playwright() as pw:
-                browser = pw.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage",
-                          "--disable-gpu", "--single-process"],
-                )
-                ctx = browser.new_context(
-                    accept_downloads=True,
-                    viewport={"width": 1280, "height": 800},
-                    user_agent=(
-                        "Mozilla/5.0 (X11; Linux x86_64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/120.0.0.0 Safari/537.36"
-                    ),
-                )
-                page = ctx.new_page()
-
-                # Login
-                page.goto(_ESB_LOGIN_URL, timeout=30_000)
-                page.wait_for_load_state("networkidle", timeout=30_000)
-                try:
-                    page.click("#onetrust-accept-btn-handler", timeout=5_000)
-                except PWTimeout:
-                    pass
-
-                page.fill('input[type="email"], #email', email, timeout=10_000)
-                page.fill('input[type="password"], #password', password, timeout=10_000)
-                page.click('button[type="submit"]', timeout=10_000)
-                page.wait_for_load_state("networkidle", timeout=30_000)
-
-                content = page.content().lower()
-                if "captcha" in content or "too many" in content:
-                    status["error"] = "rate_limited"
-                    browser.close()
-                    status_file.write_text(json.dumps(status, indent=2, default=str))
-                    return status
-
-                if "login" in page.url.lower() or "signin" in page.url.lower():
-                    status["error"] = "login_failed"
-                    browser.close()
-                    status_file.write_text(json.dumps(status, indent=2, default=str))
-                    return status
-
-                # Download each file
-                for slot, dest_path in hdf_slots.items():
-                    try:
-                        with page.expect_download(timeout=60_000) as dl_info:
-                            page.goto(
-                                f"{_ESB_DOWNLOAD_URL}?mprn=&type={_ESB_FILE_PREFIXES[slot]}",
-                                timeout=30_000,
-                            )
-                        download = dl_info.value
-                        tmp_path = Path(tmp_dir) / f"{slot}.csv"
-                        download.save_as(str(tmp_path))
-                        if tmp_path.exists() and tmp_path.stat().st_size > 100:
-                            _shutil.copy2(str(tmp_path), str(dest_path))
-                            status["files_updated"].append(slot)
-                    except Exception as e:
-                        if status.get("partial_errors") is None:
-                            status["partial_errors"] = {}
-                        status["partial_errors"][slot] = str(e)
-
-                browser.close()
-
-        except Exception as e:
-            status["error"] = str(e)
-            status_file.write_text(json.dumps(status, indent=2, default=str))
-            return status
-
-    status["success"] = len(status["files_updated"]) > 0
-    if not status["success"] and not status.get("error"):
-        status["error"] = "no_files_downloaded"
-    status_file.write_text(json.dumps(status, indent=2, default=str))
-    return status
-
-
-def _start_scheduler(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
-    """Start APScheduler background thread — once per process."""
-    global _SCHEDULER_STARTED
-    if _SCHEDULER_STARTED:
-        return
-    _SCHEDULER_STARTED = True
-
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.interval import IntervalTrigger
-        import datetime as _dt
-    except ImportError:
-        return  # APScheduler not installed — skip silently
-
-    scheduler = BackgroundScheduler(daemon=True)
-    # Run immediately on first start if no sync history, otherwise weekly
-    first_run = (
-        _dt.datetime.now() + _dt.timedelta(seconds=30)
-        if not status_file.exists() and creds_file.exists()
-        else None
-    )
-    scheduler.add_job(
-        func=esb_sync_now,
-        trigger=IntervalTrigger(weeks=1),
-        kwargs=dict(
-            data_dir=data_dir, hdf_slots=hdf_slots,
-            creds_file=creds_file, status_file=status_file,
-            fernet_fn=fernet_fn,
-        ),
-        id="esb_weekly_sync",
-        replace_existing=True,
-        next_run_time=first_run,
-    )
-    scheduler.start()
-
-
-_start_scheduler(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
 
 # ─────────────────────────────────────────────
 #  SESSION STATE INIT
@@ -2154,7 +2151,7 @@ with st.sidebar:
     </div>""", unsafe_allow_html=True)
 
     # ── HDF file uploads — compact design ──
-    st.markdown(f'<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:{COLORS["muted"]};margin-bottom:.5rem">📂 {t("hdf_files")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#7d8590;margin-bottom:.5rem">📂 {t("hdf_files")}</div>', unsafe_allow_html=True)
 
     # Helper: show persisted file status below each uploader
     def _file_card(slot, color, icon, label, hint, primary=False):
@@ -2167,7 +2164,7 @@ with st.sidebar:
             fname = info["path"].split("/")[-1]
             # truncate long filename
             if len(fname) > 22: fname = fname[:10] + "…" + fname[-8:]
-            status = f'<div style="margin-top:.3rem;font-size:.65rem;background:{COLORS["bg3"]};border:1px solid {COLORS["border"]};border-radius:5px;padding:2px 6px;color:#58a6ff">💾 {fname}</div>'
+            status = f'<div style="margin-top:.3rem;font-size:.65rem;background:#0d1117;border:1px solid #30363d;border-radius:5px;padding:2px 6px;color:#58a6ff">💾 {fname}</div>'
         else:
             status = f'<div style="margin-top:.3rem;font-size:.65rem;color:#30363d">○ not loaded</div>'
         st.markdown(f"""
@@ -2205,7 +2202,7 @@ with st.sidebar:
         if uploaded:
             return f'<span style="color:#3fb950">✅ {slot}</span>'
         elif info:
-            return f'<span style="color:{COLORS["muted"]}">💾 {slot} <span style="font-size:.65rem">({info["modified"]})</span></span>'
+            return f'<span style="color:#7d8590">💾 {slot} <span style="font-size:.65rem">({info["modified"]})</span></span>'
         else:
             return f'<span style="color:#30363d">○ {slot} — {t("not_loaded")}</span>'
 
@@ -2244,77 +2241,69 @@ with st.sidebar:
         st.session_state["tariff"] = dict(day=t_day, peak=t_peak, night=t_night, standing=t_stand)
         save_config()
 
+    # ── Update / reset ──
+    st.divider()
     # ── ESB Auto-Sync ──
     st.divider()
     st.markdown(f"##### 🔄 {t('esb_sync_title')}")
 
-    _sync_email, _sync_pass = decrypt_esb_creds()
-    _has_creds = bool(_sync_email and _sync_pass)
+    _esb_email, _esb_pass = decrypt_esb_creds()
+    _has_creds = bool(_esb_email and _esb_pass)
+    _sync_st   = read_sync_status()
 
-    # Show sync status
-    _sync_st = read_sync_status()
+    # Status badge
     if _sync_st:
         _last = _sync_st.get("last_attempt", "")[:16].replace("T", " ")
         if _sync_st.get("success"):
             _files = ", ".join(_sync_st.get("files_updated", []))
             st.markdown(
                 f'<div class="alert-box alert-good" style="font-size:.75rem;padding:.4rem .7rem">'
-                f'✅ {_last}<br><span style="opacity:.8">{t("esb_sync_files")}: {_files}</span></div>',
-                unsafe_allow_html=True
-            )
+                f'✅ {t("esb_sync_ok")} · {_last}<br>'
+                f'<span style="opacity:.8">{t("esb_sync_files")}: {_files}</span></div>',
+                unsafe_allow_html=True)
         else:
             _err = _sync_st.get("error", "unknown")
-            if _err == "rate_limited":
-                _msg = t("esb_sync_rate_limit")
-            elif _err == "login_failed":
-                _msg = t("esb_sync_login_fail")
-            elif _err == "no_credentials":
-                _msg = t("esb_sync_no_creds")
-            else:
-                _msg = f'{t("esb_sync_fail")}: {_err}'
+            _emsg = (t("esb_sync_rate_limit") if _err == "rate_limited"
+                     else t("esb_sync_login_fail") if _err == "login_failed"
+                     else f'{t("esb_sync_fail")}: {_err}')
             st.markdown(
                 f'<div class="alert-box alert-warn" style="font-size:.75rem;padding:.4rem .7rem">'
-                f'{_msg}<br><span style="opacity:.7">{_last}</span></div>',
-                unsafe_allow_html=True
-            )
+                f'⚠️ {_emsg}<br><span style="opacity:.7">{_last}</span></div>',
+                unsafe_allow_html=True)
+    elif _has_creds:
+        st.caption(t("esb_sync_weekly"))
     else:
-        if _has_creds:
-            st.caption(t("esb_sync_weekly"))
-        else:
-            st.caption(t("esb_sync_no_creds"))
+        st.caption(t("esb_sync_no_creds"))
 
-    # Credentials form
-    with st.expander(t("esb_creds_stored") if _has_creds else "🔑 " + t("esb_sync_email"), expanded=not _has_creds):
-        _new_email = st.text_input(t("esb_sync_email"), value=_sync_email, key="esb_email_input",
-                                   placeholder="name@example.com")
-        _new_pass  = st.text_input(t("esb_sync_password"), value=_sync_pass, key="esb_pass_input",
-                                   type="password", placeholder="••••••••")
-        _c1, _c2 = st.columns(2)
-        with _c1:
-            if st.button(t("esb_sync_save"), use_container_width=True, key="esb_save_btn"):
+    # Credentials expander
+    _exp_label = t("esb_creds_stored") if _has_creds else f"🔑 {t('esb_sync_email')}"
+    with st.expander(_exp_label, expanded=not _has_creds):
+        _new_email = st.text_input(t("esb_sync_email"),    value=_esb_email,
+                                   key="esb_email_in", placeholder="name@example.com")
+        _new_pass  = st.text_input(t("esb_sync_password"), value=_esb_pass,
+                                   key="esb_pass_in",  type="password", placeholder="••••••••")
+        _ca, _cb = st.columns(2)
+        with _ca:
+            if st.button(t("esb_sync_save"), use_container_width=True, key="esb_save"):
                 if _new_email and _new_pass:
                     _enc = encrypt_esb_creds(_new_email, _new_pass)
                     if _enc:
                         ESB_CREDS_FILE.write_bytes(_enc)
-                        # Reset sync status so scheduler runs soon
-                        if SYNC_STATUS_FILE.exists():
-                            SYNC_STATUS_FILE.unlink()
+                        SYNC_STATUS_FILE.unlink(missing_ok=True)  # trigger immediate sync
                         st.success(t("esb_sync_creds_saved"))
                         st.rerun()
-        with _c2:
-            if _has_creds and st.button(t("esb_sync_clear"), use_container_width=True, key="esb_clear_btn"):
+        with _cb:
+            if _has_creds and st.button(t("esb_sync_clear"), use_container_width=True, key="esb_clear"):
                 ESB_CREDS_FILE.unlink(missing_ok=True)
                 st.rerun()
 
-    # Manual sync button
     if _has_creds:
-        if st.button(t("esb_sync_now"), use_container_width=True, key="esb_sync_now_btn"):
+        if st.button(t("esb_sync_now"), use_container_width=True, key="esb_now"):
             with st.spinner(t("esb_sync_running")):
-                _result = esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
+                esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
             st.rerun()
 
-    # ── Update / reset ──
-    st.divider()
+    # ── Configuration ──
     st.markdown(f"##### 🔄 {t('configuration')}")
     if st.button(t("reparse_btn"), use_container_width=True):
         st.session_state["setup_done"] = False
@@ -2354,11 +2343,6 @@ _inject_pl_month_names()
 
 # ─────────────────────────────────────────────
 #  TABS
-# Rebuild theme-dependent objects on every rerun
-COLORS = _build_colors()
-PLOTLY_BASE = _build_plotly_base()
-RANGESLIDER_X = _build_rangeslider_x()
-
 # ─────────────────────────────────────────────
 tabs = st.tabs([
     t("tab_overview"), t("tab_consumption"), t("tab_power"),
@@ -2440,7 +2424,7 @@ if df_calc is not None:
 if df_calc is not None:
     with sidebar_chart_slot.container():
         st.divider()
-        st.markdown(f'<p style="color:{COLORS["muted"]};font-size:.7rem;text-transform:uppercase;'
+        st.markdown(f'<p style="color:#7d8590;font-size:.7rem;text-transform:uppercase;'
                     f'letter-spacing:.08em;margin-bottom:4px">⚡ {t("tariff_split_header")}</p>',
                     unsafe_allow_html=True)
         by_p   = df_calc.groupby("period")["value"].sum()
@@ -2475,17 +2459,17 @@ if df_calc is not None:
             st.markdown(
                 f'<div class="tariff-row">'
                 f'<div class="tariff-dot" style="background:{color}"></div>'
-                f'<span style="color:{COLORS["muted"]}">{p_lbl}</span>'
+                f'<span style="color:#7d8590">{p_lbl}</span>'
                 f'<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;'
                 f'color:{color}">{pct:.1f}%</span>'
-                f'<span style="color:{COLORS["muted"]};font-size:.7rem">{kwh:.0f} kWh</span>'
+                f'<span style="color:#7d8590;font-size:.7rem">{kwh:.0f} kWh</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
         # Show MPRN only if user entered it
         if st.session_state.get("mprn"):
             st.markdown(
-                f'<p style="color:{COLORS["muted"]};font-size:.7rem;text-align:center;'
+                f'<p style="color:#7d8590;font-size:.7rem;text-align:center;'
                 f'margin-top:8px">MPRN: {st.session_state["mprn"]}</p>',
                 unsafe_allow_html=True,
             )
