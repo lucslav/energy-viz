@@ -4,6 +4,37 @@ All notable changes to **energy-viz** are documented here.
 
 ---
 
+## [2.1.0] - 2026-03-16
+
+### Added
+- **Bilingual support (EN / PL)** — full Polish and English translations across all 8 tabs, setup screen, sidebar and alerts. Language selected on first run and persisted in `config.json`
+- **Language toggle** — `🇮🇪 English` / `🇵🇱 Polski` buttons at the top of the sidebar and on the setup screen
+- **Tariff split follows period selector** — the Day/Peak/Night split section in Overview now filters by the selected period (Week / Month / Bill / Total) instead of always showing full history
+- **Polish month names** — chart axes show Polish month abbreviations (sty, lut, mar…) when Polish is active, via `st.components.v1.html` JS injection
+
+### Changed
+- **Consumption tab redesigned** — stripped to date range selector + hourly heatmap only; the half-hourly line chart and metric cards removed as redundant with Overview
+- **Tariff Split section renamed** — "Full-Period Tariff Split" → "Tariff Split" / "Podział taryfy"; current period shown in badge instead of in the title
+- **Discount removed** — the discount (%) field has been removed entirely; invoice-imported rates are already post-discount, so applying a separate discount multiplier was incorrect. `DISC_FACTOR` is now always 1.0
+- **Consumption tab metrics replaced** — removed Gross cost and Net cards; replaced with Total kWh, Daily avg and Peak day
+- **"Standby" → "Czuwanie"** in all Polish labels
+- **"kWh/rok (est.)"** → **"kWh/rok (szac.)"** in Polish
+- **"Weekday vs Weekend"** → **"Dni robocze / Weekend"** in Polish
+- **"net"** → **"netto"** in all Polish labels
+- Monthly bill estimate legend moved below chart to avoid overlapping x-axis labels
+- Cumulative register values legend moved below chart
+- Load profile — added Day zone annotation (08:00–17:00); fixed annotation position so Day and Peak labels don't overlap
+- README Installation section made platform-agnostic (removed CasaOS-specific instructions)
+
+### Fixed
+- **Language not persisted across restarts** — `load_config()` was skipping `lang` key because `"en"` didn't match the `(None, "", [], {})` empty-value check; now always restored from config
+- **HDF files not loading after restart** — `@st.cache_data` could not hash `BytesIO` objects; `_resolve()` now returns a path string for persisted files, and `_open_hdf()` opens it as `BytesIO` at call time; added `hash_funcs={io.BytesIO: lambda x: x.getvalue()}` to all load functions
+- **Period selector reset on language change** — radio stored text value which changed when language switched; now stores index in `session_state["ov_period_i"]`
+- Various `{t("key")}` strings appearing as literal text in HTML blocks due to missing `f` prefix on `st.markdown()` calls
+- `t()` called inside `TRANSLATIONS` dict definition (before function was defined), causing `NameError` on startup — fixed across multiple rounds
+
+---
+
 ## [2.0.3] - 2026-03-15
 
 ### Fixed
