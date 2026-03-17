@@ -20,6 +20,8 @@ DATA_DIR   = Path(os.environ.get("ENERGY_VIZ_DATA", "/app/data"))
 HDF_DIR    = DATA_DIR / "hdf"
 CONFIG_FILE    = DATA_DIR / "config.json"
 API_KEY_FILE   = DATA_DIR / "api_key.enc"
+ESB_CREDS_FILE = DATA_DIR / "esb_creds.enc"
+SYNC_STATUS_FILE = DATA_DIR / "esb_sync.json"
 INVOICE_FILE   = DATA_DIR / "invoice.pdf"
 
 # Create dirs on startup (safe if already exist)
@@ -69,7 +71,38 @@ def decrypt_api_key() -> str:
         return ""
 
 
-# ── Config persistence ─────────────────────────────
+def encrypt_esb_creds(email: str, password: str) -> bytes | None:
+    """Encrypt ESB credentials as JSON using Fernet (same key as API key)."""
+    f = _fernet()
+    if f is None or not email or not password:
+        return None
+    return f.encrypt(json.dumps({"email": email, "password": password}).encode())
+
+
+def decrypt_esb_creds() -> tuple[str, str]:
+    """Return (email, password) or ('', '') if not stored."""
+    if not ESB_CREDS_FILE.exists():
+        return "", ""
+    f = _fernet()
+    if f is None:
+        return "", ""
+    try:
+        data = json.loads(f.decrypt(ESB_CREDS_FILE.read_bytes()).decode())
+        return data.get("email", ""), data.get("password", "")
+    except Exception:
+        return "", ""
+
+
+def read_sync_status() -> dict:
+    if not SYNC_STATUS_FILE.exists():
+        return {}
+    try:
+        return json.loads(SYNC_STATUS_FILE.read_text())
+    except Exception:
+        return {}
+
+
+
 _CONFIG_KEYS = [
     "lang", "tariff", "mprn", "supplier",
     "api_provider", "billing_start", "billing_end", "billing_days",
@@ -1010,6 +1043,24 @@ TRANSLATIONS = {
     "cons_avg_day":         {"en": "Daily avg",                   "pl": "Śred. dzienna"},
     "total_cost":           {"en": "Total cost",                  "pl": "Koszt łączny"},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
+    # ── ESB Auto-Sync ──
+    "esb_sync_title":       {"en": "ESB Auto-Sync",               "pl": "Auto-sync ESB"},
+    "esb_sync_email":       {"en": "ESB account email",           "pl": "Email konta ESB"},
+    "esb_sync_password":    {"en": "ESB account password",        "pl": "Hasło konta ESB"},
+    "esb_sync_save":        {"en": "💾 Save & enable",            "pl": "💾 Zapisz i włącz"},
+    "esb_sync_clear":       {"en": "🗑️ Remove",                   "pl": "🗑️ Usuń"},
+    "esb_sync_now":         {"en": "🔄 Sync now",                 "pl": "🔄 Synchronizuj teraz"},
+    "esb_sync_ok":          {"en": "Sync successful",             "pl": "Synchronizacja udana"},
+    "esb_sync_files":       {"en": "Updated",                     "pl": "Zaktualizowano"},
+    "esb_sync_running":     {"en": "Syncing with ESB…",           "pl": "Synchronizuję z ESB…"},
+    "esb_sync_never":       {"en": "Never synced",                "pl": "Brak synchronizacji"},
+    "esb_sync_no_creds":    {"en": "Enter credentials to enable weekly auto-sync.", "pl": "Wpisz dane aby włączyć auto-sync co tydzień."},
+    "esb_sync_weekly":      {"en": "✅ Auto-sync active — every week.", "pl": "✅ Auto-sync aktywny — co tydzień."},
+    "esb_sync_rate_limit":  {"en": "Rate limit hit — max 2 logins/24h. Resets at midnight.", "pl": "Limit logowań ESB (max 2/24h). Reset o północy."},
+    "esb_sync_login_fail":  {"en": "Login failed — check email and password.", "pl": "Błąd logowania — sprawdź email i hasło ESB."},
+    "esb_sync_creds_saved": {"en": "Saved. First sync starts in ~30 seconds.", "pl": "Zapisano. Pierwsza synchronizacja za ~30 sekund."},
+    "esb_creds_stored":     {"en": "🔒 Credentials saved (AES-256)", "pl": "🔒 Dane zapisane (AES-256)"},
+    "esb_sync_fail":        {"en": "Sync failed",                 "pl": "Błąd synchronizacji"},
 }
 
 
@@ -1067,6 +1118,187 @@ RANGESLIDER_X = dict(
         ],
     ),
 )
+
+
+
+# ─────────────────────────────────────────────
+#  ESB AUTO-SYNC  (APScheduler + Playwright)
+# ─────────────────────────────────────────────
+_SCHEDULER_STARTED = False
+_ESB_BASE_URL      = "https://myaccount.esbnetworks.ie"
+_ESB_DOWNLOAD_URL  = "https://myaccount.esbnetworks.ie/Api/HistoricConsumption"
+_ESB_FILE_TYPES    = {
+    "calc":  "HDF_calckWh",
+    "kw":    "HDF_kW",
+    "dnp":   "HDF_DailyDNP",
+    "daily": "HDF_Daily_kWh",
+}
+
+
+def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Download all HDF files from ESB Networks via Playwright headless Chromium."""
+    import datetime as _dt, tempfile, shutil as _sh
+    status = {"last_attempt": _dt.datetime.now().isoformat(),
+               "success": False, "error": None, "files_updated": []}
+
+    def _save(s):
+        status_file.write_text(json.dumps(s, indent=2, default=str))
+
+    f = fernet_fn()
+    if f is None:
+        status["error"] = "encryption_unavailable"; _save(status); return status
+    if not creds_file.exists():
+        status["error"] = "no_credentials";         _save(status); return status
+
+    try:
+        creds    = json.loads(f.decrypt(creds_file.read_bytes()).decode())
+        email    = creds.get("email", "")
+        password = creds.get("password", "")
+    except Exception as e:
+        status["error"] = f"decrypt_failed: {e}"; _save(status); return status
+
+    if not email or not password:
+        status["error"] = "empty_credentials"; _save(status); return status
+
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        status["error"] = "playwright_not_installed"; _save(status); return status
+
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--single-process"],
+                )
+                ctx  = browser.new_context(accept_downloads=True,
+                                            viewport={"width":1280,"height":800},
+                                            user_agent="Mozilla/5.0 (X11; Linux x86_64) "
+                                                       "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+                page = ctx.new_page()
+
+                # ── Login — ESB uses Azure AD B2C, renders async ──
+                page.goto(_ESB_BASE_URL, timeout=30_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+
+                # Accept cookies banner if present
+                try:
+                    page.click("#onetrust-accept-btn-handler", timeout=5_000)
+                    page.wait_for_load_state("networkidle", timeout=10_000)
+                except PWTimeout:
+                    pass
+
+                # Wait for email field (Azure AD B2C renders it async)
+                page.wait_for_selector(
+                    'input[name="loginfmt"], input[type="email"], #email, [id*="signInName"]',
+                    timeout=20_000, state="visible"
+                )
+                for sel in ['input[name="loginfmt"]', '[id*="signInName"]',
+                            'input[type="email"]', '#email']:
+                    try:
+                        page.fill(sel, email, timeout=3_000); break
+                    except PWTimeout:
+                        continue
+
+                # Some Azure AD flows split email/password onto two pages
+                for sel in ['#idSIButton9', 'input[value="Next"]',
+                            '[id*="next"]', 'button[type="submit"]']:
+                    try:
+                        page.click(sel, timeout=3_000)
+                        page.wait_for_load_state("networkidle", timeout=10_000)
+                        break
+                    except PWTimeout:
+                        continue
+
+                # Wait for password field
+                page.wait_for_selector(
+                    'input[type="password"], [name="passwd"], [id*="Password"]',
+                    timeout=15_000, state="visible"
+                )
+                for sel in ['input[type="password"]', '[name="passwd"]', '[id*="Password"]']:
+                    try:
+                        page.fill(sel, password, timeout=3_000); break
+                    except PWTimeout:
+                        continue
+
+                for sel in ['#idSIButton9', 'input[value="Sign in"]',
+                            'button[type="submit"]', '[id*="next"]']:
+                    try:
+                        page.click(sel, timeout=3_000); break
+                    except PWTimeout:
+                        continue
+
+                page.wait_for_load_state("networkidle", timeout=30_000)
+
+                content = page.content().lower()
+                if "captcha" in content or "too many" in content:
+                    status["error"] = "rate_limited"
+                    browser.close(); _save(status); return status
+                if "login" in page.url.lower() or "signin" in page.url.lower():
+                    status["error"] = "login_failed"
+                    browser.close(); _save(status); return status
+
+                # ── Download each file ──
+                for slot, dest in hdf_slots.items():
+                    try:
+                        with page.expect_download(timeout=60_000) as dl:
+                            page.goto(f"{_ESB_DOWNLOAD_URL}?mprn=&type={_ESB_FILE_TYPES[slot]}",
+                                      timeout=30_000)
+                        tmp_path = Path(tmp) / f"{slot}.csv"
+                        dl.value.save_as(str(tmp_path))
+                        if tmp_path.exists() and tmp_path.stat().st_size > 100:
+                            _sh.copy2(str(tmp_path), str(dest))
+                            status["files_updated"].append(slot)
+                    except Exception as e:
+                        status.setdefault("partial_errors", {})[slot] = str(e)
+
+                browser.close()
+
+        except Exception as e:
+            status["error"] = str(e); _save(status); return status
+
+    status["success"] = len(status["files_updated"]) > 0
+    if not status["success"] and not status.get("error"):
+        status["error"] = "no_files_downloaded"
+    _save(status)
+    return status
+
+
+def _start_scheduler(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Start APScheduler background daemon — once per container process."""
+    global _SCHEDULER_STARTED
+    if _SCHEDULER_STARTED:
+        return
+    _SCHEDULER_STARTED = True
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.interval import IntervalTrigger
+        import datetime as _dt
+    except ImportError:
+        return  # APScheduler not installed — skip silently
+
+    sched = BackgroundScheduler(daemon=True)
+    # Run immediately on first start if credentials exist but no sync history
+    first_run = (
+        _dt.datetime.now() + _dt.timedelta(seconds=30)
+        if creds_file.exists() and not status_file.exists() else None
+    )
+    sched.add_job(
+        func=esb_sync_now,
+        trigger=IntervalTrigger(weeks=1),
+        kwargs=dict(data_dir=data_dir, hdf_slots=hdf_slots,
+                    creds_file=creds_file, status_file=status_file,
+                    fernet_fn=fernet_fn),
+        id="esb_weekly_sync",
+        replace_existing=True,
+        next_run_time=first_run,
+    )
+    sched.start()
+
+
+# Kick off scheduler at container start (daemon thread — survives reruns)
+_start_scheduler(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
 
 
 def _inject_pl_month_names():
@@ -1853,7 +2085,7 @@ def _open_hdf(file_or_path):
         return io.BytesIO(Path(file_or_path).read_bytes())
     return file_or_path  # UploadedFile or BytesIO
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_calc_kwh(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1881,7 +2113,7 @@ def load_calc_kwh(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_kw(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1895,7 +2127,7 @@ def load_kw(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_dnp(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1909,7 +2141,7 @@ def load_dnp(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_daily(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -2000,21 +2232,17 @@ with st.sidebar:
 
     # ── Upload status summary + persistence ──
     # Save any newly uploaded files to disk immediately
-# ─────────────────────────────────────────────
-# PRIMARY FILE — calckWh
-# ─────────────────────────────────────────────
-if f_calc is not None:
-    if st.session_state.get("calc_name") != f_calc.name:
-        save_hdf_file("calc", f_calc)
-        st.session_state["calc_name"] = f_calc.name
-        st.rerun()
-
-# ─────────────────────────────────────────────
-# OPTIONAL FILES
-# ─────────────────────────────────────────────
-for slot, file_widget in [("kw", f_kw), ("dnp", f_dnp), ("daily", f_daily)]:
-    if file_widget is not None:
-        save_hdf_file(slot, file_widget)
+    _newly_saved = False
+    for slot, file_widget in [("calc",f_calc),("kw",f_kw),("dnp",f_dnp),("daily",f_daily)]:
+        if file_widget is not None:
+            save_hdf_file(slot, file_widget)
+            _newly_saved = True
+    # Clear data cache so freshly saved files load on this rerun
+    if _newly_saved:
+        load_calc_kwh.clear()
+        load_kw.clear()
+        load_dnp.clear()
+        load_daily.clear()
 
     # Build status line showing uploaded + persisted
     def _slot_status(slot, uploaded):
@@ -2063,6 +2291,67 @@ for slot, file_widget in [("kw", f_kw), ("dnp", f_dnp), ("daily", f_daily)]:
 
     # ── Update / reset ──
     st.divider()
+    # ── ESB Auto-Sync ──
+    st.divider()
+    st.markdown(f"##### 🔄 {t('esb_sync_title')}")
+
+    _esb_email, _esb_pass = decrypt_esb_creds()
+    _has_creds = bool(_esb_email and _esb_pass)
+    _sync_st   = read_sync_status()
+
+    # Status badge
+    if _sync_st:
+        _last = _sync_st.get("last_attempt", "")[:16].replace("T", " ")
+        if _sync_st.get("success"):
+            _files = ", ".join(_sync_st.get("files_updated", []))
+            st.markdown(
+                f'<div class="alert-box alert-good" style="font-size:.75rem;padding:.4rem .7rem">'
+                f'✅ {t("esb_sync_ok")} · {_last}<br>'
+                f'<span style="opacity:.8">{t("esb_sync_files")}: {_files}</span></div>',
+                unsafe_allow_html=True)
+        else:
+            _err = _sync_st.get("error", "unknown")
+            _emsg = (t("esb_sync_rate_limit") if _err == "rate_limited"
+                     else t("esb_sync_login_fail") if _err == "login_failed"
+                     else f'{t("esb_sync_fail")}: {_err}')
+            st.markdown(
+                f'<div class="alert-box alert-warn" style="font-size:.75rem;padding:.4rem .7rem">'
+                f'⚠️ {_emsg}<br><span style="opacity:.7">{_last}</span></div>',
+                unsafe_allow_html=True)
+    elif _has_creds:
+        st.caption(t("esb_sync_weekly"))
+    else:
+        st.caption(t("esb_sync_no_creds"))
+
+    # Credentials expander
+    _exp_label = t("esb_creds_stored") if _has_creds else f"🔑 {t('esb_sync_email')}"
+    with st.expander(_exp_label, expanded=not _has_creds):
+        _new_email = st.text_input(t("esb_sync_email"),    value=_esb_email,
+                                   key="esb_email_in", placeholder="name@example.com")
+        _new_pass  = st.text_input(t("esb_sync_password"), value=_esb_pass,
+                                   key="esb_pass_in",  type="password", placeholder="••••••••")
+        _ca, _cb = st.columns(2)
+        with _ca:
+            if st.button(t("esb_sync_save"), use_container_width=True, key="esb_save"):
+                if _new_email and _new_pass:
+                    _enc = encrypt_esb_creds(_new_email, _new_pass)
+                    if _enc:
+                        ESB_CREDS_FILE.write_bytes(_enc)
+                        SYNC_STATUS_FILE.unlink(missing_ok=True)  # trigger immediate sync
+                        st.success(t("esb_sync_creds_saved"))
+                        st.rerun()
+        with _cb:
+            if _has_creds and st.button(t("esb_sync_clear"), use_container_width=True, key="esb_clear"):
+                ESB_CREDS_FILE.unlink(missing_ok=True)
+                st.rerun()
+
+    if _has_creds:
+        if st.button(t("esb_sync_now"), use_container_width=True, key="esb_now"):
+            with st.spinner(t("esb_sync_running")):
+                esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
+            st.rerun()
+
+    # ── Configuration ──
     st.markdown(f"##### 🔄 {t('configuration')}")
     if st.button(t("reparse_btn"), use_container_width=True):
         st.session_state["setup_done"] = False
