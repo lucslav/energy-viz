@@ -2000,9 +2000,21 @@ with st.sidebar:
 
     # ── Upload status summary + persistence ──
     # Save any newly uploaded files to disk immediately
-    for slot, file_widget in [("calc",f_calc),("kw",f_kw),("dnp",f_dnp),("daily",f_daily)]:
-        if file_widget is not None:
-            save_hdf_file(slot, file_widget)
+# ─────────────────────────────────────────────
+# PRIMARY FILE — calckWh
+# ─────────────────────────────────────────────
+if f_calc is not None:
+    if st.session_state.get("calc_name") != f_calc.name:
+        save_hdf_file("calc", f_calc)
+        st.session_state["calc_name"] = f_calc.name
+        st.rerun()
+
+# ─────────────────────────────────────────────
+# OPTIONAL FILES
+# ─────────────────────────────────────────────
+for slot, file_widget in [("kw", f_kw), ("dnp", f_dnp), ("daily", f_daily)]:
+    if file_widget is not None:
+        save_hdf_file(slot, file_widget)
 
     # Build status line showing uploaded + persisted
     def _slot_status(slot, uploaded):
