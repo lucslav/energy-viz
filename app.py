@@ -1269,16 +1269,53 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                     browser.close(); _save(status); return status
 
                 # ── Download each file ──
+                # Navigate to the HDF download page and click each download button
+                page.goto(_ESB_DOWNLOAD_URL, timeout=30_000)
+                page.wait_for_load_state("networkidle", timeout=30_000)
+
                 for slot, dest in hdf_slots.items():
+                    file_type = _ESB_FILE_TYPES[slot]
                     try:
+                        # Look for download link/button matching this file type
+                        # ESB page has buttons or links with file type names
                         with page.expect_download(timeout=60_000) as dl:
-                            page.goto(f"{_ESB_DOWNLOAD_URL}?mprn=&type={_ESB_FILE_TYPES[slot]}",
-                                      timeout=30_000)
+                            # Try clicking a link/button that contains the file type name
+                            clicked = False
+                            for selector in [
+                                f'a[href*="{file_type}"]',
+                                f'button:has-text("{file_type}")',
+                                f'a:has-text("{file_type}")',
+                                f'[data-type="{file_type}"]',
+                                # Generic CSV download buttons in order of appearance
+                                f'a[href*="HistoricConsumption"][href*="{file_type}"]',
+                            ]:
+                                try:
+                                    page.click(selector, timeout=5_000)
+                                    clicked = True
+                                    break
+                                except PWTimeout:
+                                    continue
+
+                            if not clicked:
+                                # Fallback: direct URL download
+                                page.goto(
+                                    f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}",
+                                    timeout=30_000,
+                                )
+
                         tmp_path = Path(tmp) / f"{slot}.csv"
                         dl.value.save_as(str(tmp_path))
                         if tmp_path.exists() and tmp_path.stat().st_size > 100:
                             _sh.copy2(str(tmp_path), str(dest))
                             status["files_updated"].append(slot)
+                        else:
+                            status.setdefault("partial_errors", {})[slot] = "empty_file"
+
+                        # Return to download page for next file
+                        if slot != list(hdf_slots.keys())[-1]:
+                            page.goto(_ESB_DOWNLOAD_URL, timeout=30_000)
+                            page.wait_for_load_state("networkidle", timeout=15_000)
+
                     except Exception as e:
                         status.setdefault("partial_errors", {})[slot] = str(e)
 
@@ -1289,7 +1326,12 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
 
     status["success"] = len(status["files_updated"]) > 0
     if not status["success"] and not status.get("error"):
-        status["error"] = "no_files_downloaded"
+        partial = status.get("partial_errors", {})
+        if partial:
+            first_err = next(iter(partial.values()))
+            status["error"] = f"no_files_downloaded: {first_err[:120]}"
+        else:
+            status["error"] = "no_files_downloaded"
     _save(status)
     return status
 
@@ -2689,7 +2731,7 @@ with tabs[1]:
     heat_piv = heat.pivot(index="date", columns="hour", values="value").fillna(0)
     fig2 = go.Figure(go.Heatmap(
         z=heat_piv.values,
-        x=[f"{h:02d}:00" for h in heat_piv.columns],
+        x=[f"{int(h):02d}:00" for h in heat_piv.columns],
         y=[str(d) for d in heat_piv.index],
         colorscale=[[0,"#0d1117"],[0.25,"#1f3a5f"],[0.55,"#58a6ff"],[0.8,"#f0883e"],[1,"#f85149"]],
         hoverongaps=False, colorbar=dict(title="kWh", tickfont=dict(color=COLORS["muted"])),
