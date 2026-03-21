@@ -20,8 +20,9 @@ DATA_DIR   = Path(os.environ.get("ENERGY_VIZ_DATA", "/app/data"))
 HDF_DIR    = DATA_DIR / "hdf"
 CONFIG_FILE    = DATA_DIR / "config.json"
 API_KEY_FILE   = DATA_DIR / "api_key.enc"
-ESB_CREDS_FILE = DATA_DIR / "esb_creds.enc"
-SYNC_STATUS_FILE = DATA_DIR / "esb_sync.json"
+ESB_CREDS_FILE   = DATA_DIR / "esb_creds.enc"
+SYNC_STATUS_FILE  = DATA_DIR / "esb_sync.json"
+ESB_COOKIES_FILE  = DATA_DIR / "esb_cookies.json"
 INVOICE_FILE   = DATA_DIR / "invoice.pdf"
 
 # Create dirs on startup (safe if already exist)
@@ -1172,69 +1173,102 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                     headless=True,
                     args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--single-process"],
                 )
-                ctx  = browser.new_context(accept_downloads=True,
-                                            viewport={"width":1280,"height":800},
-                                            user_agent="Mozilla/5.0 (X11; Linux x86_64) "
-                                                       "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+
+                # ── Try to reuse saved cookies first (avoids login count) ──
+                ctx_kwargs = dict(
+                    accept_downloads=True,
+                    viewport={"width":1280,"height":800},
+                    user_agent="Mozilla/5.0 (X11; Linux x86_64) "
+                               "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                )
+                cookies_file = status_file.parent / "esb_cookies.json"
+                _used_saved_cookies = False
+                if cookies_file.exists():
+                    try:
+                        saved = json.loads(cookies_file.read_text())
+                        ctx = browser.new_context(**ctx_kwargs)
+                        ctx.add_cookies(saved)
+                        _used_saved_cookies = True
+                    except Exception:
+                        ctx = browser.new_context(**ctx_kwargs)
+                else:
+                    ctx = browser.new_context(**ctx_kwargs)
+
                 page = ctx.new_page()
 
-                # ── Login — ESB uses Azure AD B2C, renders async ──
-                page.goto(_ESB_BASE_URL, timeout=30_000)
-                page.wait_for_load_state("networkidle", timeout=30_000)
-
-                # Accept cookies banner if present
-                try:
-                    page.click("#onetrust-accept-btn-handler", timeout=5_000)
-                    page.wait_for_load_state("networkidle", timeout=10_000)
-                except PWTimeout:
-                    pass
-
-                # Wait for email field (Azure AD B2C renders it async)
-                page.wait_for_selector(
-                    'input[name="loginfmt"], input[type="email"], #email, [id*="signInName"]',
-                    timeout=20_000, state="visible"
-                )
-                for sel in ['input[name="loginfmt"]', '[id*="signInName"]',
-                            'input[type="email"]', '#email']:
+                # ── Check if saved cookies are still valid ──
+                _needs_login = True
+                if _used_saved_cookies:
                     try:
-                        page.fill(sel, email, timeout=3_000); break
-                    except PWTimeout:
-                        continue
+                        page.goto(_ESB_BASE_URL, timeout=30_000)
+                        page.wait_for_load_state("networkidle", timeout=20_000)
+                        if "myaccount.esbnetworks.ie" in page.url.lower():
+                            _needs_login = False  # still logged in
+                    except Exception:
+                        pass
 
-                # Some Azure AD flows split email/password onto two pages
-                for sel in ['#idSIButton9', 'input[value="Next"]',
-                            '[id*="next"]', 'button[type="submit"]']:
+                if _needs_login:
+                    # ── Login — ESB uses Azure AD B2C, renders async ──
+                    if not _used_saved_cookies:
+                        page.goto(_ESB_BASE_URL, timeout=30_000)
+                        page.wait_for_load_state("networkidle", timeout=30_000)
+
+                    # Accept cookies banner if present
                     try:
-                        page.click(sel, timeout=3_000)
+                        page.click("#onetrust-accept-btn-handler", timeout=5_000)
                         page.wait_for_load_state("networkidle", timeout=10_000)
-                        break
                     except PWTimeout:
-                        continue
+                        pass
 
-                # Wait for password field
-                page.wait_for_selector(
-                    'input[type="password"], [name="passwd"], [id*="Password"]',
-                    timeout=15_000, state="visible"
-                )
-                for sel in ['input[type="password"]', '[name="passwd"]', '[id*="Password"]']:
+                    # Wait for email field (Azure AD B2C renders it async)
+                    page.wait_for_selector(
+                        'input[name="loginfmt"], input[type="email"], #email, [id*="signInName"]',
+                        timeout=20_000, state="visible"
+                    )
+                    for sel in ['input[name="loginfmt"]', '[id*="signInName"]',
+                                'input[type="email"]', '#email']:
+                        try:
+                            page.fill(sel, email, timeout=3_000); break
+                        except PWTimeout:
+                            continue
+
+                    for sel in ['#idSIButton9', 'input[value="Next"]',
+                                '[id*="next"]', 'button[type="submit"]']:
+                        try:
+                            page.click(sel, timeout=3_000)
+                            page.wait_for_load_state("networkidle", timeout=10_000)
+                            break
+                        except PWTimeout:
+                            continue
+
+                    page.wait_for_selector(
+                        'input[type="password"], [name="passwd"], [id*="Password"]',
+                        timeout=15_000, state="visible"
+                    )
+                    for sel in ['input[type="password"]', '[name="passwd"]', '[id*="Password"]']:
+                        try:
+                            page.fill(sel, password, timeout=3_000); break
+                        except PWTimeout:
+                            continue
+
+                    for sel in ['#idSIButton9', 'input[value="Sign in"]',
+                                'button[type="submit"]', '[id*="next"]']:
+                        try:
+                            page.click(sel, timeout=3_000); break
+                        except PWTimeout:
+                            continue
+
+                    page.wait_for_load_state("networkidle", timeout=30_000)
+                    import time as _time
+                    _time.sleep(3)
+                    page.wait_for_load_state("networkidle", timeout=15_000)
+
+                    # ── Save cookies for next time ──
                     try:
-                        page.fill(sel, password, timeout=3_000); break
-                    except PWTimeout:
-                        continue
-
-                for sel in ['#idSIButton9', 'input[value="Sign in"]',
-                            'button[type="submit"]', '[id*="next"]']:
-                    try:
-                        page.click(sel, timeout=3_000); break
-                    except PWTimeout:
-                        continue
-
-                page.wait_for_load_state("networkidle", timeout=30_000)
-
-                # Give Azure AD extra time to complete redirect
-                import time as _time
-                _time.sleep(3)
-                page.wait_for_load_state("networkidle", timeout=15_000)
+                        cookies = ctx.cookies()
+                        cookies_file.write_text(json.dumps(cookies))
+                    except Exception:
+                        pass
 
                 content = page.content().lower()
                 current_url = page.url.lower()
