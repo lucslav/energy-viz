@@ -1231,12 +1231,41 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
 
                 page.wait_for_load_state("networkidle", timeout=30_000)
 
+                # Give Azure AD extra time to complete redirect
+                import time as _time
+                _time.sleep(3)
+                page.wait_for_load_state("networkidle", timeout=15_000)
+
                 content = page.content().lower()
-                if "captcha" in content or "too many" in content:
+                current_url = page.url.lower()
+
+                # Rate limit / captcha detection
+                if ("captcha" in content or "too many" in content
+                        or "too many retries" in content or "human verification" in content):
                     status["error"] = "rate_limited"
                     browser.close(); _save(status); return status
-                if "login" in page.url.lower() or "signin" in page.url.lower():
-                    status["error"] = "login_failed"
+
+                # Login failed detection — must NOT be on myaccount domain yet
+                # Azure AD B2C redirect ends at myaccount.esbnetworks.ie on success
+                login_domains = ("login.esbnetworks.ie", "b2c_1a", "oauth2", "authorize")
+                on_login_page = any(d in current_url for d in login_domains)
+                on_portal     = "myaccount.esbnetworks.ie" in current_url
+
+                # Wait up to 10s more for redirect to portal if still on login page
+                if on_login_page and not on_portal:
+                    try:
+                        page.wait_for_url("**/myaccount.esbnetworks.ie/**", timeout=10_000)
+                        current_url = page.url.lower()
+                        on_portal   = "myaccount.esbnetworks.ie" in current_url
+                    except PWTimeout:
+                        pass
+
+                if not on_portal:
+                    # Still not on portal — check if it's wrong password error
+                    if any(x in content for x in ["incorrect", "invalid", "wrong", "error"]):
+                        status["error"] = "login_failed"
+                    else:
+                        status["error"] = f"login_failed (url={page.url[:80]})"
                     browser.close(); _save(status); return status
 
                 # ── Download each file ──
@@ -2237,12 +2266,14 @@ with st.sidebar:
         if file_widget is not None:
             save_hdf_file(slot, file_widget)
             _newly_saved = True
-    # Clear data cache so freshly saved files load on this rerun
+    # Force rerun after saving so _resolve picks up stable path string from disk
+    # (avoids UploadedFile hashing issues with st.cache_data)
     if _newly_saved:
         load_calc_kwh.clear()
         load_kw.clear()
         load_dnp.clear()
         load_daily.clear()
+        st.rerun()
 
     # Build status line showing uploaded + persisted
     def _slot_status(slot, uploaded):
@@ -2312,7 +2343,7 @@ with st.sidebar:
         else:
             _err = _sync_st.get("error", "unknown")
             _emsg = (t("esb_sync_rate_limit") if _err == "rate_limited"
-                     else t("esb_sync_login_fail") if _err == "login_failed"
+                     else t("esb_sync_login_fail") if _err.startswith("login_failed")
                      else f'{t("esb_sync_fail")}: {_err}')
             st.markdown(
                 f'<div class="alert-box alert-warn" style="font-size:.75rem;padding:.4rem .7rem">'
