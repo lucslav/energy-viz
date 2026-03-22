@@ -1327,11 +1327,77 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                         status["error"] = f"login_failed (url={page.url[:80]})"
                     browser.close(); _save(status); return status
 
-                # ── Download each file via page.request (keeps session cookies) ──
-                # page.goto() loses cookies on cross-domain redirect.
-                # page.request.get() sends HTTP in the same browser context — stays authenticated.
-                _log(f"Starting downloads, portal URL: {page.url}")
+                # ── Intercept Bearer token from network traffic ──
+                # The HistoricConsumption API requires Authorization: Bearer <token>
+                # We capture it by monitoring XHR/fetch requests made by the dashboard page
+                _log(f"Starting — capturing auth token from network. Portal URL: {page.url}")
 
+                _bearer_token = None
+                _antiforgery  = None
+
+                def _capture_request(request):
+                    nonlocal _bearer_token, _antiforgery
+                    auth = request.headers.get("authorization", "")
+                    if auth.startswith("Bearer "):
+                        _bearer_token = auth[7:]
+                        _log(f"  Captured Bearer token ({len(_bearer_token)} chars)")
+                    xsrf = request.headers.get("x-xsrf-token") or request.headers.get("requestverificationtoken", "")
+                    if xsrf:
+                        _antiforgery = xsrf
+
+                page.on("request", _capture_request)
+
+                # Navigate to a page that makes API calls — this triggers token usage
+                _log("Navigating to Usage page to trigger API calls...")
+                try:
+                    page.goto("https://myaccount.esbnetworks.ie/myusage", timeout=30_000)
+                    page.wait_for_load_state("networkidle", timeout=20_000)
+                except Exception:
+                    pass
+
+                # Also try the main dashboard
+                if not _bearer_token:
+                    try:
+                        page.goto("https://myaccount.esbnetworks.ie/Dashboard", timeout=30_000)
+                        page.wait_for_load_state("networkidle", timeout=20_000)
+                    except Exception:
+                        pass
+
+                page.remove_listener("request", _capture_request)
+                _log(f"Token captured: {bool(_bearer_token)}")
+
+                if not _bearer_token:
+                    # Fallback: try to get token from localStorage/sessionStorage
+                    try:
+                        _bearer_token = page.evaluate("""() => {
+                            for (let i = 0; i < sessionStorage.length; i++) {
+                                const k = sessionStorage.key(i);
+                                const v = sessionStorage.getItem(k);
+                                if (v && v.includes('access_token')) {
+                                    try { return JSON.parse(v).access_token; } catch {}
+                                }
+                            }
+                            for (let i = 0; i < localStorage.length; i++) {
+                                const k = localStorage.key(i);
+                                const v = localStorage.getItem(k);
+                                if (v && v.includes('access_token')) {
+                                    try { return JSON.parse(v).access_token; } catch {}
+                                }
+                            }
+                            return null;
+                        }""")
+                        if _bearer_token:
+                            _log(f"Got token from storage ({len(_bearer_token)} chars)")
+                    except Exception as te:
+                        _log(f"Storage token lookup failed: {te}")
+
+                if not _bearer_token:
+                    status["error"] = "no_bearer_token"
+                    _log("❌ Could not capture Bearer token — cannot download files")
+                    browser.close(); _save(status); return status
+
+                # ── Download using captured Bearer token ──
+                import urllib.request as _urllib
                 for slot, dest in hdf_slots.items():
                     file_type = _ESB_FILE_TYPES[slot]
                     download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
@@ -1341,32 +1407,27 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                             download_url,
                             timeout=60_000,
                             headers={
+                                "Authorization": f"Bearer {_bearer_token}",
                                 "Accept": "text/csv,application/octet-stream,*/*",
                                 "Referer": "https://myaccount.esbnetworks.ie/",
+                                "X-Requested-With": "XMLHttpRequest",
                             }
                         )
-                        _log(f"  Status: {response.status}, Content-Type: {response.headers.get('content-type','?')}")
-                        _log(f"  Final URL: {response.url[:120]}")
+                        _log(f"  Status: {response.status}, CT: {response.headers.get('content-type','?')}")
 
                         if response.status == 200:
                             body = response.body()
-                            _log(f"  Body length: {len(body)} bytes")
-                            if len(body) > 100:
-                                # Check it looks like CSV
-                                preview = body[:200].decode("utf-8", errors="replace")
-                                _log(f"  Preview: {preview[:100]}")
-                                if "MPRN" in preview or "Read Value" in preview or "," in preview:
-                                    tmp_path = Path(tmp) / f"{slot}.csv"
-                                    tmp_path.write_bytes(body)
-                                    _sh.copy2(str(tmp_path), str(dest))
-                                    status["files_updated"].append(slot)
-                                    _log(f"  ✅ Saved {slot}")
-                                else:
-                                    status.setdefault("partial_errors", {})[slot] = "not_csv"
-                                    _log(f"  ❌ Response not CSV: {preview[:80]}")
+                            preview = body[:200].decode("utf-8", errors="replace")
+                            _log(f"  {len(body)} bytes | preview: {preview[:80]}")
+                            if ("MPRN" in preview or "Read Value" in preview) and len(body) > 100:
+                                tmp_path = Path(tmp) / f"{slot}.csv"
+                                tmp_path.write_bytes(body)
+                                _sh.copy2(str(tmp_path), str(dest))
+                                status["files_updated"].append(slot)
+                                _log(f"  ✅ Saved {slot}")
                             else:
-                                status.setdefault("partial_errors", {})[slot] = f"too_small_{len(body)}b"
-                                _log(f"  ❌ Body too small: {len(body)} bytes")
+                                status.setdefault("partial_errors", {})[slot] = "not_csv"
+                                _log(f"  ❌ Not CSV: {preview[:60]}")
                         else:
                             status.setdefault("partial_errors", {})[slot] = f"http_{response.status}"
                             _log(f"  ❌ HTTP {response.status}")
