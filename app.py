@@ -23,6 +23,7 @@ API_KEY_FILE   = DATA_DIR / "api_key.enc"
 ESB_CREDS_FILE   = DATA_DIR / "esb_creds.enc"
 SYNC_STATUS_FILE  = DATA_DIR / "esb_sync.json"
 ESB_COOKIES_FILE  = DATA_DIR / "esb_cookies.json"
+ESB_LOG_FILE      = DATA_DIR / "esb_sync.log"
 INVOICE_FILE   = DATA_DIR / "invoice.pdf"
 
 # Create dirs on startup (safe if already exist)
@@ -1302,56 +1303,86 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                         status["error"] = f"login_failed (url={page.url[:80]})"
                     browser.close(); _save(status); return status
 
-                # ── Download each file ──
-                # Navigate to the HDF download page and click each download button
-                page.goto(_ESB_DOWNLOAD_URL, timeout=30_000)
-                page.wait_for_load_state("networkidle", timeout=30_000)
+                # ── Log helper ──
+                _log_file = status_file.parent / "esb_sync.log"
+                def _log(msg):
+                    import datetime as _dtt
+                    line = f"{_dtt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n"
+                    try:
+                        with open(_log_file, "a") as _lf:
+                            _lf.write(line)
+                    except Exception:
+                        pass
+
+                # ── Download each file via API intercept ──
+                # ESB serves CSV directly as response body — use route interception
+                # instead of expect_download which waits for Content-Disposition attachment
+                _log(f"Starting downloads, portal URL: {page.url}")
 
                 for slot, dest in hdf_slots.items():
                     file_type = _ESB_FILE_TYPES[slot]
+                    _log(f"Downloading slot={slot} type={file_type}")
                     try:
-                        # Look for download link/button matching this file type
-                        # ESB page has buttons or links with file type names
-                        with page.expect_download(timeout=60_000) as dl:
-                            # Try clicking a link/button that contains the file type name
-                            clicked = False
-                            for selector in [
-                                f'a[href*="{file_type}"]',
-                                f'button:has-text("{file_type}")',
-                                f'a:has-text("{file_type}")',
-                                f'[data-type="{file_type}"]',
-                                # Generic CSV download buttons in order of appearance
-                                f'a[href*="HistoricConsumption"][href*="{file_type}"]',
-                            ]:
+                        # Intercept the response to capture CSV bytes directly
+                        _captured = {}
+
+                        def _handle_response(response):
+                            url = response.url
+                            if "HistoricConsumption" in url or file_type in url:
                                 try:
-                                    page.click(selector, timeout=5_000)
-                                    clicked = True
-                                    break
-                                except PWTimeout:
-                                    continue
+                                    body = response.body()
+                                    if body and len(body) > 100:
+                                        _captured["body"] = body
+                                        _captured["url"]  = url
+                                        _log(f"  Captured {len(body)} bytes from {url}")
+                                except Exception as re:
+                                    _log(f"  Response body error: {re}")
 
-                            if not clicked:
-                                # Fallback: direct URL download
-                                page.goto(
-                                    f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}",
-                                    timeout=30_000,
-                                )
+                        page.on("response", _handle_response)
 
-                        tmp_path = Path(tmp) / f"{slot}.csv"
-                        dl.value.save_as(str(tmp_path))
-                        if tmp_path.exists() and tmp_path.stat().st_size > 100:
+                        # Navigate directly to the download URL
+                        download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
+                        _log(f"  GET {download_url}")
+                        try:
+                            page.goto(download_url, timeout=30_000,
+                                      wait_until="networkidle")
+                        except Exception as ge:
+                            _log(f"  goto error (may be ok if CSV): {ge}")
+
+                        page.remove_listener("response", _handle_response)
+
+                        # Check if we captured response body
+                        if _captured.get("body"):
+                            tmp_path = Path(tmp) / f"{slot}.csv"
+                            tmp_path.write_bytes(_captured["body"])
                             _sh.copy2(str(tmp_path), str(dest))
                             status["files_updated"].append(slot)
+                            _log(f"  ✅ Saved {slot} ({len(_captured['body'])} bytes)")
                         else:
-                            status.setdefault("partial_errors", {})[slot] = "empty_file"
-
-                        # Return to download page for next file
-                        if slot != list(hdf_slots.keys())[-1]:
-                            page.goto(_ESB_DOWNLOAD_URL, timeout=30_000)
-                            page.wait_for_load_state("networkidle", timeout=15_000)
+                            # Fallback: check page content directly (ESB may render CSV in page)
+                            content = page.content()
+                            _log(f"  No intercept — page content length: {len(content)}, url: {page.url}")
+                            if "MPRN" in content or "Read Value" in content:
+                                # Page IS the CSV content
+                                import re as _re
+                                # Extract text content between <pre> or <body> tags
+                                csv_text = _re.sub(r"<[^>]+>", "", content).strip()
+                                tmp_path = Path(tmp) / f"{slot}.csv"
+                                tmp_path.write_text(csv_text)
+                                if tmp_path.stat().st_size > 100:
+                                    _sh.copy2(str(tmp_path), str(dest))
+                                    status["files_updated"].append(slot)
+                                    _log(f"  ✅ Saved {slot} from page content")
+                                else:
+                                    status.setdefault("partial_errors", {})[slot] = "empty_content"
+                                    _log(f"  ❌ Content too small for {slot}")
+                            else:
+                                status.setdefault("partial_errors", {})[slot] = "no_csv_found"
+                                _log(f"  ❌ No CSV found for {slot}")
 
                     except Exception as e:
-                        status.setdefault("partial_errors", {})[slot] = str(e)
+                        status.setdefault("partial_errors", {})[slot] = str(e)[:200]
+                        _log(f"  ❌ Exception for {slot}: {e}")
 
                 browser.close()
 
@@ -2457,6 +2488,17 @@ with st.sidebar:
             with st.spinner(t("esb_sync_running")):
                 esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
             st.rerun()
+
+        # ── Log viewer ──
+        _log_path = DATA_DIR / "esb_sync.log"
+        if _log_path.exists():
+            with st.expander("🪵 Sync log", expanded=False):
+                _log_lines = _log_path.read_text().strip().split("\n")
+                # Show last 30 lines
+                st.code("\n".join(_log_lines[-30:]), language=None)
+                if st.button("🗑️ Clear log", key="clear_log"):
+                    _log_path.unlink(missing_ok=True)
+                    st.rerun()
 
     # ── Configuration ──
     st.markdown(f"##### 🔄 {t('configuration')}")
