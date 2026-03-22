@@ -1327,75 +1327,53 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                         status["error"] = f"login_failed (url={page.url[:80]})"
                     browser.close(); _save(status); return status
 
-                # ── Download each file via API intercept ──
-                # ESB serves CSV directly as response body — use route interception
-                # instead of expect_download which waits for Content-Disposition attachment
+                # ── Download each file via page.request (keeps session cookies) ──
+                # page.goto() loses cookies on cross-domain redirect.
+                # page.request.get() sends HTTP in the same browser context — stays authenticated.
                 _log(f"Starting downloads, portal URL: {page.url}")
 
                 for slot, dest in hdf_slots.items():
                     file_type = _ESB_FILE_TYPES[slot]
-                    _log(f"Downloading slot={slot} type={file_type}")
+                    download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
+                    _log(f"Downloading slot={slot} → {download_url}")
                     try:
-                        # Intercept the response to capture CSV bytes directly
-                        _captured = {}
+                        response = page.request.get(
+                            download_url,
+                            timeout=60_000,
+                            headers={
+                                "Accept": "text/csv,application/octet-stream,*/*",
+                                "Referer": "https://myaccount.esbnetworks.ie/",
+                            }
+                        )
+                        _log(f"  Status: {response.status}, Content-Type: {response.headers.get('content-type','?')}")
+                        _log(f"  Final URL: {response.url[:120]}")
 
-                        def _handle_response(response):
-                            url = response.url
-                            if "HistoricConsumption" in url or file_type in url:
-                                try:
-                                    body = response.body()
-                                    if body and len(body) > 100:
-                                        _captured["body"] = body
-                                        _captured["url"]  = url
-                                        _log(f"  Captured {len(body)} bytes from {url}")
-                                except Exception as re:
-                                    _log(f"  Response body error: {re}")
-
-                        page.on("response", _handle_response)
-
-                        # Navigate directly to the download URL
-                        download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
-                        _log(f"  GET {download_url}")
-                        try:
-                            page.goto(download_url, timeout=30_000,
-                                      wait_until="networkidle")
-                        except Exception as ge:
-                            _log(f"  goto error (may be ok if CSV): {ge}")
-
-                        page.remove_listener("response", _handle_response)
-
-                        # Check if we captured response body
-                        if _captured.get("body"):
-                            tmp_path = Path(tmp) / f"{slot}.csv"
-                            tmp_path.write_bytes(_captured["body"])
-                            _sh.copy2(str(tmp_path), str(dest))
-                            status["files_updated"].append(slot)
-                            _log(f"  ✅ Saved {slot} ({len(_captured['body'])} bytes)")
-                        else:
-                            # Fallback: check page content directly (ESB may render CSV in page)
-                            content = page.content()
-                            _log(f"  No intercept — page content length: {len(content)}, url: {page.url}")
-                            if "MPRN" in content or "Read Value" in content:
-                                # Page IS the CSV content
-                                import re as _re
-                                # Extract text content between <pre> or <body> tags
-                                csv_text = _re.sub(r"<[^>]+>", "", content).strip()
-                                tmp_path = Path(tmp) / f"{slot}.csv"
-                                tmp_path.write_text(csv_text)
-                                if tmp_path.stat().st_size > 100:
+                        if response.status == 200:
+                            body = response.body()
+                            _log(f"  Body length: {len(body)} bytes")
+                            if len(body) > 100:
+                                # Check it looks like CSV
+                                preview = body[:200].decode("utf-8", errors="replace")
+                                _log(f"  Preview: {preview[:100]}")
+                                if "MPRN" in preview or "Read Value" in preview or "," in preview:
+                                    tmp_path = Path(tmp) / f"{slot}.csv"
+                                    tmp_path.write_bytes(body)
                                     _sh.copy2(str(tmp_path), str(dest))
                                     status["files_updated"].append(slot)
-                                    _log(f"  ✅ Saved {slot} from page content")
+                                    _log(f"  ✅ Saved {slot}")
                                 else:
-                                    status.setdefault("partial_errors", {})[slot] = "empty_content"
-                                    _log(f"  ❌ Content too small for {slot}")
+                                    status.setdefault("partial_errors", {})[slot] = "not_csv"
+                                    _log(f"  ❌ Response not CSV: {preview[:80]}")
                             else:
-                                status.setdefault("partial_errors", {})[slot] = "no_csv_found"
-                                _log(f"  ❌ No CSV found for {slot}")
+                                status.setdefault("partial_errors", {})[slot] = f"too_small_{len(body)}b"
+                                _log(f"  ❌ Body too small: {len(body)} bytes")
+                        else:
+                            status.setdefault("partial_errors", {})[slot] = f"http_{response.status}"
+                            _log(f"  ❌ HTTP {response.status}")
 
                     except Exception as e:
                         status.setdefault("partial_errors", {})[slot] = str(e)[:200]
-                        _log(f"  ❌ Exception for {slot}: {e}")
+                        _log(f"  ❌ Exception: {e}")
 
                 browser.close()
 
