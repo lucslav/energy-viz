@@ -1327,98 +1327,111 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                         status["error"] = f"login_failed (url={page.url[:80]})"
                     browser.close(); _save(status); return status
 
-                # ── Intercept Bearer token from network traffic ──
-                # The HistoricConsumption API requires Authorization: Bearer <token>
-                # We capture it by monitoring XHR/fetch requests made by the dashboard page
-                _log(f"Starting — capturing auth token from network. Portal URL: {page.url}")
+                # ── Log all cookies and network requests to understand auth ──
+                _log(f"Portal URL after login: {page.url}")
 
-                _bearer_token = None
-                _antiforgery  = None
+                # Get all cookies in current context
+                all_cookies = ctx.cookies()
+                cookie_names = [c['name'] for c in all_cookies]
+                _log(f"Cookies available: {cookie_names}")
 
-                def _capture_request(request):
-                    nonlocal _bearer_token, _antiforgery
-                    auth = request.headers.get("authorization", "")
-                    if auth.startswith("Bearer "):
-                        _bearer_token = auth[7:]
-                        _log(f"  Captured Bearer token ({len(_bearer_token)} chars)")
-                    xsrf = request.headers.get("x-xsrf-token") or request.headers.get("requestverificationtoken", "")
-                    if xsrf:
-                        _antiforgery = xsrf
+                # Intercept ALL requests to see what headers ESB uses
+                _captured_headers = {}
+                _captured_tokens  = {}
 
-                page.on("request", _capture_request)
+                def _sniff_request(req):
+                    url = req.url
+                    if "myaccount.esbnetworks.ie" in url or "HistoricConsumption" in url:
+                        hdrs = dict(req.headers)
+                        _log(f"  REQ → {url[:80]}")
+                        for k, v in hdrs.items():
+                            if k.lower() in ("authorization","x-xsrf-token","requestverificationtoken",
+                                             "x-requested-with","cookie"):
+                                _log(f"    {k}: {v[:60]}")
+                                _captured_headers[k.lower()] = v
 
-                # Navigate to a page that makes API calls — this triggers token usage
-                _log("Navigating to Usage page to trigger API calls...")
+                def _sniff_response(resp):
+                    url = resp.url
+                    if "HistoricConsumption" in url:
+                        _log(f"  RESP {resp.status} ← {url[:80]}")
+                        ct = resp.headers.get("content-type","")
+                        _log(f"    Content-Type: {ct}")
+
+                page.on("request",  _sniff_request)
+                page.on("response", _sniff_response)
+
+                # Navigate to usage page — triggers real API calls
+                _log("Navigating to usage page...")
                 try:
-                    page.goto("https://myaccount.esbnetworks.ie/myusage", timeout=30_000)
-                    page.wait_for_load_state("networkidle", timeout=20_000)
+                    page.goto("https://myaccount.esbnetworks.ie/myusage",
+                              timeout=30_000, wait_until="networkidle")
+                    _log(f"Usage page URL: {page.url}")
+                except Exception as ge:
+                    _log(f"Usage nav error: {ge}")
+
+                # Also try triggering the download link on the page
+                try:
+                    page.wait_for_timeout(2000)
+                    # Look for any download/export links
+                    links = page.eval_on_selector_all(
+                        'a[href*="HistoricConsumption"], a[href*="Historic"], button:has-text("Download"), a:has-text("Download")',
+                        "els => els.map(e => e.href || e.textContent)"
+                    )
+                    _log(f"Download links found: {links}")
                 except Exception:
                     pass
 
-                # Also try the main dashboard
-                if not _bearer_token:
-                    try:
-                        page.goto("https://myaccount.esbnetworks.ie/Dashboard", timeout=30_000)
-                        page.wait_for_load_state("networkidle", timeout=20_000)
-                    except Exception:
-                        pass
+                page.remove_listener("request",  _sniff_request)
+                page.remove_listener("response", _sniff_response)
 
-                page.remove_listener("request", _capture_request)
-                _log(f"Token captured: {bool(_bearer_token)}")
+                # Try to get __RequestVerificationToken from page
+                rvt = None
+                try:
+                    rvt = page.evaluate(
+                        "() => { const el = document.querySelector('[name=__RequestVerificationToken]'); return el ? el.value : null; }"
+                    )
+                    if rvt:
+                        _log(f"RequestVerificationToken: {rvt[:30]}...")
+                except Exception:
+                    pass
 
-                if not _bearer_token:
-                    # Fallback: try to get token from localStorage/sessionStorage
-                    try:
-                        _bearer_token = page.evaluate("""() => {
-                            for (let i = 0; i < sessionStorage.length; i++) {
-                                const k = sessionStorage.key(i);
-                                const v = sessionStorage.getItem(k);
-                                if (v && v.includes('access_token')) {
-                                    try { return JSON.parse(v).access_token; } catch {}
-                                }
-                            }
-                            for (let i = 0; i < localStorage.length; i++) {
-                                const k = localStorage.key(i);
-                                const v = localStorage.getItem(k);
-                                if (v && v.includes('access_token')) {
-                                    try { return JSON.parse(v).access_token; } catch {}
-                                }
-                            }
-                            return null;
-                        }""")
-                        if _bearer_token:
-                            _log(f"Got token from storage ({len(_bearer_token)} chars)")
-                    except Exception as te:
-                        _log(f"Storage token lookup failed: {te}")
+                # Build session cookie string
+                session_cookies = "; ".join(
+                    f"{c['name']}={c['value']}"
+                    for c in all_cookies
+                    if "myaccount.esbnetworks.ie" in c.get("domain","")
+                       or "esbnetworks" in c.get("domain","")
+                )
+                _log(f"Session cookie string length: {len(session_cookies)}")
 
-                if not _bearer_token:
-                    status["error"] = "no_bearer_token"
-                    _log("❌ Could not capture Bearer token — cannot download files")
+                if not session_cookies:
+                    status["error"] = "no_session_cookies"
+                    _log("❌ No session cookies found")
                     browser.close(); _save(status); return status
 
-                # ── Download using captured Bearer token ──
-                import urllib.request as _urllib
-                for slot, dest in hdf_slots.items():
-                    file_type = _ESB_FILE_TYPES[slot]
-                    download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
-                    _log(f"Downloading slot={slot} → {download_url}")
-                    try:
-                        response = page.request.get(
-                            download_url,
-                            timeout=60_000,
-                            headers={
-                                "Authorization": f"Bearer {_bearer_token}",
-                                "Accept": "text/csv,application/octet-stream,*/*",
-                                "Referer": "https://myaccount.esbnetworks.ie/",
-                                "X-Requested-With": "XMLHttpRequest",
-                            }
-                        )
-                        _log(f"  Status: {response.status}, CT: {response.headers.get('content-type','?')}")
+                # ── Download using session cookies directly ──
+                import urllib.request as _ul
+                import urllib.error  as _ue
 
-                        if response.status == 200:
-                            body = response.body()
+                for slot, dest in hdf_slots.items():
+                    file_type    = _ESB_FILE_TYPES[slot]
+                    download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
+                    _log(f"Downloading {slot} → {download_url}")
+                    try:
+                        req = _ul.Request(download_url)
+                        req.add_header("Cookie",  session_cookies)
+                        req.add_header("Accept",  "text/csv,application/octet-stream,*/*")
+                        req.add_header("Referer", "https://myaccount.esbnetworks.ie/")
+                        req.add_header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+                        if rvt:
+                            req.add_header("RequestVerificationToken", rvt)
+
+                        with _ul.urlopen(req, timeout=60) as resp:
+                            _log(f"  HTTP {resp.status} CT={resp.headers.get('Content-Type','?')} URL={resp.url[:80]}")
+                            body = resp.read()
                             preview = body[:200].decode("utf-8", errors="replace")
-                            _log(f"  {len(body)} bytes | preview: {preview[:80]}")
+                            _log(f"  {len(body)} bytes | {preview[:80]}")
+
                             if ("MPRN" in preview or "Read Value" in preview) and len(body) > 100:
                                 tmp_path = Path(tmp) / f"{slot}.csv"
                                 tmp_path.write_bytes(body)
@@ -1426,16 +1439,12 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                                 status["files_updated"].append(slot)
                                 _log(f"  ✅ Saved {slot}")
                             else:
-                                status.setdefault("partial_errors", {})[slot] = "not_csv"
+                                status.setdefault("partial_errors",{})[slot] = "not_csv"
                                 _log(f"  ❌ Not CSV: {preview[:60]}")
-                        else:
-                            status.setdefault("partial_errors", {})[slot] = f"http_{response.status}"
-                            _log(f"  ❌ HTTP {response.status}")
 
                     except Exception as e:
-                        status.setdefault("partial_errors", {})[slot] = str(e)[:200]
-                        _log(f"  ❌ Exception: {e}")
-
+                        status.setdefault("partial_errors",{})[slot] = str(e)[:200]
+                        _log(f"  ❌ {slot}: {e}")
                 browser.close()
 
         except Exception as e:
