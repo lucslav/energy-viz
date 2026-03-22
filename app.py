@@ -1186,11 +1186,11 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                 _used_saved_cookies = False
                 if cookies_file.exists():
                     try:
-                        saved = json.loads(cookies_file.read_text())
-                        ctx = browser.new_context(**ctx_kwargs)
-                        ctx.add_cookies(saved)
+                        # Restore full storage state
+                        ctx = browser.new_context(**ctx_kwargs,
+                                                   storage_state=str(cookies_file))
                         _used_saved_cookies = True
-                    except Exception:
+                    except Exception as ce:
                         ctx = browser.new_context(**ctx_kwargs)
                 else:
                     ctx = browser.new_context(**ctx_kwargs)
@@ -1201,12 +1201,20 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                 _needs_login = True
                 if _used_saved_cookies:
                     try:
-                        page.goto(_ESB_BASE_URL, timeout=30_000)
+                        # Try a direct API call to check if session is valid
+                        page.goto("https://myaccount.esbnetworks.ie/Dashboard",
+                                  timeout=30_000)
                         page.wait_for_load_state("networkidle", timeout=20_000)
-                        if "myaccount.esbnetworks.ie" in page.url.lower():
-                            _needs_login = False  # still logged in
-                    except Exception:
-                        pass
+                        current = page.url.lower()
+                        if "myaccount.esbnetworks.ie" in current and "login" not in current:
+                            _needs_login = False  # session still valid
+                            _log(f"Reusing saved session, URL: {page.url}")
+                        else:
+                            _log(f"Saved session expired, need login. URL: {page.url}")
+                            # Delete stale cookies
+                            cookies_file.unlink(missing_ok=True)
+                    except Exception as ce:
+                        _log(f"Session check error: {ce}")
 
                 if _needs_login:
                     # ── Login — ESB uses Azure AD B2C, renders async ──
@@ -1264,15 +1272,17 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                     _time.sleep(3)
                     page.wait_for_load_state("networkidle", timeout=15_000)
 
-                    # ── Save cookies for next time ──
+                    # ── Save full storage state (cookies + localStorage) ──
                     try:
-                        cookies = ctx.cookies()
-                        cookies_file.write_text(json.dumps(cookies))
-                    except Exception:
-                        pass
+                        storage = ctx.storage_state()
+                        cookies_file.write_text(json.dumps(storage))
+                        _log(f"Saved session state: {len(storage.get('cookies',[]))} cookies")
+                    except Exception as se:
+                        _log(f"Failed to save session: {se}")
 
                 content = page.content().lower()
                 current_url = page.url.lower()
+                _log(f"Post-login URL: {page.url[:100]}")
 
                 # Rate limit / captcha detection
                 if ("captcha" in content or "too many" in content
@@ -1296,14 +1306,16 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                         pass
 
                 if not on_portal:
-                    # Still not on portal — check if it's wrong password error
+                    # Invalidate stale cookies
+                    cookies_file.unlink(missing_ok=True)
+                    _log(f"Login failed - not on portal. URL: {page.url[:120]}")
                     if any(x in content for x in ["incorrect", "invalid", "wrong", "error"]):
                         status["error"] = "login_failed"
                     else:
                         status["error"] = f"login_failed (url={page.url[:80]})"
                     browser.close(); _save(status); return status
 
-                # ── Log helper ──
+                # ── Log helper (defined here so it can reference _log_file) ──
                 _log_file = status_file.parent / "esb_sync.log"
                 def _log(msg):
                     import datetime as _dtt
