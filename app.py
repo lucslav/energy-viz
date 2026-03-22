@@ -1170,6 +1170,18 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
     with tempfile.TemporaryDirectory() as tmp:
         try:
             with sync_playwright() as pw:
+
+                # ── Log helper — defined first so all code below can use it ──
+                _log_file = status_file.parent / "esb_sync.log"
+                def _log(msg):
+                    import datetime as _dtt
+                    line = f"{_dtt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n"
+                    try:
+                        with open(_log_file, "a") as _lf:
+                            _lf.write(line)
+                    except Exception:
+                        pass
+
                 browser = pw.chromium.launch(
                     headless=True,
                     args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--single-process"],
@@ -1314,17 +1326,6 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                     else:
                         status["error"] = f"login_failed (url={page.url[:80]})"
                     browser.close(); _save(status); return status
-
-                # ── Log helper (defined here so it can reference _log_file) ──
-                _log_file = status_file.parent / "esb_sync.log"
-                def _log(msg):
-                    import datetime as _dtt
-                    line = f"{_dtt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n"
-                    try:
-                        with open(_log_file, "a") as _lf:
-                            _lf.write(line)
-                    except Exception:
-                        pass
 
                 # ── Download each file via API intercept ──
                 # ESB serves CSV directly as response body — use route interception
