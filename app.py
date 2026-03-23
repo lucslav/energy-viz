@@ -1395,12 +1395,14 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                 except Exception:
                     pass
 
-                # Build session cookie string
+                # Build session cookie string — include ALL cookies, no domain filter
+                _log(f"All cookies ({len(all_cookies)}):")
+                for c in all_cookies:
+                    _log(f"  {c['name']}={c['value'][:30]}... domain={c.get('domain','?')}")
+
                 session_cookies = "; ".join(
                     f"{c['name']}={c['value']}"
                     for c in all_cookies
-                    if "myaccount.esbnetworks.ie" in c.get("domain","")
-                       or "esbnetworks" in c.get("domain","")
                 )
                 _log(f"Session cookie string length: {len(session_cookies)}")
 
