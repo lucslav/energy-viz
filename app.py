@@ -2608,14 +2608,14 @@ with st.sidebar:
                 ESB_CREDS_FILE.unlink(missing_ok=True)
                 st.rerun()
 
-        st.divider()
-        # ── cookies.txt fallback ──
-        _has_txt = ESB_COOKIES_TXT.exists()
+    # ── cookies.txt — always visible ──
+    _has_txt = ESB_COOKIES_TXT.exists()
+    with st.expander("🍪 cookies.txt", expanded=not _has_txt):
         st.caption(t("esb_cookies_hint"))
         _cookies_input = st.text_area(
             t("esb_cookies_txt"),
             placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
-            height=80, key="esb_cookies_txt_input"
+            height=100, key="esb_cookies_txt_input"
         )
         _cca, _ccb = st.columns(2)
         with _cca:
@@ -2629,8 +2629,8 @@ with st.sidebar:
                                       use_container_width=True):
                 ESB_COOKIES_TXT.unlink(missing_ok=True)
                 st.rerun()
-        if _has_txt:
-            st.caption(f"✅ cookies.txt saved ({ESB_COOKIES_TXT.stat().st_size} bytes)")
+    if _has_txt:
+        st.caption(f"✅ cookies.txt ({ESB_COOKIES_TXT.stat().st_size} B)")
 
     _can_sync = _has_creds or ESB_COOKIES_TXT.exists()
     if _can_sync:
