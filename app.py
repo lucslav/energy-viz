@@ -23,6 +23,7 @@ API_KEY_FILE   = DATA_DIR / "api_key.enc"
 ESB_CREDS_FILE   = DATA_DIR / "esb_creds.enc"
 SYNC_STATUS_FILE  = DATA_DIR / "esb_sync.json"
 ESB_COOKIES_FILE  = DATA_DIR / "esb_cookies.json"
+ESB_COOKIES_TXT   = DATA_DIR / "esb_cookies.txt"
 ESB_LOG_FILE      = DATA_DIR / "esb_sync.log"
 INVOICE_FILE   = DATA_DIR / "invoice.pdf"
 
@@ -1062,6 +1063,13 @@ TRANSLATIONS = {
     "esb_sync_login_fail":  {"en": "Login failed — check email and password.", "pl": "Błąd logowania — sprawdź email i hasło ESB."},
     "esb_sync_creds_saved": {"en": "Saved. First sync starts in ~30 seconds.", "pl": "Zapisano. Pierwsza synchronizacja za ~30 sekund."},
     "esb_creds_stored":     {"en": "🔒 Credentials saved (AES-256)", "pl": "🔒 Dane zapisane (AES-256)"},
+    "esb_cookies_txt":      {"en": "Or paste browser cookies (cookies.txt format)",
+                             "pl": "Lub wklej cookies z przeglądarki (format cookies.txt)"},
+    "esb_cookies_saved":    {"en": "✅ Browser cookies saved — will be used for downloads.", 
+                             "pl": "✅ Cookies zapisane — będą użyte do pobierania."},
+    "esb_cookies_clear":    {"en": "🗑️ Clear cookies",        "pl": "🗑️ Usuń cookies"},
+    "esb_cookies_hint":     {"en": "Export from browser using 'Get cookies.txt LOCALLY' extension on myaccount.esbnetworks.ie",
+                             "pl": "Eksportuj z przeglądarki rozszerzeniem 'Get cookies.txt LOCALLY' na myaccount.esbnetworks.ie"},
     "esb_sync_fail":        {"en": "Sync failed",                 "pl": "Błąd synchronizacji"},
 }
 
@@ -1146,6 +1154,71 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
     def _save(s):
         status_file.write_text(json.dumps(s, indent=2, default=str))
 
+    # ── Log helper ──
+    _log_file = status_file.parent / "esb_sync.log"
+    def _log(msg):
+        import datetime as _dtt
+        line = f"{_dtt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n"
+        try:
+            with open(_log_file, "a") as _lf:
+                _lf.write(line)
+        except Exception:
+            pass
+
+    # ── Shortcut: use cookies.txt if available (no login needed) ──
+    _cookies_txt = status_file.parent / "esb_cookies.txt"
+    if _cookies_txt.exists():
+        _log("Using browser cookies.txt (no login needed)")
+        import http.cookiejar as _cj, urllib.request as _ul
+        with tempfile.TemporaryDirectory() as tmp:
+            jar = _cj.MozillaCookieJar()
+            try:
+                jar.load(str(_cookies_txt), ignore_discard=True, ignore_expires=True)
+                _log(f"Loaded {len(list(jar))} cookies from cookies.txt")
+            except Exception as e:
+                _log(f"cookies.txt load error: {e}")
+                status["error"] = f"cookies_txt_invalid: {e}"
+                _save(status); return status
+
+            opener = _ul.build_opener(_ul.HTTPCookieProcessor(jar))
+            opener.addheaders = [
+                ("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"),
+                ("Accept", "text/csv,application/octet-stream,*/*"),
+                ("Referer", "https://myaccount.esbnetworks.ie/"),
+            ]
+
+            for slot, dest in hdf_slots.items():
+                file_type    = _ESB_FILE_TYPES[slot]
+                download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
+                _log(f"Downloading {slot} → {download_url}")
+                try:
+                    with opener.open(download_url, timeout=60) as resp:
+                        body = resp.read()
+                        preview = body[:200].decode("utf-8", errors="replace")
+                        _log(f"  {resp.status} | {len(body)} bytes | {preview[:80]}")
+                        if ("MPRN" in preview or "Read Value" in preview) and len(body) > 100:
+                            tmp_path = Path(tmp) / f"{slot}.csv"
+                            tmp_path.write_bytes(body)
+                            _sh.copy2(str(tmp_path), str(dest))
+                            status["files_updated"].append(slot)
+                            _log(f"  ✅ Saved {slot}")
+                        else:
+                            status.setdefault("partial_errors",{})[slot] = "not_csv"
+                            _log(f"  ❌ Not CSV: {preview[:60]}")
+                            # If redirected to login, cookies are expired
+                            if "login.esbnetworks.ie" in preview or "DOCTYPE" in preview:
+                                _log("  ⚠️ Cookies appear expired — please refresh cookies.txt")
+                except Exception as e:
+                    status.setdefault("partial_errors",{})[slot] = str(e)[:200]
+                    _log(f"  ❌ {slot}: {e}")
+
+        status["success"] = len(status["files_updated"]) > 0
+        if not status["success"] and not status.get("error"):
+            first_err = next(iter(status.get("partial_errors",{}).values()), "no_csv")
+            status["error"] = f"cookies_txt: {first_err[:100]}"
+        _save(status)
+        return status
+
     f = fernet_fn()
     if f is None:
         status["error"] = "encryption_unavailable"; _save(status); return status
@@ -1170,17 +1243,6 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
     with tempfile.TemporaryDirectory() as tmp:
         try:
             with sync_playwright() as pw:
-
-                # ── Log helper — defined first so all code below can use it ──
-                _log_file = status_file.parent / "esb_sync.log"
-                def _log(msg):
-                    import datetime as _dtt
-                    line = f"{_dtt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n"
-                    try:
-                        with open(_log_file, "a") as _lf:
-                            _lf.write(line)
-                    except Exception:
-                        pass
 
                 browser = pw.chromium.launch(
                     headless=True,
@@ -2538,7 +2600,7 @@ with st.sidebar:
                     _enc = encrypt_esb_creds(_new_email, _new_pass)
                     if _enc:
                         ESB_CREDS_FILE.write_bytes(_enc)
-                        SYNC_STATUS_FILE.unlink(missing_ok=True)  # trigger immediate sync
+                        SYNC_STATUS_FILE.unlink(missing_ok=True)
                         st.success(t("esb_sync_creds_saved"))
                         st.rerun()
         with _cb:
@@ -2546,7 +2608,32 @@ with st.sidebar:
                 ESB_CREDS_FILE.unlink(missing_ok=True)
                 st.rerun()
 
-    if _has_creds:
+        st.divider()
+        # ── cookies.txt fallback ──
+        _has_txt = ESB_COOKIES_TXT.exists()
+        st.caption(t("esb_cookies_hint"))
+        _cookies_input = st.text_area(
+            t("esb_cookies_txt"),
+            placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
+            height=80, key="esb_cookies_txt_input"
+        )
+        _cca, _ccb = st.columns(2)
+        with _cca:
+            if st.button("💾 " + t("esb_sync_save"), key="esb_txt_save",
+                         use_container_width=True, disabled=not _cookies_input.strip()):
+                ESB_COOKIES_TXT.write_text(_cookies_input.strip())
+                st.success(t("esb_cookies_saved"))
+                st.rerun()
+        with _ccb:
+            if _has_txt and st.button(t("esb_cookies_clear"), key="esb_txt_clear",
+                                      use_container_width=True):
+                ESB_COOKIES_TXT.unlink(missing_ok=True)
+                st.rerun()
+        if _has_txt:
+            st.caption(f"✅ cookies.txt saved ({ESB_COOKIES_TXT.stat().st_size} bytes)")
+
+    _can_sync = _has_creds or ESB_COOKIES_TXT.exists()
+    if _can_sync:
         if st.button(t("esb_sync_now"), use_container_width=True, key="esb_now"):
             with st.spinner(t("esb_sync_running")):
                 esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
@@ -2557,7 +2644,6 @@ with st.sidebar:
         if _log_path.exists():
             with st.expander("🪵 Sync log", expanded=False):
                 _log_lines = _log_path.read_text().strip().split("\n")
-                # Show last 30 lines
                 st.code("\n".join(_log_lines[-30:]), language=None)
                 if st.button("🗑️ Clear log", key="clear_log"):
                     _log_path.unlink(missing_ok=True)
