@@ -1187,16 +1187,63 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                 ("Referer", "https://myaccount.esbnetworks.ie/"),
             ]
 
+            # Read MPRN from config
+            _mprn = ""
+            try:
+                _cfg = data_dir / "config.json"
+                if _cfg.exists():
+                    _mprn = json.loads(_cfg.read_text()).get("mprn","") or ""
+                    _mprn = _mprn.replace(" ","")
+                _log(f"MPRN: {_mprn!r}")
+            except Exception as e:
+                _log(f"Config read error: {e}")
+
+            # Extract cookies — ESB needs: ARRAffinity, AspNetCore.Cookies, Antiforgery
+            _cookie_dict = {c.name: c.value for c in jar}
+            _log(f"Cookie names: {list(_cookie_dict.keys())}")
+
+            # XSRF token comes from the .AspNetCore.Antiforgery.* cookie
+            _xsrf_cookie_name = next(
+                (k for k in _cookie_dict if "Antiforgery" in k), None
+            )
+            _xsrf = _cookie_dict.get(_xsrf_cookie_name, "") if _xsrf_cookie_name else ""
+            _log(f"XSRF token found: {bool(_xsrf)} (from cookie: {_xsrf_cookie_name})")
+
+            _cookie_str = "; ".join(f"{c.name}={c.value}" for c in jar)
+
+            import urllib.request as _ur, urllib.error as _ue
+
+            _POST_URL = "https://myaccount.esbnetworks.ie/DataHub/DownloadHdfPeriodic"
+            _POST_TYPES = {
+                "calc":  "HDF_calckWh",
+                "kw":    "HDF_kW",
+                "dnp":   "HDF_DailyDNP",
+                "daily": "HDF_Daily_kWh",
+            }
+
             for slot, dest in hdf_slots.items():
-                file_type    = _ESB_FILE_TYPES[slot]
-                download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
-                _log(f"Downloading {slot} → {download_url}")
+                file_type = _POST_TYPES[slot]
+                _log(f"POST {slot} type={file_type} mprn={_mprn!r}")
                 try:
-                    with opener.open(download_url, timeout=60) as resp:
+                    _body = json.dumps({"mprn": _mprn, "type": file_type}).encode()
+                    req = _ur.Request(_POST_URL, data=_body, method="POST")
+                    req.add_header("Content-Type",  "application/json")
+                    req.add_header("Accept",        "*/*")
+                    req.add_header("Cookie",        _cookie_str)
+                    req.add_header("Origin",        "https://myaccount.esbnetworks.ie")
+                    req.add_header("Referer",       "https://myaccount.esbnetworks.ie/Api/HistoricConsumption")
+                    req.add_header("x-returnurl",   "https://myaccount.esbnetworks.ie/Api/HistoricConsumption")
+                    req.add_header("User-Agent",    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36")
+                    if _xsrf:
+                        req.add_header("x-xsrf-token", _xsrf)
+
+                    with _ur.urlopen(req, timeout=60) as resp:
                         body = resp.read()
+                        ct = resp.headers.get("Content-Type", "?")
+                        cd = resp.headers.get("Content-Disposition", "")
+                        _log(f"  {resp.status} | {len(body)}B | CT={ct} | CD={cd[:60]}")
                         preview = body[:200].decode("utf-8", errors="replace")
-                        _log(f"  {resp.status} | {len(body)} bytes | {preview[:80]}")
-                        if ("MPRN" in preview or "Read Value" in preview) and len(body) > 100:
+                        if "MPRN" in preview or "Read Value" in preview:
                             tmp_path = Path(tmp) / f"{slot}.csv"
                             tmp_path.write_bytes(body)
                             _sh.copy2(str(tmp_path), str(dest))
@@ -1204,10 +1251,11 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                             _log(f"  ✅ Saved {slot}")
                         else:
                             status.setdefault("partial_errors",{})[slot] = "not_csv"
-                            _log(f"  ❌ Not CSV: {preview[:60]}")
-                            # If redirected to login, cookies are expired
-                            if "login.esbnetworks.ie" in preview or "DOCTYPE" in preview:
-                                _log("  ⚠️ Cookies appear expired — please refresh cookies.txt")
+                            _log(f"  ❌ Not CSV: {preview[:80]}")
+
+                except _ue.HTTPError as e:
+                    status.setdefault("partial_errors",{})[slot] = f"HTTP {e.code}"
+                    _log(f"  ❌ HTTP {e.code}: {e.reason}")
                 except Exception as e:
                     status.setdefault("partial_errors",{})[slot] = str(e)[:200]
                     _log(f"  ❌ {slot}: {e}")
@@ -1479,7 +1527,15 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
 
                 for slot, dest in hdf_slots.items():
                     file_type    = _ESB_FILE_TYPES[slot]
-                    download_url = f"{_ESB_DOWNLOAD_URL}?mprn=&type={file_type}"
+                    _mprn2 = ""
+                    try:
+                        _cfg2 = data_dir / "config.json"
+                        if _cfg2.exists():
+                            _mprn2 = json.loads(_cfg2.read_text()).get("mprn","") or ""
+                            _mprn2 = _mprn2.replace(" ","")
+                    except Exception:
+                        pass
+                    download_url = f"{_ESB_DOWNLOAD_URL}?mprn={_mprn2}&type={file_type}"
                     _log(f"Downloading {slot} → {download_url}")
                     try:
                         req = _ul.Request(download_url)
