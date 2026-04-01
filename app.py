@@ -1215,17 +1215,17 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
 
             _POST_URL = "https://myaccount.esbnetworks.ie/DataHub/DownloadHdfPeriodic"
             _POST_TYPES = {
-                "calc":  "HDF_calckWh",
-                "kw":    "HDF_kW",
-                "dnp":   "HDF_DailyDNP",
-                "daily": "HDF_Daily_kWh",
+                "calc":  ("HDF_calckWh",   "intervalkwh"),
+                "kw":    ("HDF_kW",        "intervalkw"),
+                "dnp":   ("HDF_DailyDNP",  "nightdaypeak"),
+                "daily": ("HDF_Daily_kWh", "daily"),
             }
 
             for slot, dest in hdf_slots.items():
-                file_type = _POST_TYPES[slot]
-                _log(f"POST {slot} type={file_type} mprn={_mprn!r}")
+                file_type, search_type = _POST_TYPES[slot]
+                _log(f"POST {slot} type={file_type} searchType={search_type} mprn={_mprn!r}")
                 try:
-                    _body = json.dumps({"mprn": _mprn, "type": file_type}).encode()
+                    _body = json.dumps({"mprn": _mprn, "searchType": search_type}).encode()
                     req = _ur.Request(_POST_URL, data=_body, method="POST")
                     req.add_header("Content-Type",  "application/json")
                     req.add_header("Accept",        "*/*")
