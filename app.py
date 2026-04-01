@@ -1217,8 +1217,8 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
             _POST_TYPES = {
                 "calc":  ("HDF_calckWh",   "intervalkwh"),
                 "kw":    ("HDF_kW",        "intervalkw"),
-                "dnp":   ("HDF_DailyDNP",  "nightdaypeak"),
-                "daily": ("HDF_Daily_kWh", "daily"),
+                "dnp":   ("HDF_DailyDNP",  "daynightpeak"),
+                "daily": ("HDF_Daily_kWh", "day"),
             }
 
             for slot, dest in hdf_slots.items():
