@@ -1211,9 +1211,11 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
 
             _cookie_str = "; ".join(f"{c.name}={c.value}" for c in jar)
 
-            import urllib.request as _ur, urllib.error as _ue
-
-            _POST_URL = "https://myaccount.esbnetworks.ie/DataHub/DownloadHdfPeriodic"
+            # Try both known URLs — ESB changed endpoint, try both
+            _POST_URLS = [
+                "https://myaccount.esbnetworks.ie/Dashboard/DownloadHDF",
+                "https://myaccount.esbnetworks.ie/DataHub/DownloadHdfPeriodic",
+            ]
             _POST_TYPES = {
                 "calc":  ("HDF_calckWh",   "intervalkwh"),
                 "kw":    ("HDF_kW",        "intervalkw"),
@@ -1221,44 +1223,56 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                 "daily": ("HDF_Daily_kWh", "day"),
             }
 
+            import urllib.request as _ur, urllib.error as _ue
+
             for slot, dest in hdf_slots.items():
                 file_type, search_type = _POST_TYPES[slot]
-                _log(f"POST {slot} type={file_type} searchType={search_type} mprn={_mprn!r}")
-                try:
-                    _body = json.dumps({"mprn": _mprn, "searchType": search_type}).encode()
-                    req = _ur.Request(_POST_URL, data=_body, method="POST")
-                    req.add_header("Content-Type",  "application/json")
-                    req.add_header("Accept",        "*/*")
-                    req.add_header("Cookie",        _cookie_str)
-                    req.add_header("Origin",        "https://myaccount.esbnetworks.ie")
-                    req.add_header("Referer",       "https://myaccount.esbnetworks.ie/Api/HistoricConsumption")
-                    req.add_header("x-returnurl",   "https://myaccount.esbnetworks.ie/Api/HistoricConsumption")
-                    req.add_header("User-Agent",    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36")
-                    if _xsrf:
-                        req.add_header("x-xsrf-token", _xsrf)
+                _saved = False
+                for _post_url in _POST_URLS:
+                    if _saved:
+                        break
+                    _log(f"POST {slot} → {_post_url} searchType={search_type}")
+                    try:
+                        _payload = {"mprn": _mprn, "searchType": search_type, "type": file_type}
+                        _body = json.dumps(_payload).encode()
+                        req = _ur.Request(_post_url, data=_body, method="POST")
+                        req.add_header("Content-Type",       "application/json")
+                        req.add_header("Accept",             "text/csv,application/octet-stream,*/*")
+                        req.add_header("Cookie",             _cookie_str)
+                        req.add_header("Origin",             "https://myaccount.esbnetworks.ie")
+                        req.add_header("Referer",            "https://myaccount.esbnetworks.ie/Dashboard")
+                        req.add_header("X-Requested-With",   "XMLHttpRequest")
+                        req.add_header("Sec-Fetch-Site",     "same-origin")
+                        req.add_header("Sec-Fetch-Mode",     "cors")
+                        req.add_header("Sec-Fetch-Dest",     "empty")
+                        req.add_header("User-Agent",         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36")
+                        if _xsrf:
+                            req.add_header("x-xsrf-token",              _xsrf)
+                            req.add_header("RequestVerificationToken",   _xsrf)
 
-                    with _ur.urlopen(req, timeout=60) as resp:
-                        body = resp.read()
-                        ct = resp.headers.get("Content-Type", "?")
-                        cd = resp.headers.get("Content-Disposition", "")
-                        _log(f"  {resp.status} | {len(body)}B | CT={ct} | CD={cd[:60]}")
-                        preview = body[:200].decode("utf-8", errors="replace")
-                        if "MPRN" in preview or "Read Value" in preview:
-                            tmp_path = Path(tmp) / f"{slot}.csv"
-                            tmp_path.write_bytes(body)
-                            _sh.copy2(str(tmp_path), str(dest))
-                            status["files_updated"].append(slot)
-                            _log(f"  ✅ Saved {slot}")
-                        else:
-                            status.setdefault("partial_errors",{})[slot] = "not_csv"
-                            _log(f"  ❌ Not CSV: {preview[:80]}")
+                        with _ur.urlopen(req, timeout=60) as resp:
+                            body = resp.read()
+                            ct = resp.headers.get("Content-Type", "?")
+                            cd = resp.headers.get("Content-Disposition", "")
+                            _log(f"  {resp.status} | {len(body)}B | CT={ct} | CD={cd[:60]}")
+                            preview = body[:300].decode("utf-8", errors="replace")
+                            if not preview.strip().startswith("<!DOCTYPE") and len(body) > 500:
+                                tmp_path = Path(tmp) / f"{slot}.csv"
+                                tmp_path.write_bytes(body)
+                                _sh.copy2(str(tmp_path), str(dest))
+                                status["files_updated"].append(slot)
+                                _log(f"  ✅ Saved {slot} ({len(body):,} bytes)")
+                                _saved = True
+                            else:
+                                _log(f"  ❌ Not CSV: {preview[:80]}")
 
-                except _ue.HTTPError as e:
-                    status.setdefault("partial_errors",{})[slot] = f"HTTP {e.code}"
-                    _log(f"  ❌ HTTP {e.code}: {e.reason}")
-                except Exception as e:
-                    status.setdefault("partial_errors",{})[slot] = str(e)[:200]
-                    _log(f"  ❌ {slot}: {e}")
+                    except _ue.HTTPError as e:
+                        _log(f"  ❌ HTTP {e.code}: {e.reason}")
+                    except Exception as e:
+                        _log(f"  ❌ {slot}: {e}")
+
+                if not _saved:
+                    status.setdefault("partial_errors",{})[slot] = "not_csv"
 
         status["success"] = len(status["files_updated"]) > 0
         if not status["success"] and not status.get("error"):
