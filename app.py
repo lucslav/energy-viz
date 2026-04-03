@@ -1198,20 +1198,61 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
             except Exception as e:
                 _log(f"Config read error: {e}")
 
-            # Extract cookies — ESB needs: ARRAffinity, AspNetCore.Cookies, Antiforgery
+            # Extract cookies
             _cookie_dict = {c.name: c.value for c in jar}
             _log(f"Cookie names: {list(_cookie_dict.keys())}")
 
-            # XSRF token comes from the .AspNetCore.Antiforgery.* cookie
-            _xsrf_cookie_name = next(
-                (k for k in _cookie_dict if "Antiforgery" in k), None
-            )
-            _xsrf = _cookie_dict.get(_xsrf_cookie_name, "") if _xsrf_cookie_name else ""
-            _log(f"XSRF token found: {bool(_xsrf)} (from cookie: {_xsrf_cookie_name})")
-
             _cookie_str = "; ".join(f"{c.name}={c.value}" for c in jar)
 
-            # Try both known URLs — ESB changed endpoint, try both
+            import urllib.request as _ur, urllib.error as _ue
+
+            # ── Fetch CSRF token from Dashboard HTML ──────────────────────
+            # ASP.NET Core Antiforgery: the __RequestVerificationToken in
+            # POST headers must be the *hidden-input* value from the page,
+            # NOT the cookie value. They are a matched pair.
+            _rvt = ""
+            _DASHBOARD_URLS = [
+                "https://myaccount.esbnetworks.ie/Dashboard",
+                "https://myaccount.esbnetworks.ie/DataHub",
+            ]
+            for _dash_url in _DASHBOARD_URLS:
+                try:
+                    _req_get = _ur.Request(_dash_url)
+                    _req_get.add_header("Cookie", _cookie_str)
+                    _req_get.add_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36")
+                    _req_get.add_header("Accept", "text/html,application/xhtml+xml,*/*")
+                    with _ur.urlopen(_req_get, timeout=30) as _gr:
+                        _html = _gr.read().decode("utf-8", errors="replace")
+                        # Also pick up any Set-Cookie the server sends back
+                        for _sc in _gr.headers.get_all("Set-Cookie") or []:
+                            _name, _, _rest = _sc.partition("=")
+                            _val, _, _ = _rest.partition(";")
+                            _name = _name.strip()
+                            if _name and _val:
+                                _cookie_dict[_name] = _val.strip()
+                        _cookie_str = "; ".join(f"{k}={v}" for k, v in _cookie_dict.items())
+                    # Look for hidden input __RequestVerificationToken
+                    import re as _re
+                    _m = _re.search(
+                        r'<input[^>]+name=["\']__RequestVerificationToken["\'][^>]+value=["\']([^"\']+)["\']',
+                        _html, _re.IGNORECASE
+                    ) or _re.search(
+                        r'<input[^>]+value=["\']([^"\']+)["\'][^>]+name=["\']__RequestVerificationToken["\']',
+                        _html, _re.IGNORECASE
+                    )
+                    if _m:
+                        _rvt = _m.group(1)
+                        _log(f"CSRF token from {_dash_url}: {_rvt[:20]}…")
+                        break
+                    else:
+                        _log(f"No CSRF token in {_dash_url} HTML (redirected to login?)")
+                except Exception as _ge:
+                    _log(f"GET {_dash_url} failed: {_ge}")
+
+            if not _rvt:
+                _log("⚠️  No CSRF token found — POSTs will likely return 400. Cookies may be expired.")
+
+            # Try both known POST endpoints
             _POST_URLS = [
                 "https://myaccount.esbnetworks.ie/Dashboard/DownloadHDF",
                 "https://myaccount.esbnetworks.ie/DataHub/DownloadHdfPeriodic",
@@ -1222,8 +1263,6 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                 "dnp":   ("HDF_DailyDNP",  "daynightpeak"),
                 "daily": ("HDF_Daily_kWh", "day"),
             }
-
-            import urllib.request as _ur, urllib.error as _ue
 
             for slot, dest in hdf_slots.items():
                 file_type, search_type = _POST_TYPES[slot]
@@ -1237,7 +1276,7 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                         _body = json.dumps(_payload).encode()
                         req = _ur.Request(_post_url, data=_body, method="POST")
                         req.add_header("Content-Type",       "application/json")
-                        req.add_header("Accept",             "text/csv,application/octet-stream,*/*")
+                        req.add_header("Accept",             "text/csv,application/octet-stream,*/*;q=0.9")
                         req.add_header("Cookie",             _cookie_str)
                         req.add_header("Origin",             "https://myaccount.esbnetworks.ie")
                         req.add_header("Referer",            "https://myaccount.esbnetworks.ie/Dashboard")
@@ -1246,15 +1285,15 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
                         req.add_header("Sec-Fetch-Mode",     "cors")
                         req.add_header("Sec-Fetch-Dest",     "empty")
                         req.add_header("User-Agent",         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36")
-                        if _xsrf:
-                            req.add_header("x-xsrf-token",              _xsrf)
-                            req.add_header("RequestVerificationToken",   _xsrf)
+                        if _rvt:
+                            req.add_header("RequestVerificationToken", _rvt)
+                            req.add_header("__RequestVerificationToken", _rvt)
 
                         with _ur.urlopen(req, timeout=60) as resp:
                             body = resp.read()
                             ct = resp.headers.get("Content-Type", "?")
                             cd = resp.headers.get("Content-Disposition", "")
-                            _log(f"  {resp.status} | {len(body)}B | CT={ct} | CD={cd[:60]}")
+                            _log(f"  {resp.status} | {len(body):,} bytes | CT={ct} | CD={cd[:60]}")
                             preview = body[:300].decode("utf-8", errors="replace")
                             if not preview.strip().startswith("<!DOCTYPE") and len(body) > 500:
                                 tmp_path = Path(tmp) / f"{slot}.csv"
