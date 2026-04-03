@@ -1,0 +1,22 @@
+# ESB Energy Dashboard — Production Requirements (Streamlit Edition)
+# Project: https://github.com/lucslav/energy-viz/tree/test
+
+# Core Frameworks
+streamlit>=1.30.0
+APScheduler>=3.10.4  # For background tasks if needed later
+
+# HTTP & Session Management (for API requests)
+requests>=2.31.0
+
+# Cryptography (AES-256 encryption for credentials)
+Fernet>=1.0.0
+cryptography>=41.0.0
+
+# Browser Automation Fallback (Playwright) - Critical for ESB Login
+playwright>=1.40.0
+
+# YAML Configuration
+PyYAML>=6.0.1
+
+# Utilities
+python-dateutil>=2.8.2
