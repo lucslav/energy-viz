@@ -1,11 +1,4 @@
-"""ESB Energy Dashboard — Production-Ready with ESB Sync Fix (Streamlit Edition)
-
-This application downloads energy consumption data from ESB Networks API.
-Handles authentication securely (AES-256 encrypted credentials or cookies),
-and displays interactive dashboards using Streamlit framework.
-
-Project: https://github.com/lucslav/energy-viz/tree/test
-"""
+"""ESB Energy Dashboard — Production-Ready with ESB Sync Fix
 
 from __future__ import annotations
 
