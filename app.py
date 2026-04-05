@@ -1146,12 +1146,7 @@ _ESB_FILE_TYPES    = {
 
 
 def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
-    """Download HDF files from ESB Networks.
-
-    Uses a requests-based Azure AD B2C login (no browser needed).
-    Approach modelled on badger707/esb-smart-meter-reading-automation.
-    Falls back to Playwright headless browser if requests login fails.
-    """
+    """Download all HDF files from ESB Networks via Playwright headless Chromium."""
     import datetime as _dt, tempfile, shutil as _sh
     status = {"last_attempt": _dt.datetime.now().isoformat(),
                "success": False, "error": None, "files_updated": []}
@@ -1159,6 +1154,7 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
     def _save(s):
         status_file.write_text(json.dumps(s, indent=2, default=str))
 
+    # ── Log helper ──
     _log_file = status_file.parent / "esb_sync.log"
     def _log(msg):
         import datetime as _dtt
@@ -1169,477 +1165,417 @@ def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
         except Exception:
             pass
 
-    # ── Read MPRN from config ──────────────────────────────────────────
-    _mprn = ""
-    try:
-        _cfg = data_dir / "config.json"
-        if _cfg.exists():
-            _mprn = json.loads(_cfg.read_text()).get("mprn", "") or ""
-            _mprn = _mprn.replace(" ", "")
-        _log(f"MPRN: {_mprn!r}")
-    except Exception as e:
-        _log(f"Config read error: {e}")
-
-    # ── File type map ──────────────────────────────────────────────────
-    _FILE_TYPES = {
-        "calc":  "HDF_calckWh",
-        "kw":    "HDF_kW",
-        "dnp":   "HDF_DailyDNP",
-        "daily": "HDF_Daily_kWh",
-    }
-
-    def _download_files(session, log_prefix=""):
-        """Given an authenticated requests.Session, download all HDF slots."""
-        saved = []
-        for slot, dest in hdf_slots.items():
-            ft = _FILE_TYPES[slot]
-            url = f"https://myaccount.esbnetworks.ie/Api/HistoricConsumption?mprn={_mprn}&type={ft}"
-            _log(f"{log_prefix}Downloading {slot} → {url}")
-            try:
-                r = session.get(url, timeout=60, allow_redirects=True)
-                ct = r.headers.get("Content-Type", "?")
-                _log(f"  HTTP {r.status_code} CT={ct} URL={r.url[:80]}")
-                preview = r.text[:300]
-                _log(f"  {len(r.content):,} bytes | {preview[:80]}")
-                if (r.status_code == 200
-                        and not preview.strip().startswith("<!DOCTYPE")
-                        and ("MPRN" in preview or "Read Value" in preview
-                             or "kWh" in preview or "kW" in preview)
-                        and len(r.content) > 500):
-                    dest.write_bytes(r.content)
-                    status["files_updated"].append(slot)
-                    saved.append(slot)
-                    _log(f"  ✅ Saved {slot} ({len(r.content):,} bytes)")
-                else:
-                    status.setdefault("partial_errors", {})[slot] = "not_csv"
-                    _log(f"  ❌ Not CSV: {preview[:60]}")
-            except Exception as e:
-                status.setdefault("partial_errors", {})[slot] = str(e)[:200]
-                _log(f"  ❌ {slot}: {e}")
-        return saved
-
-    # ══════════════════════════════════════════════════════════════════
-    #  PATH A — cookies.txt  (fastest, no login needed)
-    # ══════════════════════════════════════════════════════════════════
+    # ── Shortcut: use cookies.txt if available ──
     _cookies_txt = status_file.parent / "esb_cookies.txt"
     if _cookies_txt.exists():
-        _log("PATH A: Using browser cookies.txt")
-        import http.cookiejar as _cj, requests as _rq
-        try:
+        _log("Using browser cookies.txt")
+        import http.cookiejar as _cj, urllib.request as _ul, urllib.error as _ue
+        with tempfile.TemporaryDirectory() as tmp:
             jar = _cj.MozillaCookieJar()
-            jar.load(str(_cookies_txt), ignore_discard=True, ignore_expires=True)
-            _log(f"Loaded {len(list(jar))} cookies from cookies.txt")
-            _log(f"Cookie names: {[c.name for c in jar]}")
-        except Exception as e:
-            _log(f"cookies.txt load error: {e}")
-            status["error"] = f"cookies_txt_invalid: {e}"
-            _save(status); return status
-
-        sess = _rq.Session()
-        sess.cookies = jar
-        sess.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/134.0.0.0 Safari/537.36"
-            ),
-            "Accept":          "text/csv,application/octet-stream,*/*;q=0.9",
-            "Accept-Language": "en-IE,en;q=0.9",
-            "Referer":         "https://myaccount.esbnetworks.ie/",
-            "Origin":          "https://myaccount.esbnetworks.ie",
-        })
-
-        # Quick session check — should get myusage page, not login redirect
-        try:
-            _chk = sess.get("https://myaccount.esbnetworks.ie/myusage",
-                             timeout=20, allow_redirects=True)
-            _log(f"Session check: HTTP {_chk.status_code} URL={_chk.url[:80]}")
-            _on_login = any(x in _chk.url.lower() for x in
-                            ("login.esbnetworks", "b2c_1a", "oauth2", "authorize",
-                             "login.microsoftonline"))
-            if _on_login:
-                _log("❌ cookies.txt session expired — please export fresh cookies from browser")
-                status["error"] = "cookies_txt_expired"
+            try:
+                jar.load(str(_cookies_txt), ignore_discard=True, ignore_expires=True)
+                _log(f"Loaded {len(list(jar))} cookies")
+            except Exception as e:
+                status["error"] = f"cookies_txt_invalid: {e}"
                 _save(status); return status
-        except Exception as e:
-            _log(f"Session check failed: {e}")
 
-        _download_files(sess, log_prefix="[cookies.txt] ")
+            _cookie_str = "; ".join(f"{c.name}={c.value}" for c in jar)
+
+            # Read MPRN
+            _mprn = ""
+            try:
+                _cfg = data_dir / "config.json"
+                if _cfg.exists():
+                    _mprn = json.loads(_cfg.read_text()).get("mprn","") or ""
+                    _mprn = _mprn.replace(" ","")
+                _log(f"MPRN: {_mprn!r}")
+            except Exception as e:
+                _log(f"Config error: {e}")
+
+            _UA   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+            _BASE = "https://myaccount.esbnetworks.ie"
+
+            # Step 1: GET /af/t → file download token (X-Xsrf-Token for POST)
+            _xsrf_token = None
+            try:
+                req_t = _ul.Request(f"{_BASE}/af/t", headers={
+                    "User-Agent":  _UA,
+                    "Accept":      "*/*",
+                    "Cookie":      _cookie_str,
+                    "Referer":     f"{_BASE}/Api/HistoricConsumption",
+                    "X-Returnurl": f"{_BASE}/Api/HistoricConsumption",
+                })
+                with _ul.urlopen(req_t, timeout=15) as r:
+                    tok = r.read().decode("utf-8", errors="replace")
+                    _log(f"/af/t → {tok[:80]}")
+                    try:
+                        _xsrf_token = json.loads(tok).get("token")
+                        _log(f"Token: {bool(_xsrf_token)}")
+                    except Exception:
+                        _log(f"Token parse failed: {tok[:60]}")
+            except Exception as e:
+                _log(f"/af/t failed: {e}")
+
+            # Step 2: POST /DataHub/DownloadHdfPeriodic
+            _POST_URL   = f"{_BASE}/DataHub/DownloadHdfPeriodic"
+            _POST_TYPES = {
+                "calc":  "intervalkwh",
+                "kw":    "intervalkw",
+                "dnp":   "daynightpeak",
+                "daily": "day",
+            }
+
+            for slot, dest in hdf_slots.items():
+                search_type = _POST_TYPES[slot]
+                _log(f"POST {slot} searchType={search_type}")
+                try:
+                    _payload = json.dumps({"mprn": _mprn, "searchType": search_type}).encode()
+                    req = _ul.Request(_POST_URL, data=_payload, method="POST")
+                    req.add_header("Content-Type",     "application/json")
+                    req.add_header("Accept",           "*/*")
+                    req.add_header("Cookie",           _cookie_str)
+                    req.add_header("Origin",           _BASE)
+                    req.add_header("Referer",          f"{_BASE}/Api/HistoricConsumption")
+                    req.add_header("X-Returnurl",      f"{_BASE}/Api/HistoricConsumption")
+                    req.add_header("User-Agent",       _UA)
+                    req.add_header("X-Requested-With", "XMLHttpRequest")
+                    req.add_header("Sec-Fetch-Site",   "same-origin")
+                    req.add_header("Sec-Fetch-Mode",   "cors")
+                    if _xsrf_token:
+                        req.add_header("X-Xsrf-Token", _xsrf_token)
+
+                    with _ul.urlopen(req, timeout=60) as resp:
+                        body = resp.read()
+                        ct = resp.headers.get("Content-Type","?")
+                        cd = resp.headers.get("Content-Disposition","")
+                        _log(f"  {resp.status} | {len(body)}B | CT={ct} | CD={cd[:60]}")
+                        preview = body[:300].decode("utf-8", errors="replace")
+                        if not preview.strip().startswith("<!DOCTYPE") and len(body) > 500:
+                            tmp_path = Path(tmp) / f"{slot}.csv"
+                            tmp_path.write_bytes(body)
+                            _sh.copy2(str(tmp_path), str(dest))
+                            status["files_updated"].append(slot)
+                            _log(f"  ✅ Saved {slot} ({len(body):,} bytes)")
+                        else:
+                            status.setdefault("partial_errors",{})[slot] = "not_csv"
+                            _log(f"  ❌ Not CSV: {preview[:80]}")
+
+                except _ue.HTTPError as e:
+                    status.setdefault("partial_errors",{})[slot] = f"HTTP {e.code}"
+                    _log(f"  ❌ HTTP {e.code}: {e.reason}")
+                except Exception as e:
+                    status.setdefault("partial_errors",{})[slot] = str(e)[:200]
+                    _log(f"  ❌ {slot}: {e}")
+
         status["success"] = len(status["files_updated"]) > 0
         if not status["success"] and not status.get("error"):
-            status["error"] = "cookies_txt: " + str(
-                next(iter(status.get("partial_errors", {}).values()), "no_csv"))[:100]
+            first_err = next(iter(status.get("partial_errors",{}).values()), "no_csv")
+            status["error"] = f"cookies_txt: {first_err[:100]}"
         _save(status)
         return status
 
-    # ══════════════════════════════════════════════════════════════════
-    #  PATH B — requests-based Azure AD B2C login (email + password)
-    # ══════════════════════════════════════════════════════════════════
-    # Decrypt stored credentials
     f = fernet_fn()
     if f is None:
         status["error"] = "encryption_unavailable"; _save(status); return status
     if not creds_file.exists():
         status["error"] = "no_credentials";         _save(status); return status
+
     try:
         creds    = json.loads(f.decrypt(creds_file.read_bytes()).decode())
         email    = creds.get("email", "")
         password = creds.get("password", "")
     except Exception as e:
         status["error"] = f"decrypt_failed: {e}"; _save(status); return status
+
     if not email or not password:
         status["error"] = "empty_credentials"; _save(status); return status
 
-    # Try cached session cookies (avoids login count limit)
-    _session_cache = status_file.parent / "esb_cookies.json"
-
     try:
-        import requests as _rq
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
     except ImportError:
-        status["error"] = "requests_not_installed"; _save(status); return status
+        status["error"] = "playwright_not_installed"; _save(status); return status
 
-    def _try_cached_session():
-        """Return an authenticated requests.Session from cache, or None."""
-        if not _session_cache.exists():
-            return None
+    with tempfile.TemporaryDirectory() as tmp:
         try:
-            cached = json.loads(_session_cache.read_text())
-            sess = _rq.Session()
-            for ck in cached:
-                sess.cookies.set(ck["name"], ck["value"],
-                                 domain=ck.get("domain",""), path=ck.get("path","/"))
-            sess.headers.update({
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/134.0.0.0 Safari/537.36"
-                ),
-                "Accept":          "text/csv,application/octet-stream,*/*;q=0.9",
-                "Accept-Language": "en-IE,en;q=0.9",
-                "Referer":         "https://myaccount.esbnetworks.ie/",
-                "Origin":          "https://myaccount.esbnetworks.ie",
-            })
-            chk = sess.get("https://myaccount.esbnetworks.ie/myusage",
-                           timeout=20, allow_redirects=True)
-            _log(f"Cached session check: HTTP {chk.status_code} URL={chk.url[:80]}")
-            on_login = any(x in chk.url.lower() for x in
-                           ("login.esbnetworks", "b2c_1a", "oauth2",
-                            "authorize", "login.microsoftonline"))
-            if on_login:
-                _log("Cached session expired")
-                _session_cache.unlink(missing_ok=True)
-                return None
-            _log("Reusing cached session ✅")
-            return sess
-        except Exception as e:
-            _log(f"Cached session error: {e}")
-            _session_cache.unlink(missing_ok=True)
-            return None
+            with sync_playwright() as pw:
 
-    def _requests_login():
-        """
-        Full Azure AD B2C login via requests (no browser).
-        Returns authenticated requests.Session or raises RuntimeError.
-
-        Flow (same as badger707 Jan'25 rework):
-          1. GET myaccount.esbnetworks.ie  → follows OIDC redirect to B2C
-          2. POST credentials to B2C /SelfAsserted
-          3. GET B2C /api/CombinedSigninAndSignup/confirmed  → gets code
-          4. POST /signin-oidc back to portal  → session cookie
-          5. GET /Api/HistoricConsumption  → CSV
-        """
-        import re as _re
-        UA = (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/134.0.0.0 Safari/537.36"
-        )
-        sess = _rq.Session()
-        sess.headers.update({
-            "User-Agent":      UA,
-            "Accept-Language": "en-IE,en;q=0.9",
-        })
-
-        # ── Step 1: GET portal home → redirects to B2C login ──────────
-        _log("B2C login step 1: GET portal home")
-        r1 = sess.get("https://myaccount.esbnetworks.ie",
-                      timeout=30, allow_redirects=True)
-        _log(f"  → {r1.url[:100]}  HTTP {r1.status_code}")
-
-        login_url = r1.url   # should be on login.esbnetworks.ie / B2C
-
-        # Extract CSRF token (tx / csrf hidden fields in B2C page)
-        csrf   = _re.search(r'"csrf"\s*:\s*"([^"]+)"', r1.text)
-        tx     = _re.search(r'"transId"\s*:\s*"([^"]+)"', r1.text)
-        policy = _re.search(r'"hosts"\s*:.+?"policy"\s*:\s*"([^"]+)"', r1.text, _re.S)
-        tenant = _re.search(r'(esbntwkscustportalprdb2c\d+\.onmicrosoft\.com)', r1.url)
-        policy_name = _re.search(r'/(b2c_1a_\w+)/', r1.url, _re.IGNORECASE)
-
-        _log(f"  csrf={bool(csrf)} tx={bool(tx)} tenant={bool(tenant)} policy={bool(policy_name)}")
-
-        if not (csrf and tx and tenant):
-            # ESB may have started serving a captcha / rate limit page
-            preview = r1.text[:300]
-            _log(f"  B2C page parse failed. Preview: {preview[:120]}")
-            if any(x in r1.text.lower() for x in
-                   ("too many", "captcha", "human verification", "disabled javascript")):
-                raise RuntimeError("rate_limited")
-            raise RuntimeError(f"b2c_parse_failed: could not extract login fields from {r1.url[:80]}")
-
-        csrf_val   = csrf.group(1)
-        tx_val     = tx.group(1)
-        tenant_val = tenant.group(1)
-        policy_val = (policy_name.group(1) if policy_name
-                      else "B2C_1A_signup_signin")
-
-        # Base URL for B2C API calls
-        b2c_base = f"https://login.esbnetworks.ie/{tenant_val}/{policy_val}"
-
-        # ── Step 2: POST credentials to B2C SelfAsserted ──────────────
-        _log(f"B2C login step 2: POST credentials  tx={tx_val[:20]}")
-        r2 = sess.post(
-            f"{b2c_base}/SelfAsserted",
-            params={"tx": tx_val, "p": policy_val},
-            data={
-                "request_type":  "RESPONSE",
-                "signInName":    email,
-                "password":      password,
-            },
-            headers={
-                "Content-Type":  "application/x-www-form-urlencoded",
-                "X-CSRF-TOKEN":  csrf_val,
-                "Referer":       login_url,
-                "Origin":        "https://login.esbnetworks.ie",
-            },
-            timeout=30,
-        )
-        _log(f"  HTTP {r2.status_code}  body={r2.text[:80]}")
-        if r2.status_code != 200:
-            raise RuntimeError(f"b2c_selfasserted_http_{r2.status_code}")
-        body2 = r2.json() if r2.text.strip().startswith("{") else {}
-        if body2.get("status") == "400":
-            raise RuntimeError("login_failed_bad_credentials")
-
-        # ── Step 3: GET confirmed → issues auth code redirect ──────────
-        _log("B2C login step 3: GET CombinedSigninAndSignup/confirmed")
-        r3 = sess.get(
-            f"{b2c_base}/api/CombinedSigninAndSignup/confirmed",
-            params={"rememberMe": "false", "csrf_token": csrf_val,
-                    "tx": tx_val, "p": policy_val},
-            headers={"Referer": login_url},
-            timeout=30,
-            allow_redirects=True,
-        )
-        _log(f"  → {r3.url[:100]}  HTTP {r3.status_code}")
-
-        # ── Step 4: follow redirect back to portal (sets session cookie) ─
-        # r3 may have already followed to the portal via allow_redirects
-        portal_url = r3.url
-        if "myaccount.esbnetworks.ie" not in portal_url:
-            # Extract Location or the form action for POST /signin-oidc
-            loc = r3.headers.get("Location", "")
-            form_action = _re.search(r'action=["\']([^"\']+)["\']', r3.text)
-            code_match  = _re.search(r'[?&]code=([^&"\']+)', r3.text + loc)
-
-            if "signin-oidc" in loc or (form_action and "signin-oidc" in form_action.group(1)):
-                target = loc or form_action.group(1)
-                hidden = dict(_re.findall(
-                    r'<input[^>]+name=["\']([^"\']+)["\'][^>]+value=["\']([^"\']*)["\']',
-                    r3.text))
-                _log(f"B2C login step 4: POST signin-oidc  fields={list(hidden.keys())}")
-                r4 = sess.post(
-                    target if target.startswith("http")
-                    else "https://myaccount.esbnetworks.ie" + target,
-                    data=hidden,
-                    headers={
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Referer":      r3.url,
-                        "Origin":       "https://login.esbnetworks.ie",
-                    },
-                    timeout=30,
-                    allow_redirects=True,
+                browser = pw.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--single-process"],
                 )
-                _log(f"  → {r4.url[:100]}  HTTP {r4.status_code}")
-                portal_url = r4.url
-            else:
-                _log(f"  Unexpected redirect target: {loc[:80]}")
 
-        if "myaccount.esbnetworks.ie" not in portal_url:
-            raise RuntimeError(f"login_redirect_failed: landed on {portal_url[:80]}")
+                # ── Try to reuse saved cookies first (avoids login count) ──
+                ctx_kwargs = dict(
+                    accept_downloads=True,
+                    viewport={"width":1280,"height":800},
+                    user_agent="Mozilla/5.0 (X11; Linux x86_64) "
+                               "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                )
+                cookies_file = status_file.parent / "esb_cookies.json"
+                _used_saved_cookies = False
+                if cookies_file.exists():
+                    try:
+                        # Restore full storage state
+                        ctx = browser.new_context(**ctx_kwargs,
+                                                   storage_state=str(cookies_file))
+                        _used_saved_cookies = True
+                    except Exception as ce:
+                        ctx = browser.new_context(**ctx_kwargs)
+                else:
+                    ctx = browser.new_context(**ctx_kwargs)
 
-        _log(f"Login successful ✅  portal URL: {portal_url[:80]}")
+                page = ctx.new_page()
 
-        # Save session cookies for reuse
-        try:
-            cookie_list = [
-                {"name": c.name, "value": c.value,
-                 "domain": c.domain, "path": c.path}
-                for c in sess.cookies
-            ]
-            _session_cache.write_text(json.dumps(cookie_list))
-            _log(f"Session cached ({len(cookie_list)} cookies)")
-        except Exception as se:
-            _log(f"Cache save error: {se}")
-
-        sess.headers.update({
-            "Accept":          "text/csv,application/octet-stream,*/*;q=0.9",
-            "Referer":         "https://myaccount.esbnetworks.ie/",
-            "Origin":          "https://myaccount.esbnetworks.ie",
-        })
-        return sess
-
-    # ── Try cached session first, then fresh login ─────────────────────
-    _log("PATH B: requests-based login")
-    _sess = _try_cached_session()
-    if _sess is None:
-        try:
-            _sess = _requests_login()
-        except RuntimeError as e:
-            err = str(e)
-            _log(f"requests login failed: {err}")
-            if err == "rate_limited":
-                status["error"] = "rate_limited"
-            elif "bad_credentials" in err:
-                status["error"] = "login_failed"
-            else:
-                status["error"] = err
-            # ── Fallback to Playwright ─────────────────────────────────
-            _log("Falling back to Playwright…")
-            try:
-                from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
-            except ImportError:
-                _save(status); return status
-
-            with tempfile.TemporaryDirectory() as tmp:
-                try:
-                    with sync_playwright() as pw:
-                        browser = pw.chromium.launch(
-                            headless=True,
-                            args=["--no-sandbox","--disable-dev-shm-usage",
-                                  "--disable-gpu","--single-process"],
-                        )
-                        ctx = browser.new_context(
-                            accept_downloads=True,
-                            viewport={"width":1280,"height":800},
-                            user_agent=(
-                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                "Chrome/134.0.0.0 Safari/537.36"
-                            ),
-                        )
-                        # restore saved playwright cookies if any
-                        if _session_cache.exists():
-                            try:
-                                ctx2_state = json.loads(_session_cache.read_text())
-                                # Playwright storage_state format
-                                if isinstance(ctx2_state, list):
-                                    ctx.add_cookies([
-                                        {"name": c["name"], "value": c["value"],
-                                         "domain": c.get("domain","myaccount.esbnetworks.ie"),
-                                         "path": c.get("path","/")}
-                                        for c in ctx2_state
-                                    ])
-                            except Exception:
-                                pass
-
-                        page = ctx.new_page()
-                        page.goto("https://myaccount.esbnetworks.ie",
+                # ── Check if saved cookies are still valid ──
+                _needs_login = True
+                if _used_saved_cookies:
+                    try:
+                        # Try a direct API call to check if session is valid
+                        page.goto("https://myaccount.esbnetworks.ie/Dashboard",
                                   timeout=30_000)
+                        page.wait_for_load_state("networkidle", timeout=20_000)
+                        current = page.url.lower()
+                        if "myaccount.esbnetworks.ie" in current and "login" not in current:
+                            _needs_login = False  # session still valid
+                            _log(f"Reusing saved session, URL: {page.url}")
+                        else:
+                            _log(f"Saved session expired, need login. URL: {page.url}")
+                            # Delete stale cookies
+                            cookies_file.unlink(missing_ok=True)
+                    except Exception as ce:
+                        _log(f"Session check error: {ce}")
+
+                if _needs_login:
+                    # ── Login — ESB uses Azure AD B2C, renders async ──
+                    if not _used_saved_cookies:
+                        page.goto(_ESB_BASE_URL, timeout=30_000)
                         page.wait_for_load_state("networkidle", timeout=30_000)
 
-                        cur = page.url.lower()
-                        need_login = any(x in cur for x in
-                                         ("login.esbnetworks", "b2c_1a", "authorize"))
-                        if need_login:
-                            for sel in ['input[name="loginfmt"]','[id*="signInName"]',
-                                        'input[type="email"]','#email']:
-                                try: page.fill(sel, email, timeout=4000); break
-                                except PWTimeout: continue
-                            for sel in ['#idSIButton9','input[value="Next"]',
-                                        'button[type="submit"]']:
-                                try:
-                                    page.click(sel, timeout=3000)
-                                    page.wait_for_load_state("networkidle",timeout=10000)
-                                    break
-                                except PWTimeout: continue
-                            for sel in ['input[type="password"]','[name="passwd"]',
-                                        '[id*="Password"]']:
-                                try: page.fill(sel, password, timeout=4000); break
-                                except PWTimeout: continue
-                            for sel in ['#idSIButton9','input[value="Sign in"]',
-                                        'button[type="submit"]']:
-                                try: page.click(sel, timeout=3000); break
-                                except PWTimeout: continue
-                            page.wait_for_load_state("networkidle", timeout=30_000)
+                    # Accept cookies banner if present
+                    try:
+                        page.click("#onetrust-accept-btn-handler", timeout=5_000)
+                        page.wait_for_load_state("networkidle", timeout=10_000)
+                    except PWTimeout:
+                        pass
 
-                        import time as _t; _t.sleep(2)
-                        if "myaccount.esbnetworks.ie" not in page.url.lower():
-                            status["error"] = "playwright_login_failed"
-                            browser.close(); _save(status); return status
-
-                        _log(f"Playwright login OK: {page.url[:80]}")
-
-                        # Save playwright session as requests-compatible cookies
+                    # Wait for email field (Azure AD B2C renders it async)
+                    page.wait_for_selector(
+                        'input[name="loginfmt"], input[type="email"], #email, [id*="signInName"]',
+                        timeout=20_000, state="visible"
+                    )
+                    for sel in ['input[name="loginfmt"]', '[id*="signInName"]',
+                                'input[type="email"]', '#email']:
                         try:
-                            pl_cookies = ctx.cookies()
-                            _session_cache.write_text(json.dumps([
-                                {"name": c["name"], "value": c["value"],
-                                 "domain": c["domain"], "path": c["path"]}
-                                for c in pl_cookies
-                            ]))
-                        except Exception: pass
+                            page.fill(sel, email, timeout=3_000); break
+                        except PWTimeout:
+                            continue
 
-                        all_cookies = ctx.cookies()
-                        cookie_str = "; ".join(f"{c['name']}={c['value']}"
-                                               for c in all_cookies)
+                    for sel in ['#idSIButton9', 'input[value="Next"]',
+                                '[id*="next"]', 'button[type="submit"]']:
+                        try:
+                            page.click(sel, timeout=3_000)
+                            page.wait_for_load_state("networkidle", timeout=10_000)
+                            break
+                        except PWTimeout:
+                            continue
 
-                        import urllib.request as _ul, urllib.error as _ue
-                        for slot, dest in hdf_slots.items():
-                            ft  = _FILE_TYPES[slot]
-                            url = (f"https://myaccount.esbnetworks.ie/"
-                                   f"Api/HistoricConsumption?mprn={_mprn}&type={ft}")
-                            _log(f"[PW] GET {slot} → {url}")
-                            try:
-                                req = _ul.Request(url)
-                                req.add_header("Cookie",  cookie_str)
-                                req.add_header("Accept",  "text/csv,application/octet-stream,*/*")
-                                req.add_header("Referer", "https://myaccount.esbnetworks.ie/")
-                                req.add_header("User-Agent",
-                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                    "Chrome/134.0.0.0 Safari/537.36")
-                                with _ul.urlopen(req, timeout=60) as resp:
-                                    body = resp.read()
-                                    preview = body[:200].decode("utf-8", errors="replace")
-                                    _log(f"  HTTP {resp.status} {len(body):,}B  {preview[:60]}")
-                                    if (not preview.strip().startswith("<!DOCTYPE")
-                                            and len(body) > 500
-                                            and ("MPRN" in preview or "kWh" in preview
-                                                 or "kW" in preview)):
-                                        dest.write_bytes(body)
-                                        status["files_updated"].append(slot)
-                                        _log(f"  ✅ {slot}")
-                                    else:
-                                        status.setdefault("partial_errors",{})[slot]="not_csv"
-                                        _log(f"  ❌ not CSV")
-                            except Exception as e:
-                                status.setdefault("partial_errors",{})[slot] = str(e)[:200]
-                                _log(f"  ❌ {e}")
-                        browser.close()
-                except Exception as pe:
-                    _log(f"Playwright fallback error: {pe}")
-                    if not status.get("error"):
-                        status["error"] = str(pe)[:200]
+                    page.wait_for_selector(
+                        'input[type="password"], [name="passwd"], [id*="Password"]',
+                        timeout=15_000, state="visible"
+                    )
+                    for sel in ['input[type="password"]', '[name="passwd"]', '[id*="Password"]']:
+                        try:
+                            page.fill(sel, password, timeout=3_000); break
+                        except PWTimeout:
+                            continue
 
-            status["success"] = len(status["files_updated"]) > 0
-            _save(status)
-            return status
+                    for sel in ['#idSIButton9', 'input[value="Sign in"]',
+                                'button[type="submit"]', '[id*="next"]']:
+                        try:
+                            page.click(sel, timeout=3_000); break
+                        except PWTimeout:
+                            continue
+
+                    page.wait_for_load_state("networkidle", timeout=30_000)
+                    import time as _time
+                    _time.sleep(3)
+                    page.wait_for_load_state("networkidle", timeout=15_000)
+
+                    # ── Save full storage state (cookies + localStorage) ──
+                    try:
+                        storage = ctx.storage_state()
+                        cookies_file.write_text(json.dumps(storage))
+                        _log(f"Saved session state: {len(storage.get('cookies',[]))} cookies")
+                    except Exception as se:
+                        _log(f"Failed to save session: {se}")
+
+                content = page.content().lower()
+                current_url = page.url.lower()
+                _log(f"Post-login URL: {page.url[:100]}")
+
+                # Rate limit / captcha detection
+                if ("captcha" in content or "too many" in content
+                        or "too many retries" in content or "human verification" in content):
+                    status["error"] = "rate_limited"
+                    browser.close(); _save(status); return status
+
+                # Login failed detection — must NOT be on myaccount domain yet
+                # Azure AD B2C redirect ends at myaccount.esbnetworks.ie on success
+                login_domains = ("login.esbnetworks.ie", "b2c_1a", "oauth2", "authorize")
+                on_login_page = any(d in current_url for d in login_domains)
+                on_portal     = "myaccount.esbnetworks.ie" in current_url
+
+                # Wait up to 10s more for redirect to portal if still on login page
+                if on_login_page and not on_portal:
+                    try:
+                        page.wait_for_url("**/myaccount.esbnetworks.ie/**", timeout=10_000)
+                        current_url = page.url.lower()
+                        on_portal   = "myaccount.esbnetworks.ie" in current_url
+                    except PWTimeout:
+                        pass
+
+                if not on_portal:
+                    # Invalidate stale cookies
+                    cookies_file.unlink(missing_ok=True)
+                    _log(f"Login failed - not on portal. URL: {page.url[:120]}")
+                    if any(x in content for x in ["incorrect", "invalid", "wrong", "error"]):
+                        status["error"] = "login_failed"
+                    else:
+                        status["error"] = f"login_failed (url={page.url[:80]})"
+                    browser.close(); _save(status); return status
+
+                # ── Log all cookies and network requests to understand auth ──
+                _log(f"Portal URL after login: {page.url}")
+
+                # Get all cookies in current context
+                all_cookies = ctx.cookies()
+                cookie_names = [c['name'] for c in all_cookies]
+                _log(f"Cookies available: {cookie_names}")
+
+                # Intercept ALL requests to see what headers ESB uses
+                _captured_headers = {}
+                _captured_tokens  = {}
+
+                def _sniff_request(req):
+                    url = req.url
+                    if "myaccount.esbnetworks.ie" in url or "HistoricConsumption" in url:
+                        hdrs = dict(req.headers)
+                        _log(f"  REQ → {url[:80]}")
+                        for k, v in hdrs.items():
+                            if k.lower() in ("authorization","x-xsrf-token","requestverificationtoken",
+                                             "x-requested-with","cookie"):
+                                _log(f"    {k}: {v[:60]}")
+                                _captured_headers[k.lower()] = v
+
+                def _sniff_response(resp):
+                    url = resp.url
+                    if "HistoricConsumption" in url:
+                        _log(f"  RESP {resp.status} ← {url[:80]}")
+                        ct = resp.headers.get("content-type","")
+                        _log(f"    Content-Type: {ct}")
+
+                page.on("request",  _sniff_request)
+                page.on("response", _sniff_response)
+
+                # Navigate to usage page — triggers real API calls
+                _log("Navigating to usage page...")
+                try:
+                    page.goto("https://myaccount.esbnetworks.ie/myusage",
+                              timeout=30_000, wait_until="networkidle")
+                    _log(f"Usage page URL: {page.url}")
+                except Exception as ge:
+                    _log(f"Usage nav error: {ge}")
+
+                # Also try triggering the download link on the page
+                try:
+                    page.wait_for_timeout(2000)
+                    # Look for any download/export links
+                    links = page.eval_on_selector_all(
+                        'a[href*="HistoricConsumption"], a[href*="Historic"], button:has-text("Download"), a:has-text("Download")',
+                        "els => els.map(e => e.href || e.textContent)"
+                    )
+                    _log(f"Download links found: {links}")
+                except Exception:
+                    pass
+
+                page.remove_listener("request",  _sniff_request)
+                page.remove_listener("response", _sniff_response)
+
+                # Try to get __RequestVerificationToken from page
+                rvt = None
+                try:
+                    rvt = page.evaluate(
+                        "() => { const el = document.querySelector('[name=__RequestVerificationToken]'); return el ? el.value : null; }"
+                    )
+                    if rvt:
+                        _log(f"RequestVerificationToken: {rvt[:30]}...")
+                except Exception:
+                    pass
+
+                # Build session cookie string — include ALL cookies, no domain filter
+                _log(f"All cookies ({len(all_cookies)}):")
+                for c in all_cookies:
+                    _log(f"  {c['name']}={c['value'][:30]}... domain={c.get('domain','?')}")
+
+                session_cookies = "; ".join(
+                    f"{c['name']}={c['value']}"
+                    for c in all_cookies
+                )
+                _log(f"Session cookie string length: {len(session_cookies)}")
+
+                if not session_cookies:
+                    status["error"] = "no_session_cookies"
+                    _log("❌ No session cookies found")
+                    browser.close(); _save(status); return status
+
+                # ── Download using session cookies directly ──
+                import urllib.request as _ul
+                import urllib.error  as _ue
+
+                for slot, dest in hdf_slots.items():
+                    file_type    = _ESB_FILE_TYPES[slot]
+                    _mprn2 = ""
+                    try:
+                        _cfg2 = data_dir / "config.json"
+                        if _cfg2.exists():
+                            _mprn2 = json.loads(_cfg2.read_text()).get("mprn","") or ""
+                            _mprn2 = _mprn2.replace(" ","")
+                    except Exception:
+                        pass
+                    download_url = f"{_ESB_DOWNLOAD_URL}?mprn={_mprn2}&type={file_type}"
+                    _log(f"Downloading {slot} → {download_url}")
+                    try:
+                        req = _ul.Request(download_url)
+                        req.add_header("Cookie",  session_cookies)
+                        req.add_header("Accept",  "text/csv,application/octet-stream,*/*")
+                        req.add_header("Referer", "https://myaccount.esbnetworks.ie/")
+                        req.add_header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+                        if rvt:
+                            req.add_header("RequestVerificationToken", rvt)
+
+                        with _ul.urlopen(req, timeout=60) as resp:
+                            _log(f"  HTTP {resp.status} CT={resp.headers.get('Content-Type','?')} URL={resp.url[:80]}")
+                            body = resp.read()
+                            preview = body[:200].decode("utf-8", errors="replace")
+                            _log(f"  {len(body)} bytes | {preview[:80]}")
+
+                            if ("MPRN" in preview or "Read Value" in preview) and len(body) > 100:
+                                tmp_path = Path(tmp) / f"{slot}.csv"
+                                tmp_path.write_bytes(body)
+                                _sh.copy2(str(tmp_path), str(dest))
+                                status["files_updated"].append(slot)
+                                _log(f"  ✅ Saved {slot}")
+                            else:
+                                status.setdefault("partial_errors",{})[slot] = "not_csv"
+                                _log(f"  ❌ Not CSV: {preview[:60]}")
+
+                    except Exception as e:
+                        status.setdefault("partial_errors",{})[slot] = str(e)[:200]
+                        _log(f"  ❌ {slot}: {e}")
+                browser.close()
+
         except Exception as e:
-            status["error"] = str(e)[:200]
-            _save(status)
-            return status
-
-    _download_files(_sess, log_prefix="[requests] ")
+            status["error"] = str(e); _save(status); return status
 
     status["success"] = len(status["files_updated"]) > 0
     if not status["success"] and not status.get("error"):
