@@ -2637,24 +2637,7 @@ with st.sidebar:
                 esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
             st.rerun()
 
-        # ── Log viewer ──
-        _log_path = DATA_DIR / "esb_sync.log"
-        if _log_path.exists():
-            with st.expander("🪵 Sync log", expanded=False):
-                _log_lines = _log_path.read_text().strip().split("\n")
-                _log_text  = "\n".join(_log_lines[-30:])
-                st.markdown(
-                    f'<pre style="background:#0d1117;color:#c9d1d9;font-size:.72rem;'
-                    f'padding:.8rem;border-radius:8px;border:1px solid #30363d;'
-                    f'overflow-x:auto;white-space:pre-wrap;word-break:break-all">'
-                    f'{_log_text}</pre>',
-                    unsafe_allow_html=True
-                )
-                if st.button("🗑️ Clear log", key="clear_log"):
-                    _log_path.unlink(missing_ok=True)
-                    st.rerun()
-
-    # ── Configuration ──
+        # ── Configuration ──
     st.markdown(f"##### 🔄 {t('configuration')}")
     if st.button(t("reparse_btn"), use_container_width=True):
         st.session_state["setup_done"] = False
