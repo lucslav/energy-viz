@@ -1936,13 +1936,13 @@ def setup_screen():
     </div>""", unsafe_allow_html=True)
     lc1, lc2, _ = st.columns([1, 1, 2])
     with lc1:
-        if st.button("🇮🇪 English", use_container_width=True,
+        if st.button("EN 🌐 English", use_container_width=True,
                      type="primary" if st.session_state.get("lang","en") == "en" else "secondary",
                      key="setup_lang_en"):
             st.session_state["lang"] = "en"
             st.rerun()
     with lc2:
-        if st.button("🇵🇱 Polski", use_container_width=True,
+        if st.button("PL 🌐 Polski", use_container_width=True,
                      type="primary" if st.session_state.get("lang","en") == "pl" else "secondary",
                      key="setup_lang_pl"):
             st.session_state["lang"] = "pl"
@@ -2425,13 +2425,13 @@ with st.sidebar:
     # ── Language toggle ──
     lang_col1, lang_col2 = st.columns(2)
     with lang_col1:
-        if st.button("🇮🇪 English", use_container_width=True,
+        if st.button("EN 🌐 English", use_container_width=True,
                      type="primary" if st.session_state.get("lang","en") == "en" else "secondary"):
             st.session_state["lang"] = "en"
             save_config()
             st.rerun()
     with lang_col2:
-        if st.button("🇵🇱 Polski", use_container_width=True,
+        if st.button("PL 🌐 Polski", use_container_width=True,
                      type="primary" if st.session_state.get("lang","en") == "pl" else "secondary"):
             st.session_state["lang"] = "pl"
             save_config()
@@ -2642,7 +2642,14 @@ with st.sidebar:
         if _log_path.exists():
             with st.expander("🪵 Sync log", expanded=False):
                 _log_lines = _log_path.read_text().strip().split("\n")
-                st.code("\n".join(_log_lines[-30:]), language=None)
+                _log_text  = "\n".join(_log_lines[-30:])
+                st.markdown(
+                    f'<pre style="background:#0d1117;color:#c9d1d9;font-size:.72rem;'
+                    f'padding:.8rem;border-radius:8px;border:1px solid #30363d;'
+                    f'overflow-x:auto;white-space:pre-wrap;word-break:break-all">'
+                    f'{_log_text}</pre>',
+                    unsafe_allow_html=True
+                )
                 if st.button("🗑️ Clear log", key="clear_log"):
                     _log_path.unlink(missing_ok=True)
                     st.rerun()
