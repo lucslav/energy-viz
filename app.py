@@ -294,7 +294,10 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
     font-weight:600 !important; padding:.45rem 1.1rem !important;
     transition: opacity .2s !important;
 }
-.stButton > button:hover { opacity:.85 !important; }
+.stButton > button:hover { 
+    opacity:.85 !important; 
+    color:#fff !important;
+}
 
 /* ── metrics ── */
 [data-testid="stMetric"] {
@@ -1057,7 +1060,7 @@ TRANSLATIONS = {
     "esb_sync_files":       {"en": "Updated",                     "pl": "Zaktualizowano"},
     "esb_sync_running":     {"en": "Syncing with ESB…",           "pl": "Synchronizuję z ESB…"},
     "esb_sync_never":       {"en": "Never synced",                "pl": "Brak synchronizacji"},
-    "esb_sync_no_creds":    {"en": "Enter credentials to enable weekly auto-sync.", "pl": "Wpisz dane aby włączyć auto-sync co tydzień."},
+    "esb_sync_no_creds":    {"en": "Add cookies.txt below to enable weekly auto-sync.", "pl": "Dodaj cookies.txt poniżej aby włączyć auto-sync co tydzień."},
     "esb_sync_weekly":      {"en": "✅ Auto-sync active — every week.", "pl": "✅ Auto-sync aktywny — co tydzień."},
     "esb_sync_rate_limit":  {"en": "Rate limit hit — max 2 logins/24h. Resets at midnight.", "pl": "Limit logowań ESB (max 2/24h). Reset o północy."},
     "esb_sync_login_fail":  {"en": "Login failed — check email and password.", "pl": "Błąd logowania — sprawdź email i hasło ESB."},
@@ -1068,8 +1071,8 @@ TRANSLATIONS = {
     "esb_cookies_saved":    {"en": "✅ Browser cookies saved — will be used for downloads.", 
                              "pl": "✅ Cookies zapisane — będą użyte do pobierania."},
     "esb_cookies_clear":    {"en": "🗑️ Clear cookies",        "pl": "🗑️ Usuń cookies"},
-    "esb_cookies_hint":     {"en": "Export from browser using 'Get cookies.txt LOCALLY' extension on myaccount.esbnetworks.ie",
-                             "pl": "Eksportuj z przeglądarki rozszerzeniem 'Get cookies.txt LOCALLY' na myaccount.esbnetworks.ie"},
+    "esb_cookies_hint":     {"en": "Export from browser using <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> extension on myaccount.esbnetworks.ie",
+                             "pl": "Eksportuj z przeglądarki rozszerzeniem <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> na myaccount.esbnetworks.ie"},
     "esb_sync_fail":        {"en": "Sync failed",                 "pl": "Błąd synchronizacji"},
 }
 
@@ -2550,14 +2553,11 @@ with st.sidebar:
         st.session_state["tariff"] = dict(day=t_day, peak=t_peak, night=t_night, standing=t_stand)
         save_config()
 
-    # ── Update / reset ──
     st.divider()
+    
     # ── ESB Auto-Sync ──
-    st.divider()
     st.markdown(f"##### 🔄 {t('esb_sync_title')}")
 
-    _esb_email, _esb_pass = decrypt_esb_creds()
-    _has_creds = bool(_esb_email and _esb_pass)
     _sync_st   = read_sync_status()
 
     # Status badge
@@ -2579,37 +2579,13 @@ with st.sidebar:
                 f'<div class="alert-box alert-warn" style="font-size:.75rem;padding:.4rem .7rem">'
                 f'⚠️ {_emsg}<br><span style="opacity:.7">{_last}</span></div>',
                 unsafe_allow_html=True)
-    elif _has_creds:
-        st.caption(t("esb_sync_weekly"))
     else:
         st.caption(t("esb_sync_no_creds"))
 
-    # Credentials expander
-    _exp_label = t("esb_creds_stored") if _has_creds else f"🔑 {t('esb_sync_email')}"
-    with st.expander(_exp_label, expanded=not _has_creds):
-        _new_email = st.text_input(t("esb_sync_email"),    value=_esb_email,
-                                   key="esb_email_in", placeholder="name@example.com")
-        _new_pass  = st.text_input(t("esb_sync_password"), value=_esb_pass,
-                                   key="esb_pass_in",  type="password", placeholder="••••••••")
-        _ca, _cb = st.columns(2)
-        with _ca:
-            if st.button(t("esb_sync_save"), use_container_width=True, key="esb_save"):
-                if _new_email and _new_pass:
-                    _enc = encrypt_esb_creds(_new_email, _new_pass)
-                    if _enc:
-                        ESB_CREDS_FILE.write_bytes(_enc)
-                        SYNC_STATUS_FILE.unlink(missing_ok=True)
-                        st.success(t("esb_sync_creds_saved"))
-                        st.rerun()
-        with _cb:
-            if _has_creds and st.button(t("esb_sync_clear"), use_container_width=True, key="esb_clear"):
-                ESB_CREDS_FILE.unlink(missing_ok=True)
-                st.rerun()
-
-    # ── cookies.txt — always visible ──
+    # ── cookies.txt section with clear instructions ──
     _has_txt = ESB_COOKIES_TXT.exists()
     with st.expander("🍪 cookies.txt", expanded=not _has_txt):
-        st.caption(t("esb_cookies_hint"))
+        st.markdown(t("esb_cookies_hint"), unsafe_allow_html=True)
         _cookies_input = st.text_area(
             t("esb_cookies_txt"),
             placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
@@ -2630,14 +2606,16 @@ with st.sidebar:
     if _has_txt:
         st.caption(f"✅ cookies.txt ({ESB_COOKIES_TXT.stat().st_size} B)")
 
-    _can_sync = _has_creds or ESB_COOKIES_TXT.exists()
+    _can_sync = ESB_COOKIES_TXT.exists()
     if _can_sync:
         if st.button(t("esb_sync_now"), use_container_width=True, key="esb_now"):
             with st.spinner(t("esb_sync_running")):
                 esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
             st.rerun()
 
-        # ── Configuration ──
+    st.divider()
+    
+    # ── Configuration ──
     st.markdown(f"##### 🔄 {t('configuration')}")
     if st.button(t("reparse_btn"), use_container_width=True):
         st.session_state["setup_done"] = False
