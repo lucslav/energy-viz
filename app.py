@@ -466,6 +466,13 @@ div[role="radiogroup"] label span {
     border-color: #30363d !important;
     background: #161b22 !important;
 }
+/* Buttons inside expanders */
+[data-testid="stExpander"] .stButton > button {
+    color: #fff !important;
+}
+[data-testid="stExpander"] .stButton > button:hover {
+    color: #fff !important;
+}
 
 /* ── global fallback: any p/span/label still grey ── */
 p, label, span {
@@ -670,8 +677,10 @@ TRANSLATIONS = {
     "key_metrics":          {"en": "Key Metrics",                 "pl": "Główne wskaźniki"},
     "period_week":          {"en": "Week",                        "pl": "Tydzień"},
     "period_month":         {"en": "Month",                       "pl": "Miesiąc"},
-    "period_bill":          {"en": "Bill",                        "pl": "Rachunek"},
+    "period_custom":        {"en": "Custom",                      "pl": "Zakres"},
     "period_total":         {"en": "Total",                       "pl": "Całość"},
+    "date_from":            {"en": "From",                        "pl": "Od"},
+    "date_to":              {"en": "To",                          "pl": "Do"},
     "total_consumption":    {"en": "Total Consumption",           "pl": "Zużycie łącznie"},
     "daily_average":        {"en": "Daily Average",               "pl": "Średnia dzienna"},
     "energy_cost":          {"en": "Energy Cost",                 "pl": "Koszt energii"},
@@ -1053,7 +1062,7 @@ TRANSLATIONS = {
     "esb_sync_title":       {"en": "ESB Auto-Sync",               "pl": "Auto-sync ESB"},
     "esb_sync_email":       {"en": "ESB account email",           "pl": "Email konta ESB"},
     "esb_sync_password":    {"en": "ESB account password",        "pl": "Hasło konta ESB"},
-    "esb_sync_save":        {"en": "💾 Save & enable",            "pl": "💾 Zapisz i włącz"},
+    "esb_sync_save":        {"en": "Save",            "pl": "Zapisz"},
     "esb_sync_clear":       {"en": "🗑️ Remove",                   "pl": "🗑️ Usuń"},
     "esb_sync_now":         {"en": "🔄 Sync now",                 "pl": "🔄 Synchronizuj teraz"},
     "esb_sync_ok":          {"en": "Sync successful",             "pl": "Synchronizacja udana"},
@@ -2797,25 +2806,51 @@ with tabs[0]:
         section("📌", t("key_metrics"))
     with ov_col2:
         ov_period_idx = st.radio(t("period_selector"),
-                             [t("period_week"), t("period_month"), t("period_bill"), t("period_total")],
+                             [t("period_week"), t("period_month"), t("period_custom"), t("period_total")],
                              index=3, horizontal=True, label_visibility="collapsed",
                              key="ov_period")
         # Map by index position (language-independent)
-        _period_opts = [t("period_week"), t("period_month"), t("period_bill"), t("period_total")]
+        _period_opts = [t("period_week"), t("period_month"), t("period_custom"), t("period_total")]
         ov_period_i = _period_opts.index(ov_period_idx) if ov_period_idx in _period_opts else 3
+
+    # Custom date range picker (only when Custom is selected)
+    ov_custom_start = None
+    ov_custom_end = None
+    if ov_period_i == 2:  # Custom
+        st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
+        _d1, _d2 = st.columns(2)
+        with _d1:
+            ov_custom_start = st.date_input(
+                t("date_from") if "date_from" in TRANSLATIONS else "From",
+                value=None,
+                key="ov_custom_start"
+            )
+        with _d2:
+            ov_custom_end = st.date_input(
+                t("date_to") if "date_to" in TRANSLATIONS else "To",
+                value=None,
+                key="ov_custom_end"
+            )
 
     # Filter data by selected period
     if df_calc is not None:
         now = df_calc["datetime"].max()
         if ov_period_i == 0:    # Week
             ov_cutoff = now - pd.Timedelta(days=7)
+            df_ov = df_calc[df_calc["datetime"] >= ov_cutoff]
         elif ov_period_i == 1:  # Month
             ov_cutoff = now - pd.Timedelta(days=30)
-        elif ov_period_i == 2 and st.session_state.get("billing_start"):  # Bill
-            ov_cutoff = pd.Timestamp(st.session_state["billing_start"])
+            df_ov = df_calc[df_calc["datetime"] >= ov_cutoff]
+        elif ov_period_i == 2:  # Custom
+            if ov_custom_start and ov_custom_end:
+                df_ov = df_calc[
+                    (df_calc["date"] >= ov_custom_start) & 
+                    (df_calc["date"] <= ov_custom_end)
+                ]
+            else:
+                df_ov = df_calc  # Show all if dates not selected
         else:  # Total
-            ov_cutoff = df_calc["datetime"].min()
-        df_ov = df_calc[df_calc["datetime"] >= ov_cutoff]
+            df_ov = df_calc
     else:
         df_ov = None
 
@@ -2931,7 +2966,6 @@ with tabs[1]:
                    annotation_text=t("peak_rate"), annotation_font_color=COLORS["peak"])
     apply_layout(fig2, "", height=max(280, len(heat_piv)*14+60))
     fig2.update_layout(
-        yaxis_autorange="reversed",
         xaxis=dict(
             tickmode="array",
             tickvals=[f"{h:02d}:00" for h in range(0, 24)],
@@ -3128,6 +3162,10 @@ with tabs[3]:
 
 # ════════════════════════════════════════════
 #  TAB 4 — COST BREAKDOWN
+#  TODO (future): Add year-to-year comparison with monthly and annual views
+#  - Monthly comparison: same month across different years (e.g., Jan 2024 vs Jan 2025)
+#  - Annual comparison: full year totals side-by-side
+#  - Visual: dual-axis bar charts with YoY % change indicators
 # ════════════════════════════════════════════
 with tabs[4]:
     if df_calc is None:
