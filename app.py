@@ -298,6 +298,14 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
     opacity:.85 !important; 
     color:#fff !important;
 }
+.stButton > button:focus,
+.stButton > button:active {
+    color:#fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+}
+.stButton > button:focus:not(:focus-visible) {
+    outline: none !important;
+}
 
 /* ── metrics ── */
 [data-testid="stMetric"] {
@@ -472,6 +480,11 @@ div[role="radiogroup"] label span {
 }
 [data-testid="stExpander"] .stButton > button:hover {
     color: #fff !important;
+}
+[data-testid="stExpander"] .stButton > button:focus,
+[data-testid="stExpander"] .stButton > button:active {
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
 }
 
 /* ── global fallback: any p/span/label still grey ── */
