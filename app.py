@@ -286,25 +286,45 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
 }
 
 /* ── buttons ── */
-.stButton > button {
+.stButton > button,
+button[kind="primary"],
+button[kind="secondary"] {
     background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
-    color:#fff !important; border:none !important;
+    color:#fff !important; 
+    border:none !important;
     border-radius:8px !important;
     font-family:'Space Grotesk',sans-serif !important;
-    font-weight:600 !important; padding:.45rem 1.1rem !important;
+    font-weight:600 !important; 
+    padding:.45rem 1.1rem !important;
     transition: opacity .2s !important;
 }
-.stButton > button:hover { 
+.stButton > button:hover,
+button[kind="primary"]:hover,
+button[kind="secondary"]:hover { 
     opacity:.85 !important; 
     color:#fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
 }
 .stButton > button:focus,
-.stButton > button:active {
+.stButton > button:active,
+button[kind="primary"]:focus,
+button[kind="primary"]:active,
+button[kind="secondary"]:focus,
+button[kind="secondary"]:active {
     color:#fff !important;
     background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    opacity: 1 !important;
 }
 .stButton > button:focus:not(:focus-visible) {
     outline: none !important;
+}
+/* Disabled state */
+.stButton > button:disabled,
+button[kind="primary"]:disabled,
+button[kind="secondary"]:disabled {
+    opacity: 0.4 !important;
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
 }
 
 /* ── metrics ── */
@@ -474,17 +494,29 @@ div[role="radiogroup"] label span {
     border-color: #30363d !important;
     background: #161b22 !important;
 }
-/* Buttons inside expanders */
-[data-testid="stExpander"] .stButton > button {
-    color: #fff !important;
-}
-[data-testid="stExpander"] .stButton > button:hover {
-    color: #fff !important;
-}
-[data-testid="stExpander"] .stButton > button:focus,
-[data-testid="stExpander"] .stButton > button:active {
+/* Buttons inside expanders - all states */
+[data-testid="stExpander"] .stButton > button,
+[data-testid="stExpander"] button[kind="primary"],
+[data-testid="stExpander"] button[kind="secondary"] {
     color: #fff !important;
     background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+}
+[data-testid="stExpander"] .stButton > button:hover,
+[data-testid="stExpander"] button[kind="primary"]:hover,
+[data-testid="stExpander"] button[kind="secondary"]:hover {
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    opacity: .85 !important;
+}
+[data-testid="stExpander"] .stButton > button:focus,
+[data-testid="stExpander"] .stButton > button:active,
+[data-testid="stExpander"] button[kind="primary"]:focus,
+[data-testid="stExpander"] button[kind="primary"]:active,
+[data-testid="stExpander"] button[kind="secondary"]:focus,
+[data-testid="stExpander"] button[kind="secondary"]:active {
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    opacity: 1 !important;
 }
 
 /* ── global fallback: any p/span/label still grey ── */
@@ -724,6 +756,11 @@ TRANSLATIONS = {
     # ── Cost Breakdown ──
     "cost_breakdown":       {"en": "Cost Breakdown",              "pl": "Rozliczenie kosztów"},
     "monthly_bill":         {"en": "Monthly Bill Estimate",       "pl": "Szacunkowy rachunek miesięczny"},
+    "yoy_comparison":       {"en": "Year-to-Year Comparison",    "pl": "Porównanie rok do roku"},
+    "yoy_monthly":          {"en": "Monthly Comparison",         "pl": "Porównanie miesięczne"},
+    "yoy_select_years":     {"en": "Select years to compare",    "pl": "Wybierz lata do porównania"},
+    "yoy_change":           {"en": "Change",                     "pl": "Zmiana"},
+    "yoy_prev_year":        {"en": "vs. previous year",          "pl": "vs. poprzedni rok"},
     # ── Advanced Insights ──
     "seasonal_trend":       {"en": "Seasonal & Monthly Trend",    "pl": "Trend sezonowy i miesięczny"},
     "load_profile":         {"en": "Average Daily Load Profile",  "pl": "Średni dobowy profil obciążenia"},
@@ -3274,6 +3311,168 @@ with tabs[4]:
         margin=dict(l=10, r=10, t=20, b=100),
     )
     st.plotly_chart(fig_m, use_container_width=True)
+
+    # ════════════════════════════════════════════
+    #  YEAR-TO-YEAR COMPARISON
+    # ════════════════════════════════════════════
+    st.divider()
+    section("📊", t("yoy_comparison"))
+    
+    # Extract year and month from data
+    df_calc["year"] = df_calc["datetime"].dt.year
+    df_calc["month_num"] = df_calc["datetime"].dt.month
+    
+    # Get available years
+    available_years = sorted(df_calc["year"].unique())
+    
+    if len(available_years) >= 2:
+        # Year selector
+        yoy_col1, yoy_col2 = st.columns(2)
+        with yoy_col1:
+            year1 = st.selectbox(
+                t("yoy_select_years") + " 1",
+                options=available_years,
+                index=len(available_years)-2 if len(available_years) >= 2 else 0,
+                key="yoy_year1"
+            )
+        with yoy_col2:
+            year2 = st.selectbox(
+                t("yoy_select_years") + " 2",
+                options=available_years,
+                index=len(available_years)-1,
+                key="yoy_year2"
+            )
+        
+        # Prepare data for both years
+        df_year1 = df_calc[df_calc["year"] == year1].copy()
+        df_year2 = df_calc[df_calc["year"] == year2].copy()
+        
+        # Monthly aggregation
+        mo_year1 = df_year1.groupby("month_num").agg(
+            kwh=("value","sum"), 
+            cost=("cost","sum")
+        ).reset_index()
+        mo_year1["cost_net"] = mo_year1["cost"] * disc_factor
+        mo_year1["days"] = df_year1.groupby("month_num")["date"].nunique().values[:len(mo_year1)]
+        mo_year1["standing"] = mo_year1["days"] * t_stand
+        mo_year1["vat"] = (mo_year1["cost_net"] + mo_year1["standing"]) * VAT_RATE
+        mo_year1["total"] = mo_year1["cost_net"] + mo_year1["standing"] + mo_year1["vat"]
+        
+        mo_year2 = df_year2.groupby("month_num").agg(
+            kwh=("value","sum"), 
+            cost=("cost","sum")
+        ).reset_index()
+        mo_year2["cost_net"] = mo_year2["cost"] * disc_factor
+        mo_year2["days"] = df_year2.groupby("month_num")["date"].nunique().values[:len(mo_year2)]
+        mo_year2["standing"] = mo_year2["days"] * t_stand
+        mo_year2["vat"] = (mo_year2["cost_net"] + mo_year2["standing"]) * VAT_RATE
+        mo_year2["total"] = mo_year2["cost_net"] + mo_year2["standing"] + mo_year2["vat"]
+        
+        # Month labels
+        if st.session_state.get("lang","en") == "pl":
+            month_labels = TRANSLATIONS["months_short"]["pl"]
+        else:
+            month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+        
+        # ── Bar chart comparison ──
+        st.markdown(f"<h4 style='color:#7d8590;font-size:.9rem;margin:1rem 0 .5rem'>{t('yoy_monthly')}</h4>", unsafe_allow_html=True)
+        
+        fig_yoy = go.Figure()
+        
+        # Merge data for alignment
+        mo_merged = mo_year1.merge(mo_year2, on="month_num", how="outer", suffixes=("_y1","_y2"))
+        mo_merged = mo_merged.sort_values("month_num")
+        mo_merged["month_label"] = mo_merged["month_num"].apply(lambda m: month_labels[int(m)-1] if pd.notna(m) and 1 <= m <= 12 else "")
+        
+        # Add bars for each year
+        fig_yoy.add_trace(go.Bar(
+            name=str(year1),
+            x=mo_merged["month_label"],
+            y=mo_merged["total_y1"].fillna(0),
+            marker_color=COLORS["blue"],
+            marker_line_width=0,
+            text=mo_merged["total_y1"].fillna(0).apply(lambda v: f"€{v:.0f}" if v > 0 else ""),
+            textposition="outside",
+            textfont=dict(size=9, color=COLORS["blue"]),
+        ))
+        fig_yoy.add_trace(go.Bar(
+            name=str(year2),
+            x=mo_merged["month_label"],
+            y=mo_merged["total_y2"].fillna(0),
+            marker_color=COLORS["cyan"],
+            marker_line_width=0,
+            text=mo_merged["total_y2"].fillna(0).apply(lambda v: f"€{v:.0f}" if v > 0 else ""),
+            textposition="outside",
+            textfont=dict(size=9, color=COLORS["cyan"]),
+        ))
+        
+        apply_layout(fig_yoy, "", height=340)
+        fig_yoy.update_layout(
+            barmode="group",
+            yaxis_title="€",
+            legend=dict(
+                orientation="h", yanchor="top", y=-0.15,
+                xanchor="center", x=0.5,
+                font=dict(size=11, color=COLORS["text"]),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+            margin=dict(l=10, r=10, t=30, b=80),
+        )
+        st.plotly_chart(fig_yoy, use_container_width=True)
+        
+        # ── Comparison table ──
+        st.markdown(f"<h4 style='color:#7d8590;font-size:.9rem;margin:1.5rem 0 .5rem'>📋 {t('cost_breakdown')}</h4>", unsafe_allow_html=True)
+        
+        # Annual totals
+        total_y1 = mo_year1["total"].sum()
+        total_y2 = mo_year2["total"].sum()
+        kwh_y1 = mo_year1["kwh"].sum()
+        kwh_y2 = mo_year2["kwh"].sum()
+        
+        delta_total = total_y2 - total_y1
+        delta_pct = (delta_total / total_y1 * 100) if total_y1 > 0 else 0
+        delta_kwh = kwh_y2 - kwh_y1
+        delta_kwh_pct = (delta_kwh / kwh_y1 * 100) if kwh_y1 > 0 else 0
+        
+        # Display as nice cards
+        yc1, yc2, yc3 = st.columns(3)
+        
+        with yc1:
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                        padding:1rem;text-align:center;border-top:3px solid {COLORS['blue']}">
+                <div style="font-size:.78rem;color:#7d8590;margin-bottom:.3rem">{year1}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;
+                            font-weight:700;color:#e6edf3">€{total_y1:,.0f}</div>
+                <div style="font-size:.75rem;color:#7d8590;margin-top:.2rem">{kwh_y1:,.0f} kWh</div>
+            </div>""", unsafe_allow_html=True)
+        
+        with yc2:
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                        padding:1rem;text-align:center;border-top:3px solid {COLORS['cyan']}">
+                <div style="font-size:.78rem;color:#7d8590;margin-bottom:.3rem">{year2}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;
+                            font-weight:700;color:#e6edf3">€{total_y2:,.0f}</div>
+                <div style="font-size:.75rem;color:#7d8590;margin-top:.2rem">{kwh_y2:,.0f} kWh</div>
+            </div>""", unsafe_allow_html=True)
+        
+        with yc3:
+            change_color = COLORS["green"] if delta_pct < 0 else COLORS["red"]
+            change_icon = "↓" if delta_pct < 0 else "↑"
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                        padding:1rem;text-align:center;border-top:3px solid {change_color}">
+                <div style="font-size:.78rem;color:#7d8590;margin-bottom:.3rem">{t('yoy_change')}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;
+                            font-weight:700;color:{change_color}">{delta_pct:+.1f}% {change_icon}</div>
+                <div style="font-size:.75rem;color:#7d8590;margin-top:.2rem">
+                    {delta_kwh:+,.0f} kWh ({delta_kwh_pct:+.1f}%)</div>
+            </div>""", unsafe_allow_html=True)
+        
+    else:
+        alert("Need at least 2 years of data for year-to-year comparison." if st.session_state.get("lang","en") == "en" 
+              else "Potrzebne dane z przynajmniej 2 lat do porównania.", "info")
 
 
 # ════════════════════════════════════════════
