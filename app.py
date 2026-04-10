@@ -613,6 +613,32 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
 section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] * {
     color: #e6edf3 !important;
 }
+
+/* ── Sidebar buttons (non-file-uploader) — FORCE blue gradient ── */
+section[data-testid="stSidebar"] .stButton > button,
+section[data-testid="stSidebar"] button[kind="primary"],
+section[data-testid="stSidebar"] button[kind="secondary"] {
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    color: #fff !important;
+    border: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover,
+section[data-testid="stSidebar"] button[kind="primary"]:hover,
+section[data-testid="stSidebar"] button[kind="secondary"]:hover {
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    color: #fff !important;
+    opacity: .85 !important;
+}
+section[data-testid="stSidebar"] .stButton > button:focus,
+section[data-testid="stSidebar"] .stButton > button:active,
+section[data-testid="stSidebar"] button[kind="primary"]:focus,
+section[data-testid="stSidebar"] button[kind="primary"]:active,
+section[data-testid="stSidebar"] button[kind="secondary"]:focus,
+section[data-testid="stSidebar"] button[kind="secondary"]:active {
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    color: #fff !important;
+    opacity: 1 !important;
+}
 /* Nuclear option: any white/light backgrounds inside sidebar uploader */
 section[data-testid="stSidebar"] [data-testid^="stFileUploader"] > div,
 section[data-testid="stSidebar"] [data-testid^="stFileUploader"] li,
@@ -637,7 +663,7 @@ COLORS = dict(
     day="#58a6ff", peak="#f0883e", night="#bc8cff",
     total="#3fb950", kw="#39d0d8", bg="#161b22",
     grid="#30363d", text="#e6edf3", muted="#7d8590",
-    red="#f85149", yellow="#d29922",
+    red="#f85149", yellow="#d29922", green="#3fb950",
     # aliases
     blue="#58a6ff", cyan="#39d0d8", purple="#bc8cff",
 )
@@ -1130,8 +1156,8 @@ TRANSLATIONS = {
     "esb_cookies_saved":    {"en": "✅ Browser cookies saved — will be used for downloads.", 
                              "pl": "✅ Cookies zapisane — będą użyte do pobierania."},
     "esb_cookies_clear":    {"en": "🗑️ Clear cookies",        "pl": "🗑️ Usuń cookies"},
-    "esb_cookies_hint":     {"en": "Export from browser using <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> extension on myaccount.esbnetworks.ie",
-                             "pl": "Eksportuj z przeglądarki rozszerzeniem <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> na myaccount.esbnetworks.ie"},
+    "esb_cookies_hint":     {"en": "Export from browser using <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> extension on <a href='https://myaccount.esbnetworks.ie' target='_blank' style='color:#58a6ff;text-decoration:underline'>myaccount.esbnetworks.ie</a>",
+                             "pl": "Eksportuj z przeglądarki rozszerzeniem <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> na <a href='https://myaccount.esbnetworks.ie' target='_blank' style='color:#58a6ff;text-decoration:underline'>myaccount.esbnetworks.ie</a>"},
     "esb_sync_fail":        {"en": "Sync failed",                 "pl": "Błąd synchronizacji"},
 }
 
