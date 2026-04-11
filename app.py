@@ -2669,27 +2669,37 @@ with st.sidebar:
 
     # ── cookies.txt section with clear instructions ──
     _has_txt = ESB_COOKIES_TXT.exists()
+    
+    # Show hint outside expander
+    st.markdown(t("esb_cookies_hint"), unsafe_allow_html=True)
+    
+    # Expander for textarea only
     with st.expander("🍪 cookies.txt", expanded=not _has_txt):
-        st.markdown(t("esb_cookies_hint"), unsafe_allow_html=True)
         _cookies_input = st.text_area(
             t("esb_cookies_txt"),
             placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
-            height=100, key="esb_cookies_txt_input"
+            height=100, key="esb_cookies_txt_input",
+            label_visibility="collapsed"
         )
-        _cca, _ccb = st.columns(2)
-        with _cca:
-            if st.button("💾 " + t("esb_sync_save"), key="esb_txt_save",
-                         use_container_width=True, disabled=not _cookies_input.strip()):
-                ESB_COOKIES_TXT.write_text(_cookies_input.strip())
-                st.success(t("esb_cookies_saved"))
-                st.rerun()
-        with _ccb:
-            if _has_txt and st.button(t("esb_cookies_clear"), key="esb_txt_clear",
-                                      use_container_width=True):
-                ESB_COOKIES_TXT.unlink(missing_ok=True)
-                st.rerun()
+    
+    # Status and buttons OUTSIDE expander
     if _has_txt:
         st.caption(f"✅ cookies.txt ({ESB_COOKIES_TXT.stat().st_size} B)")
+    
+    _cca, _ccb = st.columns(2)
+    with _cca:
+        # Get the input value from session state
+        _input_val = st.session_state.get("esb_cookies_txt_input", "")
+        if st.button("💾 " + t("esb_sync_save"), key="esb_txt_save",
+                     use_container_width=True, disabled=not _input_val.strip()):
+            ESB_COOKIES_TXT.write_text(_input_val.strip())
+            st.success(t("esb_cookies_saved"))
+            st.rerun()
+    with _ccb:
+        if _has_txt and st.button(t("esb_cookies_clear"), key="esb_txt_clear",
+                                  use_container_width=True):
+            ESB_COOKIES_TXT.unlink(missing_ok=True)
+            st.rerun()
 
     _can_sync = ESB_COOKIES_TXT.exists()
     if _can_sync:
