@@ -2510,16 +2510,32 @@ def load_daily(file):
 #  SIDEBAR
 # ─────────────────────────────────────────────
 with st.sidebar:
-    # ── Language toggle ──
+    # ── Language toggle with flag images ──
     lang_col1, lang_col2 = st.columns(2)
+    
     with lang_col1:
-        if st.button("🇮🇪 English", use_container_width=True,
+        # Show flag image
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:-10px">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/4/45/Flag_of_Ireland.svg" 
+                 style="height:16px;width:auto;border:1px solid rgba(255,255,255,0.2);border-radius:2px">
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("English", use_container_width=True, key="lang_en",
                      type="primary" if st.session_state.get("lang","en") == "en" else "secondary"):
             st.session_state["lang"] = "en"
             save_config()
             st.rerun()
+    
     with lang_col2:
-        if st.button("🇵🇱 Polski", use_container_width=True,
+        # Show flag image
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:-10px">
+            <img src="https://upload.wikimedia.org/wikipedia/en/1/12/Flag_of_Poland.svg" 
+                 style="height:16px;width:auto;border:1px solid rgba(255,255,255,0.2);border-radius:2px">
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Polski", use_container_width=True, key="lang_pl",
                      type="primary" if st.session_state.get("lang","en") == "pl" else "secondary"):
             st.session_state["lang"] = "pl"
             save_config()
@@ -2667,50 +2683,42 @@ with st.sidebar:
     else:
         st.caption(t("esb_sync_no_creds"))
 
-    # ── cookies.txt section with clear instructions ──
+    # ── cookies.txt section - NO EXPANDER, always visible ──
     _has_txt = ESB_COOKIES_TXT.exists()
     
-    # Show hint outside expander
+    st.markdown(f"<div style='font-size:.85rem;font-weight:600;color:#7d8590;margin:.8rem 0 .4rem'>🍪 cookies.txt</div>", unsafe_allow_html=True)
+    
+    # Show hint
     st.markdown(t("esb_cookies_hint"), unsafe_allow_html=True)
     
-    # Expander for textarea only
-    with st.expander("🍪 cookies.txt", expanded=not _has_txt):
-        _cookies_input = st.text_area(
-            t("esb_cookies_txt"),
-            placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
-            height=100, key="esb_cookies_txt_input",
-            label_visibility="collapsed"
-        )
+    # Textarea for cookies
+    _cookies_input = st.text_area(
+        t("esb_cookies_txt"),
+        placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
+        height=100, 
+        key="esb_cookies_txt_input",
+        label_visibility="collapsed"
+    )
     
-    # Status and buttons OUTSIDE expander
+    # Status
     if _has_txt:
         st.caption(f"✅ cookies.txt ({ESB_COOKIES_TXT.stat().st_size} B)")
     
-    # Use FORMS for buttons - different CSS behavior
+    # Buttons side by side - FIXED layout
     _cca, _ccb = st.columns(2)
     with _cca:
-        with st.form(key="esb_cookies_save_form", clear_on_submit=False):
-            _submitted = st.form_submit_button(
-                "💾 " + t("esb_sync_save"),
-                use_container_width=True
-            )
-            if _submitted:
-                _input_val = st.session_state.get("esb_cookies_txt_input", "")
-                if _input_val.strip():
-                    ESB_COOKIES_TXT.write_text(_input_val.strip())
-                    st.success(t("esb_cookies_saved"))
-                    st.rerun()
-    
+        if st.button("💾 " + t("esb_sync_save"), key="esb_txt_save",
+                     use_container_width=True):
+            if _cookies_input.strip():
+                ESB_COOKIES_TXT.write_text(_cookies_input.strip())
+                st.success(t("esb_cookies_saved"))
+                st.rerun()
     with _ccb:
         if _has_txt:
-            with st.form(key="esb_cookies_clear_form", clear_on_submit=False):
-                _clear_submitted = st.form_submit_button(
-                    t("esb_cookies_clear"),
-                    use_container_width=True
-                )
-                if _clear_submitted:
-                    ESB_COOKIES_TXT.unlink(missing_ok=True)
-                    st.rerun()
+            if st.button(t("esb_cookies_clear"), key="esb_txt_clear",
+                         use_container_width=True):
+                ESB_COOKIES_TXT.unlink(missing_ok=True)
+                st.rerun()
 
     _can_sync = ESB_COOKIES_TXT.exists()
     if _can_sync:
