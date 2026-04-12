@@ -2510,47 +2510,121 @@ def load_daily(file):
 #  SIDEBAR
 # ─────────────────────────────────────────────
 with st.sidebar:
-    # ── Language toggle with flag images ──
-    lang_col1, lang_col2 = st.columns(2)
+    # ── Language toggle with SVG flags side-by-side ──
+    current_lang = st.session_state.get("lang", "en")
     
-    with lang_col1:
-        # Show flag image
-        st.markdown("""
-        <div style="text-align:center;margin-bottom:-10px">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/4/45/Flag_of_Ireland.svg" 
-                 style="height:16px;width:auto;border:1px solid rgba(255,255,255,0.2);border-radius:2px">
+    st.markdown("""
+    <style>
+    .lang-selector {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 1rem;
+    }
+    .lang-option {
+        flex: 1;
+        display: flex;
+        align-items: stretch;
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: opacity 0.2s;
+        text-decoration: none;
+    }
+    .lang-option:hover {
+        opacity: 0.85;
+    }
+    .lang-flag {
+        width: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-right: none;
+    }
+    .lang-flag img {
+        width: 28px;
+        height: 20px;
+        object-fit: cover;
+        border-radius: 2px;
+    }
+    .lang-text {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem 1rem;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 600;
+        font-size: 0.875rem;
+        border: none;
+    }
+    .lang-primary .lang-text {
+        background: linear-gradient(135deg, #1f6feb, #388bfd);
+        color: #fff;
+    }
+    .lang-secondary .lang-text {
+        background: #21262d;
+        color: #e6edf3;
+        border: 1px solid #30363d;
+        border-left: none;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    en_class = "lang-primary" if current_lang == "en" else "lang-secondary"
+    pl_class = "lang-primary" if current_lang == "pl" else "lang-secondary"
+    
+    st.markdown(f"""
+    <div class="lang-selector">
+        <div class="lang-option {en_class}" onclick="document.getElementById('btn_lang_en_hidden').click()">
+            <div class="lang-flag">
+                <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/ireland-flag-icon.svg" alt="IE">
+            </div>
+            <div class="lang-text">English</div>
         </div>
-        """, unsafe_allow_html=True)
-        if st.button("English", use_container_width=True, key="lang_en",
-                     type="primary" if st.session_state.get("lang","en") == "en" else "secondary"):
+        <div class="lang-option {pl_class}" onclick="document.getElementById('btn_lang_pl_hidden').click()">
+            <div class="lang-flag">
+                <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/poland-flag-icon.svg" alt="PL">
+            </div>
+            <div class="lang-text">Polski</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Hidden buttons triggered by onclick
+    lang_col1, lang_col2 = st.columns(2)
+    with lang_col1:
+        if st.button("en", key="btn_lang_en_hidden", label_visibility="collapsed"):
             st.session_state["lang"] = "en"
             save_config()
             st.rerun()
-    
     with lang_col2:
-        # Show flag image
-        st.markdown("""
-        <div style="text-align:center;margin-bottom:-10px">
-            <img src="https://upload.wikimedia.org/wikipedia/en/1/12/Flag_of_Poland.svg" 
-                 style="height:16px;width:auto;border:1px solid rgba(255,255,255,0.2);border-radius:2px">
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Polski", use_container_width=True, key="lang_pl",
-                     type="primary" if st.session_state.get("lang","en") == "pl" else "secondary"):
+        if st.button("pl", key="btn_lang_pl_hidden", label_visibility="collapsed"):
             st.session_state["lang"] = "pl"
             save_config()
             st.rerun()
 
     st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
 
-    # Logo
+    # Logo with GitHub link
     st.markdown(f"""
     <div class="sb-logo">
         <img src="{LOGO_URL}" alt="logo" onerror="this.style.display='none'">
-        <div>
+        <div style="flex:1">
             <div class="lname">Energy Viz</div>
             <div class="lsub">Smart Meter Dashboard</div>
         </div>
+        <a href="https://github.com/lucslav/energy-viz" target="_blank" 
+           style="display:flex;align-items:center;justify-content:center;
+                  width:36px;height:36px;border-radius:8px;
+                  background:#21262d;border:1px solid #30363d;
+                  transition:opacity 0.2s;text-decoration:none"
+           onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="#e6edf3">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+        </a>
     </div>""", unsafe_allow_html=True)
 
     # ── HDF file uploads — compact design ──
