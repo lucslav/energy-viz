@@ -2539,8 +2539,6 @@ with st.sidebar:
             save_config()
             st.rerun()
 
-    """, unsafe_allow_html=True)
-
     st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
 
     # Logo with GitHub link
