@@ -2572,38 +2572,43 @@ with st.sidebar:
     </style>
     """, unsafe_allow_html=True)
     
+    # Create two columns for actual buttons
+    lang_col1, lang_col2 = st.columns(2)
+    
+    with lang_col1:
+        if st.button("EN", key="btn_lang_en", use_container_width=True):
+            st.session_state["lang"] = "en"
+            save_config()
+            st.rerun()
+    
+    with lang_col2:
+        if st.button("PL", key="btn_lang_pl", use_container_width=True):
+            st.session_state["lang"] = "pl"
+            save_config()
+            st.rerun()
+    
+    # Visual overlay with flags (positioned over buttons)
     en_class = "lang-primary" if current_lang == "en" else "lang-secondary"
     pl_class = "lang-primary" if current_lang == "pl" else "lang-secondary"
     
     st.markdown(f"""
-    <div class="lang-selector">
-        <div class="lang-option {en_class}" onclick="document.getElementById('btn_lang_en_hidden').click()">
-            <div class="lang-flag">
-                <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/ireland-flag-icon.svg" alt="IE">
+    <div style="margin-top:-3.2rem;pointer-events:none">
+        <div class="lang-selector">
+            <div class="lang-option {en_class}">
+                <div class="lang-flag">
+                    <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/ireland-flag-icon.svg" alt="IE">
+                </div>
+                <div class="lang-text">English</div>
             </div>
-            <div class="lang-text">English</div>
-        </div>
-        <div class="lang-option {pl_class}" onclick="document.getElementById('btn_lang_pl_hidden').click()">
-            <div class="lang-flag">
-                <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/poland-flag-icon.svg" alt="PL">
+            <div class="lang-option {pl_class}">
+                <div class="lang-flag">
+                    <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/poland-flag-icon.svg" alt="PL">
+                </div>
+                <div class="lang-text">Polski</div>
             </div>
-            <div class="lang-text">Polski</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Hidden buttons triggered by onclick
-    lang_col1, lang_col2 = st.columns(2)
-    with lang_col1:
-        if st.button("en", key="btn_lang_en_hidden", label_visibility="collapsed"):
-            st.session_state["lang"] = "en"
-            save_config()
-            st.rerun()
-    with lang_col2:
-        if st.button("pl", key="btn_lang_pl_hidden", label_visibility="collapsed"):
-            st.session_state["lang"] = "pl"
-            save_config()
-            st.rerun()
 
     st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
 
