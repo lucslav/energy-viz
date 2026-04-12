@@ -2510,104 +2510,35 @@ def load_daily(file):
 #  SIDEBAR
 # ─────────────────────────────────────────────
 with st.sidebar:
-    # ── Language toggle with SVG flags side-by-side ──
-    current_lang = st.session_state.get("lang", "en")
-    
-    st.markdown("""
-    <style>
-    .lang-selector {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 1rem;
-    }
-    .lang-option {
-        flex: 1;
-        display: flex;
-        align-items: stretch;
-        border-radius: 8px;
-        overflow: hidden;
-        cursor: pointer;
-        transition: opacity 0.2s;
-        text-decoration: none;
-    }
-    .lang-option:hover {
-        opacity: 0.85;
-    }
-    .lang-flag {
-        width: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #161b22;
-        border: 1px solid #30363d;
-        border-right: none;
-    }
-    .lang-flag img {
-        width: 28px;
-        height: 20px;
-        object-fit: cover;
-        border-radius: 2px;
-    }
-    .lang-text {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.5rem 1rem;
-        font-family: 'Space Grotesk', sans-serif;
-        font-weight: 600;
-        font-size: 0.875rem;
-        border: none;
-    }
-    .lang-primary .lang-text {
-        background: linear-gradient(135deg, #1f6feb, #388bfd);
-        color: #fff;
-    }
-    .lang-secondary .lang-text {
-        background: #21262d;
-        color: #e6edf3;
-        border: 1px solid #30363d;
-        border-left: none;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Create two columns for actual buttons
+    # ── Language toggle with flags above buttons ──
     lang_col1, lang_col2 = st.columns(2)
     
     with lang_col1:
-        if st.button("EN", key="btn_lang_en", use_container_width=True):
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:4px">
+            <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/ireland-flag-icon.svg" 
+                 style="height:16px;width:24px;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,0.3)">
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("English", use_container_width=True, key="lang_en",
+                     type="primary" if st.session_state.get("lang","en") == "en" else "secondary"):
             st.session_state["lang"] = "en"
             save_config()
             st.rerun()
     
     with lang_col2:
-        if st.button("PL", key="btn_lang_pl", use_container_width=True):
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:4px">
+            <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/poland-flag-icon.svg" 
+                 style="height:16px;width:24px;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,0.3)">
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Polski", use_container_width=True, key="lang_pl",
+                     type="primary" if st.session_state.get("lang","en") == "pl" else "secondary"):
             st.session_state["lang"] = "pl"
             save_config()
             st.rerun()
-    
-    # Visual overlay with flags (positioned over buttons)
-    en_class = "lang-primary" if current_lang == "en" else "lang-secondary"
-    pl_class = "lang-primary" if current_lang == "pl" else "lang-secondary"
-    
-    st.markdown(f"""
-    <div style="margin-top:-3.2rem;pointer-events:none">
-        <div class="lang-selector">
-            <div class="lang-option {en_class}">
-                <div class="lang-flag">
-                    <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/ireland-flag-icon.svg" alt="IE">
-                </div>
-                <div class="lang-text">English</div>
-            </div>
-            <div class="lang-option {pl_class}">
-                <div class="lang-flag">
-                    <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/poland-flag-icon.svg" alt="PL">
-                </div>
-                <div class="lang-text">Polski</div>
-            </div>
-        </div>
-    </div>
+
     """, unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
