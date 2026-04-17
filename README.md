@@ -8,7 +8,7 @@
 [![Vibe Coded](https://img.shields.io/badge/vibe%20coded-%F0%9F%8E%B8-bc8cff?style=flat-square)](https://github.com/lucslav/energy-viz)
 [![Ireland](https://img.shields.io/badge/made%20for-Ireland%20%F0%9F%87%AE%F0%9F%87%AA-169b62?style=flat-square)](https://github.com/lucslav/energy-viz)
 
-> **Hobby project — vibe coded with AI assistance (thanks @badger-dev).** A personal smart meter analytics dashboard for Irish electricity customers using ESB Networks HDF export files. Built with Streamlit and Plotly for self-hosting on a home server or NAS. Not affiliated with ESB Networks or any energy supplier.
+> **Hobby project — vibe coded with AI assistance.** A personal smart meter analytics dashboard for Irish electricity customers using ESB Networks HDF export files. Built with Streamlit and Plotly for self-hosting on a home server or NAS. Not affiliated with ESB Networks or any energy supplier.
 
 ---
 
