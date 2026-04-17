@@ -20,6 +20,11 @@ DATA_DIR   = Path(os.environ.get("ENERGY_VIZ_DATA", "/app/data"))
 HDF_DIR    = DATA_DIR / "hdf"
 CONFIG_FILE    = DATA_DIR / "config.json"
 API_KEY_FILE   = DATA_DIR / "api_key.enc"
+ESB_CREDS_FILE   = DATA_DIR / "esb_creds.enc"
+SYNC_STATUS_FILE  = DATA_DIR / "esb_sync.json"
+ESB_COOKIES_FILE  = DATA_DIR / "esb_cookies.json"
+ESB_COOKIES_TXT   = DATA_DIR / "esb_cookies.txt"
+ESB_LOG_FILE      = DATA_DIR / "esb_sync.log"
 INVOICE_FILE   = DATA_DIR / "invoice.pdf"
 
 # Create dirs on startup (safe if already exist)
@@ -69,7 +74,38 @@ def decrypt_api_key() -> str:
         return ""
 
 
-# ── Config persistence ─────────────────────────────
+def encrypt_esb_creds(email: str, password: str) -> bytes | None:
+    """Encrypt ESB credentials as JSON using Fernet (same key as API key)."""
+    f = _fernet()
+    if f is None or not email or not password:
+        return None
+    return f.encrypt(json.dumps({"email": email, "password": password}).encode())
+
+
+def decrypt_esb_creds() -> tuple[str, str]:
+    """Return (email, password) or ('', '') if not stored."""
+    if not ESB_CREDS_FILE.exists():
+        return "", ""
+    f = _fernet()
+    if f is None:
+        return "", ""
+    try:
+        data = json.loads(f.decrypt(ESB_CREDS_FILE.read_bytes()).decode())
+        return data.get("email", ""), data.get("password", "")
+    except Exception:
+        return "", ""
+
+
+def read_sync_status() -> dict:
+    if not SYNC_STATUS_FILE.exists():
+        return {}
+    try:
+        return json.loads(SYNC_STATUS_FILE.read_text())
+    except Exception:
+        return {}
+
+
+
 _CONFIG_KEYS = [
     "lang", "tariff", "mprn", "supplier",
     "api_provider", "billing_start", "billing_end", "billing_days",
@@ -250,15 +286,46 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
 }
 
 /* ── buttons ── */
-.stButton > button {
+.stButton > button,
+button[kind="primary"],
+button[kind="secondary"] {
     background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
-    color:#fff !important; border:none !important;
+    color:#fff !important; 
+    border:none !important;
     border-radius:8px !important;
     font-family:'Space Grotesk',sans-serif !important;
-    font-weight:600 !important; padding:.45rem 1.1rem !important;
+    font-weight:600 !important; 
+    padding:.45rem 1.1rem !important;
     transition: opacity .2s !important;
 }
-.stButton > button:hover { opacity:.85 !important; }
+.stButton > button:hover,
+button[kind="primary"]:hover,
+button[kind="secondary"]:hover { 
+    opacity:.85 !important; 
+    color:#fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+}
+.stButton > button:focus,
+.stButton > button:active,
+button[kind="primary"]:focus,
+button[kind="primary"]:active,
+button[kind="secondary"]:focus,
+button[kind="secondary"]:active {
+    color:#fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    opacity: 1 !important;
+}
+.stButton > button:focus:not(:focus-visible) {
+    outline: none !important;
+}
+/* Disabled state */
+.stButton > button:disabled,
+button[kind="primary"]:disabled,
+button[kind="secondary"]:disabled {
+    opacity: 0.4 !important;
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+}
 
 /* ── metrics ── */
 [data-testid="stMetric"] {
@@ -427,6 +494,30 @@ div[role="radiogroup"] label span {
     border-color: #30363d !important;
     background: #161b22 !important;
 }
+/* Buttons inside expanders - all states */
+[data-testid="stExpander"] .stButton > button,
+[data-testid="stExpander"] button[kind="primary"],
+[data-testid="stExpander"] button[kind="secondary"] {
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+}
+[data-testid="stExpander"] .stButton > button:hover,
+[data-testid="stExpander"] button[kind="primary"]:hover,
+[data-testid="stExpander"] button[kind="secondary"]:hover {
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    opacity: .85 !important;
+}
+[data-testid="stExpander"] .stButton > button:focus,
+[data-testid="stExpander"] .stButton > button:active,
+[data-testid="stExpander"] button[kind="primary"]:focus,
+[data-testid="stExpander"] button[kind="primary"]:active,
+[data-testid="stExpander"] button[kind="secondary"]:focus,
+[data-testid="stExpander"] button[kind="secondary"]:active {
+    color: #fff !important;
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    opacity: 1 !important;
+}
 
 /* ── global fallback: any p/span/label still grey ── */
 p, label, span {
@@ -522,6 +613,32 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
 section[data-testid="stSidebar"] [data-testid="stFileUploaderFile"] * {
     color: #e6edf3 !important;
 }
+
+/* ── Sidebar buttons (non-file-uploader) — FORCE blue gradient ── */
+section[data-testid="stSidebar"] .stButton > button,
+section[data-testid="stSidebar"] button[kind="primary"],
+section[data-testid="stSidebar"] button[kind="secondary"] {
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    color: #fff !important;
+    border: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover,
+section[data-testid="stSidebar"] button[kind="primary"]:hover,
+section[data-testid="stSidebar"] button[kind="secondary"]:hover {
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    color: #fff !important;
+    opacity: .85 !important;
+}
+section[data-testid="stSidebar"] .stButton > button:focus,
+section[data-testid="stSidebar"] .stButton > button:active,
+section[data-testid="stSidebar"] button[kind="primary"]:focus,
+section[data-testid="stSidebar"] button[kind="primary"]:active,
+section[data-testid="stSidebar"] button[kind="secondary"]:focus,
+section[data-testid="stSidebar"] button[kind="secondary"]:active {
+    background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+    color: #fff !important;
+    opacity: 1 !important;
+}
 /* Nuclear option: any white/light backgrounds inside sidebar uploader */
 section[data-testid="stSidebar"] [data-testid^="stFileUploader"] > div,
 section[data-testid="stSidebar"] [data-testid^="stFileUploader"] li,
@@ -546,7 +663,7 @@ COLORS = dict(
     day="#58a6ff", peak="#f0883e", night="#bc8cff",
     total="#3fb950", kw="#39d0d8", bg="#161b22",
     grid="#30363d", text="#e6edf3", muted="#7d8590",
-    red="#f85149", yellow="#d29922",
+    red="#f85149", yellow="#d29922", green="#3fb950",
     # aliases
     blue="#58a6ff", cyan="#39d0d8", purple="#bc8cff",
 )
@@ -631,8 +748,10 @@ TRANSLATIONS = {
     "key_metrics":          {"en": "Key Metrics",                 "pl": "Główne wskaźniki"},
     "period_week":          {"en": "Week",                        "pl": "Tydzień"},
     "period_month":         {"en": "Month",                       "pl": "Miesiąc"},
-    "period_bill":          {"en": "Bill",                        "pl": "Rachunek"},
+    "period_custom":        {"en": "Custom",                      "pl": "Zakres"},
     "period_total":         {"en": "Total",                       "pl": "Całość"},
+    "date_from":            {"en": "From",                        "pl": "Od"},
+    "date_to":              {"en": "To",                          "pl": "Do"},
     "total_consumption":    {"en": "Total Consumption",           "pl": "Zużycie łącznie"},
     "daily_average":        {"en": "Daily Average",               "pl": "Średnia dzienna"},
     "energy_cost":          {"en": "Energy Cost",                 "pl": "Koszt energii"},
@@ -663,6 +782,11 @@ TRANSLATIONS = {
     # ── Cost Breakdown ──
     "cost_breakdown":       {"en": "Cost Breakdown",              "pl": "Rozliczenie kosztów"},
     "monthly_bill":         {"en": "Monthly Bill Estimate",       "pl": "Szacunkowy rachunek miesięczny"},
+    "yoy_comparison":       {"en": "Year-to-Year Comparison",    "pl": "Porównanie rok do roku"},
+    "yoy_monthly":          {"en": "Monthly Comparison",         "pl": "Porównanie miesięczne"},
+    "yoy_select_years":     {"en": "Select years to compare",    "pl": "Wybierz lata do porównania"},
+    "yoy_change":           {"en": "Change",                     "pl": "Zmiana"},
+    "yoy_prev_year":        {"en": "vs. previous year",          "pl": "vs. poprzedni rok"},
     # ── Advanced Insights ──
     "seasonal_trend":       {"en": "Seasonal & Monthly Trend",    "pl": "Trend sezonowy i miesięczny"},
     "load_profile":         {"en": "Average Daily Load Profile",  "pl": "Średni dobowy profil obciążenia"},
@@ -1010,6 +1134,31 @@ TRANSLATIONS = {
     "cons_avg_day":         {"en": "Daily avg",                   "pl": "Śred. dzienna"},
     "total_cost":           {"en": "Total cost",                  "pl": "Koszt łączny"},
     "enter_manually_tip":   {"en": "💡 You can enter rates manually using the expander below.", "pl": "💡 Możesz wprowadzić stawki ręcznie w sekcji poniżej."},
+    # ── ESB Auto-Sync ──
+    "esb_sync_title":       {"en": "ESB Auto-Sync",               "pl": "Auto-sync ESB"},
+    "esb_sync_email":       {"en": "ESB account email",           "pl": "Email konta ESB"},
+    "esb_sync_password":    {"en": "ESB account password",        "pl": "Hasło konta ESB"},
+    "esb_sync_save":        {"en": "Save",            "pl": "Zapisz"},
+    "esb_sync_clear":       {"en": "🗑️ Remove",                   "pl": "🗑️ Usuń"},
+    "esb_sync_now":         {"en": "🔄 Sync now",                 "pl": "🔄 Synchronizuj teraz"},
+    "esb_sync_ok":          {"en": "Sync successful",             "pl": "Synchronizacja udana"},
+    "esb_sync_files":       {"en": "Updated",                     "pl": "Zaktualizowano"},
+    "esb_sync_running":     {"en": "Syncing with ESB…",           "pl": "Synchronizuję z ESB…"},
+    "esb_sync_never":       {"en": "Never synced",                "pl": "Brak synchronizacji"},
+    "esb_sync_no_creds":    {"en": "Add cookies.txt below to enable weekly auto-sync.", "pl": "Dodaj cookies.txt poniżej aby włączyć auto-sync co tydzień."},
+    "esb_sync_weekly":      {"en": "✅ Auto-sync active — every week.", "pl": "✅ Auto-sync aktywny — co tydzień."},
+    "esb_sync_rate_limit":  {"en": "Rate limit hit — max 2 logins/24h. Resets at midnight.", "pl": "Limit logowań ESB (max 2/24h). Reset o północy."},
+    "esb_sync_login_fail":  {"en": "Login failed — check email and password.", "pl": "Błąd logowania — sprawdź email i hasło ESB."},
+    "esb_sync_creds_saved": {"en": "Saved. First sync starts in ~30 seconds.", "pl": "Zapisano. Pierwsza synchronizacja za ~30 sekund."},
+    "esb_creds_stored":     {"en": "🔒 Credentials saved (AES-256)", "pl": "🔒 Dane zapisane (AES-256)"},
+    "esb_cookies_txt":      {"en": "Or paste browser cookies (cookies.txt format)",
+                             "pl": "Lub wklej cookies z przeglądarki (format cookies.txt)"},
+    "esb_cookies_saved":    {"en": "✅ Browser cookies saved — will be used for downloads.", 
+                             "pl": "✅ Cookies zapisane — będą użyte do pobierania."},
+    "esb_cookies_clear":    {"en": "🗑️ Clear cookies",        "pl": "🗑️ Usuń cookies"},
+    "esb_cookies_hint":     {"en": "Export from browser using <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> extension on <a href='https://myaccount.esbnetworks.ie' target='_blank' style='color:#58a6ff;text-decoration:underline'>myaccount.esbnetworks.ie</a>",
+                             "pl": "Eksportuj z przeglądarki rozszerzeniem <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> na <a href='https://myaccount.esbnetworks.ie' target='_blank' style='color:#58a6ff;text-decoration:underline'>myaccount.esbnetworks.ie</a>"},
+    "esb_sync_fail":        {"en": "Sync failed",                 "pl": "Błąd synchronizacji"},
 }
 
 
@@ -1067,6 +1216,436 @@ RANGESLIDER_X = dict(
         ],
     ),
 )
+
+
+
+# ─────────────────────────────────────────────
+#  ESB AUTO-SYNC  (APScheduler + Playwright)
+# ─────────────────────────────────────────────
+_SCHEDULER_STARTED = False
+_ESB_BASE_URL      = "https://myaccount.esbnetworks.ie"
+_ESB_DOWNLOAD_URL  = "https://myaccount.esbnetworks.ie/Api/HistoricConsumption"
+_ESB_FILE_TYPES    = {
+    "calc":  "HDF_calckWh",
+    "kw":    "HDF_kW",
+    "dnp":   "HDF_DailyDNP",
+    "daily": "HDF_Daily_kWh",
+}
+
+
+def esb_sync_now(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Download all HDF files from ESB Networks via Playwright headless Chromium."""
+    import datetime as _dt, tempfile, shutil as _sh
+    status = {"last_attempt": _dt.datetime.now().isoformat(),
+               "success": False, "error": None, "files_updated": []}
+
+    def _save(s):
+        status_file.write_text(json.dumps(s, indent=2, default=str))
+
+    # ── Log helper ──
+    _log_file = status_file.parent / "esb_sync.log"
+    def _log(msg):
+        import datetime as _dtt
+        line = f"{_dtt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n"
+        try:
+            with open(_log_file, "a") as _lf:
+                _lf.write(line)
+        except Exception:
+            pass
+
+    # ── Shortcut: use cookies.txt if available ──
+    _cookies_txt = status_file.parent / "esb_cookies.txt"
+    if _cookies_txt.exists():
+        _log("Using browser cookies.txt")
+        import http.cookiejar as _cj, urllib.request as _ul, urllib.error as _ue
+        with tempfile.TemporaryDirectory() as tmp:
+            jar = _cj.MozillaCookieJar()
+            try:
+                jar.load(str(_cookies_txt), ignore_discard=True, ignore_expires=True)
+                _log(f"Loaded {len(list(jar))} cookies")
+            except Exception as e:
+                status["error"] = f"cookies_txt_invalid: {e}"
+                _save(status); return status
+
+            _cookie_str = "; ".join(f"{c.name}={c.value}" for c in jar)
+
+            # Read MPRN
+            _mprn = ""
+            try:
+                _cfg = data_dir / "config.json"
+                if _cfg.exists():
+                    _mprn = json.loads(_cfg.read_text()).get("mprn","") or ""
+                    _mprn = _mprn.replace(" ","")
+                _log(f"MPRN: {_mprn!r}")
+            except Exception as e:
+                _log(f"Config error: {e}")
+
+            _UA   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+            _BASE = "https://myaccount.esbnetworks.ie"
+
+            # Step 1: GET /af/t → file download token (X-Xsrf-Token for POST)
+            _xsrf_token = None
+            try:
+                req_t = _ul.Request(f"{_BASE}/af/t", headers={
+                    "User-Agent":  _UA,
+                    "Accept":      "*/*",
+                    "Cookie":      _cookie_str,
+                    "Referer":     f"{_BASE}/Api/HistoricConsumption",
+                    "X-Returnurl": f"{_BASE}/Api/HistoricConsumption",
+                })
+                with _ul.urlopen(req_t, timeout=15) as r:
+                    tok = r.read().decode("utf-8", errors="replace")
+                    _log(f"/af/t → {tok[:80]}")
+                    try:
+                        _xsrf_token = json.loads(tok).get("token")
+                        _log(f"Token: {bool(_xsrf_token)}")
+                    except Exception:
+                        _log(f"Token parse failed: {tok[:60]}")
+            except Exception as e:
+                _log(f"/af/t failed: {e}")
+
+            # Step 2: POST /DataHub/DownloadHdfPeriodic
+            _POST_URL   = f"{_BASE}/DataHub/DownloadHdfPeriodic"
+            _POST_TYPES = {
+                "calc":  "intervalkwh",
+                "kw":    "intervalkw",
+                "dnp":   "daynightpeak",
+                "daily": "day",
+            }
+
+            for slot, dest in hdf_slots.items():
+                search_type = _POST_TYPES[slot]
+                _log(f"POST {slot} searchType={search_type}")
+                try:
+                    _payload = json.dumps({"mprn": _mprn, "searchType": search_type}).encode()
+                    req = _ul.Request(_POST_URL, data=_payload, method="POST")
+                    req.add_header("Content-Type",     "application/json")
+                    req.add_header("Accept",           "*/*")
+                    req.add_header("Cookie",           _cookie_str)
+                    req.add_header("Origin",           _BASE)
+                    req.add_header("Referer",          f"{_BASE}/Api/HistoricConsumption")
+                    req.add_header("X-Returnurl",      f"{_BASE}/Api/HistoricConsumption")
+                    req.add_header("User-Agent",       _UA)
+                    req.add_header("X-Requested-With", "XMLHttpRequest")
+                    req.add_header("Sec-Fetch-Site",   "same-origin")
+                    req.add_header("Sec-Fetch-Mode",   "cors")
+                    if _xsrf_token:
+                        req.add_header("X-Xsrf-Token", _xsrf_token)
+
+                    with _ul.urlopen(req, timeout=60) as resp:
+                        body = resp.read()
+                        ct = resp.headers.get("Content-Type","?")
+                        cd = resp.headers.get("Content-Disposition","")
+                        _log(f"  {resp.status} | {len(body)}B | CT={ct} | CD={cd[:60]}")
+                        preview = body[:300].decode("utf-8", errors="replace")
+                        if not preview.strip().startswith("<!DOCTYPE") and len(body) > 500:
+                            tmp_path = Path(tmp) / f"{slot}.csv"
+                            tmp_path.write_bytes(body)
+                            _sh.copy2(str(tmp_path), str(dest))
+                            status["files_updated"].append(slot)
+                            _log(f"  ✅ Saved {slot} ({len(body):,} bytes)")
+                        else:
+                            status.setdefault("partial_errors",{})[slot] = "not_csv"
+                            _log(f"  ❌ Not CSV: {preview[:80]}")
+
+                except _ue.HTTPError as e:
+                    status.setdefault("partial_errors",{})[slot] = f"HTTP {e.code}"
+                    _log(f"  ❌ HTTP {e.code}: {e.reason}")
+                except Exception as e:
+                    status.setdefault("partial_errors",{})[slot] = str(e)[:200]
+                    _log(f"  ❌ {slot}: {e}")
+
+        status["success"] = len(status["files_updated"]) > 0
+        if not status["success"] and not status.get("error"):
+            first_err = next(iter(status.get("partial_errors",{}).values()), "no_csv")
+            status["error"] = f"cookies_txt: {first_err[:100]}"
+        _save(status)
+        return status
+
+    # ── Login via requests.Session() + Azure AD B2C (badger707 approach) ──
+    f = fernet_fn()
+    if f is None:
+        status["error"] = "encryption_unavailable"; _save(status); return status
+    if not creds_file.exists():
+        status["error"] = "no_credentials";         _save(status); return status
+
+    try:
+        creds    = json.loads(f.decrypt(creds_file.read_bytes()).decode())
+        email    = creds.get("email", "")
+        password = creds.get("password", "")
+    except Exception as e:
+        status["error"] = f"decrypt_failed: {e}"; _save(status); return status
+
+    if not email or not password:
+        status["error"] = "empty_credentials"; _save(status); return status
+
+    import urllib.request as _ul, urllib.error as _ue, urllib.parse as _up
+    import re as _re
+
+    _UA   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+    _BASE = "https://myaccount.esbnetworks.ie"
+    _LOGIN_BASE = "https://login.esbnetworks.ie"
+    _POLICY = "B2C_1A_signup_signin"
+    _TENANT = "esbntwkscustportalprdb2c01.onmicrosoft.com"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        import http.cookiejar as _cj
+        jar = _cj.CookieJar()
+        opener = _ul.build_opener(_ul.HTTPCookieProcessor(jar))
+        opener.addheaders = [("User-Agent", _UA)]
+
+        def _get(url, headers=None, referer=None):
+            req = _ul.Request(url, headers=headers or {})
+            if referer:
+                req.add_header("Referer", referer)
+            req.add_header("User-Agent", _UA)
+            with opener.open(req, timeout=20) as r:
+                return r.read().decode("utf-8", errors="replace"), r.url
+
+        def _post(url, data, headers=None, referer=None):
+            body = _up.urlencode(data).encode() if isinstance(data, dict) else data
+            req = _ul.Request(url, data=body, headers=headers or {})
+            req.add_header("User-Agent", _UA)
+            if referer:
+                req.add_header("Referer", referer)
+            with opener.open(req, timeout=20) as r:
+                return r.read().decode("utf-8", errors="replace"), r.url
+
+        try:
+            # Step 1: GET base URL — follow redirect to Azure AD B2C, get CSRF + transId
+            _log("Step 1: Init session")
+            html, final_url = _get(_BASE)
+            csrf   = _re.search(r'"csrf"\s*:\s*"([^"]+)"', html)
+            trans  = _re.search(r'"transId"\s*:\s*"([^"]+)"', html)
+            if not csrf or not trans:
+                # Try extracting from SETTINGS var
+                settings_match = _re.search(r'var SETTINGS\s*=\s*({[^;]+})', html)
+                if settings_match:
+                    try:
+                        import json as _j
+                        s = _j.loads(settings_match.group(1))
+                        csrf_val  = s.get("csrf","")
+                        trans_val = s.get("transId","")
+                    except Exception:
+                        csrf_val = trans_val = ""
+                else:
+                    csrf_val = trans_val = ""
+            else:
+                csrf_val  = csrf.group(1)
+                trans_val = trans.group(1)
+
+            _log(f"CSRF: {bool(csrf_val)} transId: {bool(trans_val)}")
+            _log(f"Auth URL: {final_url[:80]}")
+
+            if not csrf_val or not trans_val:
+                # Rate limited or CAPTCHA
+                if "too many" in html.lower() or "captcha" in html.lower():
+                    status["error"] = "rate_limited"
+                else:
+                    status["error"] = f"no_csrf_token (url={final_url[:60]})"
+                _save(status); return status
+
+            # Step 2: POST credentials to SelfAsserted
+            _log("Step 2: SelfAsserted POST")
+            sa_url = (f"{_LOGIN_BASE}/{_TENANT}/{_POLICY}/SelfAsserted"
+                      f"?tx={trans_val}&p={_POLICY}")
+            sa_html, _ = _post(
+                sa_url,
+                data={
+                    "signInName": email,
+                    "password":   password,
+                    "request_type": "RESPONSE",
+                },
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-CSRF-TOKEN": csrf_val,
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                referer=final_url,
+            )
+            _log(f"SelfAsserted: {sa_html[:60]}")
+
+            if '"status":"400"' in sa_html or "incorrect" in sa_html.lower():
+                status["error"] = "login_failed"
+                _save(status); return status
+
+            # Step 3: GET confirmed endpoint → returns HTML form with code
+            _log("Step 3: confirmed GET")
+            confirmed_url = (
+                f"{_LOGIN_BASE}/{_TENANT}/{_POLICY}"
+                f"/api/CombinedSigninAndSignup/confirmed"
+                f"?rememberMe=false&csrf_token={csrf_val}&tx={trans_val}&p={_POLICY}"
+            )
+            conf_html, conf_url = _get(confirmed_url, referer=sa_url)
+
+            # Step 4: Extract form + POST to signin-oidc
+            action = _re.search(r'<form[^>]+action="([^"]+)"', conf_html)
+            client_info = _re.search(r'name="client_info"[^>]+value="([^"]+)"', conf_html)
+            code        = _re.search(r'name="code"[^>]+value="([^"]+)"', conf_html)
+            state_val   = _re.search(r'name="state"[^>]+value="([^"]+)"', conf_html)
+
+            if not action or not code:
+                _log(f"No form found in confirmed response: {conf_html[:100]}")
+                status["error"] = "no_oidc_form"
+                _save(status); return status
+
+            _log("Step 4: OIDC POST")
+            _post(
+                action.group(1),
+                data={
+                    "state":       state_val.group(1) if state_val else "",
+                    "client_info": client_info.group(1) if client_info else "",
+                    "code":        code.group(1),
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                referer=conf_url,
+            )
+
+            # Step 5: GET /Api/HistoricConsumption (sets session cookies)
+            _log("Step 5: GET HistoricConsumption")
+            _get(f"{_BASE}/Api/HistoricConsumption", referer=_BASE)
+
+            # Step 6: GET /af/t → X-Xsrf-Token
+            _log("Step 6: GET /af/t")
+            tok_html, _ = _get(
+                f"{_BASE}/af/t",
+                headers={"X-Returnurl": f"{_BASE}/Api/HistoricConsumption"},
+                referer=f"{_BASE}/Api/HistoricConsumption",
+            )
+            _log(f"/af/t → {tok_html[:80]}")
+            try:
+                xsrf_token = json.loads(tok_html).get("token","")
+            except Exception:
+                xsrf_token = ""
+            _log(f"XSRF token: {bool(xsrf_token)}")
+
+            if not xsrf_token:
+                status["error"] = "no_xsrf_token"
+                _save(status); return status
+
+            # Build cookie string from jar
+            _cookie_str = "; ".join(f"{c.name}={c.value}" for c in jar)
+
+            # Step 7: Save session cookies for next time (avoids re-login)
+            _sess_file = status_file.parent / "esb_cookies.json"
+            try:
+                import json as _jj
+                _sess_file.write_text(_jj.dumps(
+                    [{"name": c.name, "value": c.value, "domain": c.domain}
+                     for c in jar]
+                ))
+            except Exception:
+                pass
+
+            # Step 8: Download all HDF files
+            _POST_URL   = f"{_BASE}/DataHub/DownloadHdfPeriodic"
+            _POST_TYPES = {
+                "calc":  "intervalkwh",
+                "kw":    "intervalkw",
+                "dnp":   "daynightpeak",
+                "daily": "day",
+            }
+
+            _mprn = ""
+            try:
+                _cfg = data_dir / "config.json"
+                if _cfg.exists():
+                    _mprn = json.loads(_cfg.read_text()).get("mprn","") or ""
+                    _mprn = _mprn.replace(" ","")
+            except Exception:
+                pass
+            _log(f"MPRN: {_mprn!r}")
+
+            for slot, dest in hdf_slots.items():
+                search_type = _POST_TYPES[slot]
+                _log(f"POST {slot} searchType={search_type}")
+                try:
+                    _payload = json.dumps({"mprn": _mprn, "searchType": search_type}).encode()
+                    req = _ul.Request(_POST_URL, data=_payload, method="POST")
+                    req.add_header("Content-Type",     "application/json")
+                    req.add_header("Accept",           "*/*")
+                    req.add_header("Cookie",           _cookie_str)
+                    req.add_header("Origin",           _BASE)
+                    req.add_header("Referer",          f"{_BASE}/Api/HistoricConsumption")
+                    req.add_header("X-Returnurl",      f"{_BASE}/Api/HistoricConsumption")
+                    req.add_header("User-Agent",       _UA)
+                    req.add_header("X-Requested-With", "XMLHttpRequest")
+                    req.add_header("X-Xsrf-Token",     xsrf_token)
+
+                    with opener.open(req, timeout=60) as resp:
+                        body = resp.read()
+                        ct = resp.headers.get("Content-Type","?")
+                        cd = resp.headers.get("Content-Disposition","")
+                        _log(f"  {resp.status} | {len(body)}B | CT={ct} | CD={cd[:60]}")
+                        preview = body[:300].decode("utf-8", errors="replace")
+                        if not preview.strip().startswith("<!DOCTYPE") and len(body) > 500:
+                            tmp_path = Path(tmp) / f"{slot}.csv"
+                            tmp_path.write_bytes(body)
+                            _sh.copy2(str(tmp_path), str(dest))
+                            status["files_updated"].append(slot)
+                            _log(f"  ✅ Saved {slot} ({len(body):,} bytes)")
+                        else:
+                            status.setdefault("partial_errors",{})[slot] = "not_csv"
+                            _log(f"  ❌ Not CSV: {preview[:80]}")
+
+                except _ue.HTTPError as e:
+                    status.setdefault("partial_errors",{})[slot] = f"HTTP {e.code}"
+                    _log(f"  ❌ HTTP {e.code}: {e.reason}")
+                except Exception as e:
+                    status.setdefault("partial_errors",{})[slot] = str(e)[:200]
+                    _log(f"  ❌ {slot}: {e}")
+
+        except _ue.HTTPError as e:
+            status["error"] = f"http_{e.code}"
+            _log(f"Login HTTP error: {e.code} {e.reason}")
+        except Exception as e:
+            status["error"] = str(e)[:200]
+            _log(f"Login exception: {e}")
+
+    status["success"] = len(status["files_updated"]) > 0
+    if not status["success"] and not status.get("error"):
+        partial = status.get("partial_errors", {})
+        first_err = next(iter(partial.values()), "no_files_downloaded")
+        status["error"] = f"no_files_downloaded: {first_err[:120]}"
+    _save(status)
+    return status
+
+
+def _start_scheduler(data_dir, hdf_slots, creds_file, status_file, fernet_fn):
+    """Start APScheduler background daemon — once per container process."""
+    global _SCHEDULER_STARTED
+    if _SCHEDULER_STARTED:
+        return
+    _SCHEDULER_STARTED = True
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.interval import IntervalTrigger
+        import datetime as _dt
+    except ImportError:
+        return  # APScheduler not installed — skip silently
+
+    sched = BackgroundScheduler(daemon=True)
+    # Run immediately on first start if credentials exist but no sync history
+    first_run = (
+        _dt.datetime.now() + _dt.timedelta(seconds=30)
+        if creds_file.exists() and not status_file.exists() else None
+    )
+    sched.add_job(
+        func=esb_sync_now,
+        trigger=IntervalTrigger(weeks=1),
+        kwargs=dict(data_dir=data_dir, hdf_slots=hdf_slots,
+                    creds_file=creds_file, status_file=status_file,
+                    fernet_fn=fernet_fn),
+        id="esb_weekly_sync",
+        replace_existing=True,
+        next_run_time=first_run,
+    )
+    sched.start()
+
+
+# Kick off scheduler at container start (daemon thread — survives reruns)
+_start_scheduler(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
 
 
 def _inject_pl_month_names():
@@ -1445,13 +2024,13 @@ def setup_screen():
     </div>""", unsafe_allow_html=True)
     lc1, lc2, _ = st.columns([1, 1, 2])
     with lc1:
-        if st.button("🇮🇪 English", use_container_width=True,
+        if st.button("EN 🌐 English", use_container_width=True,
                      type="primary" if st.session_state.get("lang","en") == "en" else "secondary",
                      key="setup_lang_en"):
             st.session_state["lang"] = "en"
             st.rerun()
     with lc2:
-        if st.button("🇵🇱 Polski", use_container_width=True,
+        if st.button("PL 🌐 Polski", use_container_width=True,
                      type="primary" if st.session_state.get("lang","en") == "pl" else "secondary",
                      key="setup_lang_pl"):
             st.session_state["lang"] = "pl"
@@ -1853,7 +2432,7 @@ def _open_hdf(file_or_path):
         return io.BytesIO(Path(file_or_path).read_bytes())
     return file_or_path  # UploadedFile or BytesIO
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_calc_kwh(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1881,7 +2460,7 @@ def load_calc_kwh(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_kw(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1895,7 +2474,7 @@ def load_kw(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_dnp(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1909,7 +2488,7 @@ def load_dnp(file):
     return df
 
 
-@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue()})
+@st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
 def load_daily(file):
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
@@ -1931,16 +2510,30 @@ def load_daily(file):
 #  SIDEBAR
 # ─────────────────────────────────────────────
 with st.sidebar:
-    # ── Language toggle ──
+    # ── Language toggle with flags above buttons ──
     lang_col1, lang_col2 = st.columns(2)
+    
     with lang_col1:
-        if st.button("🇮🇪 English", use_container_width=True,
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:4px">
+            <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/ireland-flag-icon.svg" 
+                 style="height:16px;width:24px;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,0.3)">
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("English", use_container_width=True, key="lang_en",
                      type="primary" if st.session_state.get("lang","en") == "en" else "secondary"):
             st.session_state["lang"] = "en"
             save_config()
             st.rerun()
+    
     with lang_col2:
-        if st.button("🇵🇱 Polski", use_container_width=True,
+        st.markdown("""
+        <div style="text-align:center;margin-bottom:4px">
+            <img src="https://uxwing.com/wp-content/themes/uxwing/download/flags-landmarks/poland-flag-icon.svg" 
+                 style="height:16px;width:24px;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,0.3)">
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Polski", use_container_width=True, key="lang_pl",
                      type="primary" if st.session_state.get("lang","en") == "pl" else "secondary"):
             st.session_state["lang"] = "pl"
             save_config()
@@ -1948,14 +2541,24 @@ with st.sidebar:
 
     st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
 
-    # Logo
+    # Logo with GitHub link
     st.markdown(f"""
     <div class="sb-logo">
         <img src="{LOGO_URL}" alt="logo" onerror="this.style.display='none'">
-        <div>
+        <div style="flex:1">
             <div class="lname">Energy Viz</div>
             <div class="lsub">Smart Meter Dashboard</div>
         </div>
+        <a href="https://github.com/lucslav/energy-viz" target="_blank" 
+           style="display:flex;align-items:center;justify-content:center;
+                  width:36px;height:36px;border-radius:8px;
+                  background:#21262d;border:1px solid #30363d;
+                  transition:opacity 0.2s;text-decoration:none"
+           onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="#e6edf3">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+            </svg>
+        </a>
     </div>""", unsafe_allow_html=True)
 
     # ── HDF file uploads — compact design ──
@@ -2000,9 +2603,19 @@ with st.sidebar:
 
     # ── Upload status summary + persistence ──
     # Save any newly uploaded files to disk immediately
+    _newly_saved = False
     for slot, file_widget in [("calc",f_calc),("kw",f_kw),("dnp",f_dnp),("daily",f_daily)]:
         if file_widget is not None:
             save_hdf_file(slot, file_widget)
+            _newly_saved = True
+    # Force rerun after saving so _resolve picks up stable path string from disk
+    # (avoids UploadedFile hashing issues with st.cache_data)
+    if _newly_saved:
+        load_calc_kwh.clear()
+        load_kw.clear()
+        load_dnp.clear()
+        load_daily.clear()
+        st.rerun()
 
     # Build status line showing uploaded + persisted
     def _slot_status(slot, uploaded):
@@ -2049,8 +2662,82 @@ with st.sidebar:
         st.session_state["tariff"] = dict(day=t_day, peak=t_peak, night=t_night, standing=t_stand)
         save_config()
 
-    # ── Update / reset ──
     st.divider()
+    
+    # ── ESB Auto-Sync ──
+    st.markdown(f"##### 🔄 {t('esb_sync_title')}")
+
+    _sync_st   = read_sync_status()
+
+    # Status badge
+    if _sync_st:
+        _last = _sync_st.get("last_attempt", "")[:16].replace("T", " ")
+        if _sync_st.get("success"):
+            _files = ", ".join(_sync_st.get("files_updated", []))
+            st.markdown(
+                f'<div class="alert-box alert-good" style="font-size:.75rem;padding:.4rem .7rem">'
+                f'✅ {t("esb_sync_ok")} · {_last}<br>'
+                f'<span style="opacity:.8">{t("esb_sync_files")}: {_files}</span></div>',
+                unsafe_allow_html=True)
+        else:
+            _err = _sync_st.get("error", "unknown")
+            _emsg = (t("esb_sync_rate_limit") if _err == "rate_limited"
+                     else t("esb_sync_login_fail") if _err.startswith("login_failed")
+                     else f'{t("esb_sync_fail")}: {_err}')
+            st.markdown(
+                f'<div class="alert-box alert-warn" style="font-size:.75rem;padding:.4rem .7rem">'
+                f'⚠️ {_emsg}<br><span style="opacity:.7">{_last}</span></div>',
+                unsafe_allow_html=True)
+    else:
+        st.caption(t("esb_sync_no_creds"))
+
+    # ── cookies.txt section - NO EXPANDER, always visible ──
+    _has_txt = ESB_COOKIES_TXT.exists()
+    
+    st.markdown(f"<div style='font-size:.85rem;font-weight:600;color:#7d8590;margin:.8rem 0 .4rem'>🍪 cookies.txt</div>", unsafe_allow_html=True)
+    
+    # Show hint
+    st.markdown(t("esb_cookies_hint"), unsafe_allow_html=True)
+    
+    # Textarea for cookies
+    _cookies_input = st.text_area(
+        t("esb_cookies_txt"),
+        placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
+        height=100, 
+        key="esb_cookies_txt_input",
+        label_visibility="collapsed"
+    )
+    
+    # Status
+    if _has_txt:
+        st.caption(f"✅ cookies.txt ({ESB_COOKIES_TXT.stat().st_size} B)")
+    
+    # Buttons side by side - FIXED layout
+    _cca, _ccb = st.columns(2)
+    with _cca:
+        if st.button("💾 " + t("esb_sync_save"), key="esb_txt_save",
+                     use_container_width=True):
+            if _cookies_input.strip():
+                ESB_COOKIES_TXT.write_text(_cookies_input.strip())
+                st.success(t("esb_cookies_saved"))
+                st.rerun()
+    with _ccb:
+        if _has_txt:
+            if st.button(t("esb_cookies_clear"), key="esb_txt_clear",
+                         use_container_width=True):
+                ESB_COOKIES_TXT.unlink(missing_ok=True)
+                st.rerun()
+
+    _can_sync = ESB_COOKIES_TXT.exists()
+    if _can_sync:
+        if st.button(t("esb_sync_now"), use_container_width=True, key="esb_now"):
+            with st.spinner(t("esb_sync_running")):
+                esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
+            st.rerun()
+
+    st.divider()
+    
+    # ── Configuration ──
     st.markdown(f"##### 🔄 {t('configuration')}")
     if st.button(t("reparse_btn"), use_container_width=True):
         st.session_state["setup_done"] = False
@@ -2232,25 +2919,51 @@ with tabs[0]:
         section("📌", t("key_metrics"))
     with ov_col2:
         ov_period_idx = st.radio(t("period_selector"),
-                             [t("period_week"), t("period_month"), t("period_bill"), t("period_total")],
+                             [t("period_week"), t("period_month"), t("period_custom"), t("period_total")],
                              index=3, horizontal=True, label_visibility="collapsed",
                              key="ov_period")
         # Map by index position (language-independent)
-        _period_opts = [t("period_week"), t("period_month"), t("period_bill"), t("period_total")]
+        _period_opts = [t("period_week"), t("period_month"), t("period_custom"), t("period_total")]
         ov_period_i = _period_opts.index(ov_period_idx) if ov_period_idx in _period_opts else 3
+
+    # Custom date range picker (only when Custom is selected)
+    ov_custom_start = None
+    ov_custom_end = None
+    if ov_period_i == 2:  # Custom
+        st.markdown("<div style='margin-bottom:.5rem'></div>", unsafe_allow_html=True)
+        _d1, _d2 = st.columns(2)
+        with _d1:
+            ov_custom_start = st.date_input(
+                t("date_from") if "date_from" in TRANSLATIONS else "From",
+                value=None,
+                key="ov_custom_start"
+            )
+        with _d2:
+            ov_custom_end = st.date_input(
+                t("date_to") if "date_to" in TRANSLATIONS else "To",
+                value=None,
+                key="ov_custom_end"
+            )
 
     # Filter data by selected period
     if df_calc is not None:
         now = df_calc["datetime"].max()
         if ov_period_i == 0:    # Week
             ov_cutoff = now - pd.Timedelta(days=7)
+            df_ov = df_calc[df_calc["datetime"] >= ov_cutoff]
         elif ov_period_i == 1:  # Month
             ov_cutoff = now - pd.Timedelta(days=30)
-        elif ov_period_i == 2 and st.session_state.get("billing_start"):  # Bill
-            ov_cutoff = pd.Timestamp(st.session_state["billing_start"])
+            df_ov = df_calc[df_calc["datetime"] >= ov_cutoff]
+        elif ov_period_i == 2:  # Custom
+            if ov_custom_start and ov_custom_end:
+                df_ov = df_calc[
+                    (df_calc["date"] >= ov_custom_start) & 
+                    (df_calc["date"] <= ov_custom_end)
+                ]
+            else:
+                df_ov = df_calc  # Show all if dates not selected
         else:  # Total
-            ov_cutoff = df_calc["datetime"].min()
-        df_ov = df_calc[df_calc["datetime"] >= ov_cutoff]
+            df_ov = df_calc
     else:
         df_ov = None
 
@@ -2357,7 +3070,7 @@ with tabs[1]:
     heat_piv = heat.pivot(index="date", columns="hour", values="value").fillna(0)
     fig2 = go.Figure(go.Heatmap(
         z=heat_piv.values,
-        x=[f"{h:02d}:00" for h in heat_piv.columns],
+        x=[f"{int(h):02d}:00" for h in heat_piv.columns],
         y=[str(d) for d in heat_piv.index],
         colorscale=[[0,"#0d1117"],[0.25,"#1f3a5f"],[0.55,"#58a6ff"],[0.8,"#f0883e"],[1,"#f85149"]],
         hoverongaps=False, colorbar=dict(title="kWh", tickfont=dict(color=COLORS["muted"])),
@@ -2366,7 +3079,6 @@ with tabs[1]:
                    annotation_text=t("peak_rate"), annotation_font_color=COLORS["peak"])
     apply_layout(fig2, "", height=max(280, len(heat_piv)*14+60))
     fig2.update_layout(
-        yaxis_autorange="reversed",
         xaxis=dict(
             tickmode="array",
             tickvals=[f"{h:02d}:00" for h in range(0, 24)],
@@ -2563,6 +3275,10 @@ with tabs[3]:
 
 # ════════════════════════════════════════════
 #  TAB 4 — COST BREAKDOWN
+#  TODO (future): Add year-to-year comparison with monthly and annual views
+#  - Monthly comparison: same month across different years (e.g., Jan 2024 vs Jan 2025)
+#  - Annual comparison: full year totals side-by-side
+#  - Visual: dual-axis bar charts with YoY % change indicators
 # ════════════════════════════════════════════
 with tabs[4]:
     if df_calc is None:
@@ -2658,6 +3374,168 @@ with tabs[4]:
         margin=dict(l=10, r=10, t=20, b=100),
     )
     st.plotly_chart(fig_m, use_container_width=True)
+
+    # ════════════════════════════════════════════
+    #  YEAR-TO-YEAR COMPARISON
+    # ════════════════════════════════════════════
+    st.divider()
+    section("📊", t("yoy_comparison"))
+    
+    # Extract year and month from data
+    df_calc["year"] = df_calc["datetime"].dt.year
+    df_calc["month_num"] = df_calc["datetime"].dt.month
+    
+    # Get available years
+    available_years = sorted(df_calc["year"].unique())
+    
+    if len(available_years) >= 2:
+        # Year selector
+        yoy_col1, yoy_col2 = st.columns(2)
+        with yoy_col1:
+            year1 = st.selectbox(
+                t("yoy_select_years") + " 1",
+                options=available_years,
+                index=len(available_years)-2 if len(available_years) >= 2 else 0,
+                key="yoy_year1"
+            )
+        with yoy_col2:
+            year2 = st.selectbox(
+                t("yoy_select_years") + " 2",
+                options=available_years,
+                index=len(available_years)-1,
+                key="yoy_year2"
+            )
+        
+        # Prepare data for both years
+        df_year1 = df_calc[df_calc["year"] == year1].copy()
+        df_year2 = df_calc[df_calc["year"] == year2].copy()
+        
+        # Monthly aggregation
+        mo_year1 = df_year1.groupby("month_num").agg(
+            kwh=("value","sum"), 
+            cost=("cost","sum")
+        ).reset_index()
+        mo_year1["cost_net"] = mo_year1["cost"] * disc_factor
+        mo_year1["days"] = df_year1.groupby("month_num")["date"].nunique().values[:len(mo_year1)]
+        mo_year1["standing"] = mo_year1["days"] * t_stand
+        mo_year1["vat"] = (mo_year1["cost_net"] + mo_year1["standing"]) * VAT_RATE
+        mo_year1["total"] = mo_year1["cost_net"] + mo_year1["standing"] + mo_year1["vat"]
+        
+        mo_year2 = df_year2.groupby("month_num").agg(
+            kwh=("value","sum"), 
+            cost=("cost","sum")
+        ).reset_index()
+        mo_year2["cost_net"] = mo_year2["cost"] * disc_factor
+        mo_year2["days"] = df_year2.groupby("month_num")["date"].nunique().values[:len(mo_year2)]
+        mo_year2["standing"] = mo_year2["days"] * t_stand
+        mo_year2["vat"] = (mo_year2["cost_net"] + mo_year2["standing"]) * VAT_RATE
+        mo_year2["total"] = mo_year2["cost_net"] + mo_year2["standing"] + mo_year2["vat"]
+        
+        # Month labels
+        if st.session_state.get("lang","en") == "pl":
+            month_labels = TRANSLATIONS["months_short"]["pl"]
+        else:
+            month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+        
+        # ── Bar chart comparison ──
+        st.markdown(f"<h4 style='color:#7d8590;font-size:.9rem;margin:1rem 0 .5rem'>{t('yoy_monthly')}</h4>", unsafe_allow_html=True)
+        
+        fig_yoy = go.Figure()
+        
+        # Merge data for alignment
+        mo_merged = mo_year1.merge(mo_year2, on="month_num", how="outer", suffixes=("_y1","_y2"))
+        mo_merged = mo_merged.sort_values("month_num")
+        mo_merged["month_label"] = mo_merged["month_num"].apply(lambda m: month_labels[int(m)-1] if pd.notna(m) and 1 <= m <= 12 else "")
+        
+        # Add bars for each year
+        fig_yoy.add_trace(go.Bar(
+            name=str(year1),
+            x=mo_merged["month_label"],
+            y=mo_merged["total_y1"].fillna(0),
+            marker_color=COLORS["blue"],
+            marker_line_width=0,
+            text=mo_merged["total_y1"].fillna(0).apply(lambda v: f"€{v:.0f}" if v > 0 else ""),
+            textposition="outside",
+            textfont=dict(size=9, color=COLORS["blue"]),
+        ))
+        fig_yoy.add_trace(go.Bar(
+            name=str(year2),
+            x=mo_merged["month_label"],
+            y=mo_merged["total_y2"].fillna(0),
+            marker_color=COLORS["cyan"],
+            marker_line_width=0,
+            text=mo_merged["total_y2"].fillna(0).apply(lambda v: f"€{v:.0f}" if v > 0 else ""),
+            textposition="outside",
+            textfont=dict(size=9, color=COLORS["cyan"]),
+        ))
+        
+        apply_layout(fig_yoy, "", height=340)
+        fig_yoy.update_layout(
+            barmode="group",
+            yaxis_title="€",
+            legend=dict(
+                orientation="h", yanchor="top", y=-0.15,
+                xanchor="center", x=0.5,
+                font=dict(size=11, color=COLORS["text"]),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+            margin=dict(l=10, r=10, t=30, b=80),
+        )
+        st.plotly_chart(fig_yoy, use_container_width=True)
+        
+        # ── Comparison table ──
+        st.markdown(f"<h4 style='color:#7d8590;font-size:.9rem;margin:1.5rem 0 .5rem'>📋 {t('cost_breakdown')}</h4>", unsafe_allow_html=True)
+        
+        # Annual totals
+        total_y1 = mo_year1["total"].sum()
+        total_y2 = mo_year2["total"].sum()
+        kwh_y1 = mo_year1["kwh"].sum()
+        kwh_y2 = mo_year2["kwh"].sum()
+        
+        delta_total = total_y2 - total_y1
+        delta_pct = (delta_total / total_y1 * 100) if total_y1 > 0 else 0
+        delta_kwh = kwh_y2 - kwh_y1
+        delta_kwh_pct = (delta_kwh / kwh_y1 * 100) if kwh_y1 > 0 else 0
+        
+        # Display as nice cards
+        yc1, yc2, yc3 = st.columns(3)
+        
+        with yc1:
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                        padding:1rem;text-align:center;border-top:3px solid {COLORS['blue']}">
+                <div style="font-size:.78rem;color:#7d8590;margin-bottom:.3rem">{year1}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;
+                            font-weight:700;color:#e6edf3">€{total_y1:,.0f}</div>
+                <div style="font-size:.75rem;color:#7d8590;margin-top:.2rem">{kwh_y1:,.0f} kWh</div>
+            </div>""", unsafe_allow_html=True)
+        
+        with yc2:
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                        padding:1rem;text-align:center;border-top:3px solid {COLORS['cyan']}">
+                <div style="font-size:.78rem;color:#7d8590;margin-bottom:.3rem">{year2}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;
+                            font-weight:700;color:#e6edf3">€{total_y2:,.0f}</div>
+                <div style="font-size:.75rem;color:#7d8590;margin-top:.2rem">{kwh_y2:,.0f} kWh</div>
+            </div>""", unsafe_allow_html=True)
+        
+        with yc3:
+            change_color = COLORS["green"] if delta_pct < 0 else COLORS["red"]
+            change_icon = "↓" if delta_pct < 0 else "↑"
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;
+                        padding:1rem;text-align:center;border-top:3px solid {change_color}">
+                <div style="font-size:.78rem;color:#7d8590;margin-bottom:.3rem">{t('yoy_change')}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.5rem;
+                            font-weight:700;color:{change_color}">{delta_pct:+.1f}% {change_icon}</div>
+                <div style="font-size:.75rem;color:#7d8590;margin-top:.2rem">
+                    {delta_kwh:+,.0f} kWh ({delta_kwh_pct:+.1f}%)</div>
+            </div>""", unsafe_allow_html=True)
+        
+    else:
+        alert("Need at least 2 years of data for year-to-year comparison." if st.session_state.get("lang","en") == "en" 
+              else "Potrzebne dane z przynajmniej 2 lat do porównania.", "info")
 
 
 # ════════════════════════════════════════════
