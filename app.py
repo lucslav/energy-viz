@@ -109,6 +109,7 @@ def read_sync_status() -> dict:
 _CONFIG_KEYS = [
     "lang", "tariff", "mprn", "supplier",
     "api_provider", "billing_start", "billing_end", "billing_days",
+    "tariff_history", "current_tariff_id",
 ]
 
 def save_config():
@@ -183,6 +184,103 @@ def hdf_file_info(slot: str) -> dict | None:
         "size_kb":  stat.st_size // 1024,
         "modified": dt_mod.datetime.fromtimestamp(stat.st_mtime).strftime("%d %b %Y %H:%M"),
     }
+
+
+# ─────────────────────────────────────────────
+#  TARIFF HISTORY MANAGEMENT
+# ─────────────────────────────────────────────
+def get_tariff_history() -> list:
+    """Return list of tariff periods, sorted by start_date (newest first)."""
+    history = st.session_state.get("tariff_history", [])
+    if not history:
+        return []
+    # Sort by start_date descending
+    return sorted(history, key=lambda x: x.get("start_date", ""), reverse=True)
+
+
+def get_current_tariff() -> dict:
+    """Return the currently active tariff (end_date=null or most recent)."""
+    history = get_tariff_history()
+    if not history:
+        return st.session_state.get("tariff", DEFAULT_TARIFF)
+    
+    # Find tariff with end_date=null
+    for t in history:
+        if t.get("end_date") is None:
+            return t
+    
+    # Fallback: return most recent
+    return history[0] if history else st.session_state.get("tariff", DEFAULT_TARIFF)
+
+
+def get_tariff_for_date(date_value) -> dict:
+    """Return applicable tariff for a specific date."""
+    import pandas as pd
+    history = get_tariff_history()
+    
+    if not history:
+        return st.session_state.get("tariff", DEFAULT_TARIFF)
+    
+    # Convert date to pd.Timestamp for comparison
+    if not isinstance(date_value, pd.Timestamp):
+        date_value = pd.Timestamp(date_value)
+    
+    for tariff in history:
+        start = pd.Timestamp(tariff["start_date"])
+        end_str = tariff.get("end_date")
+        end = pd.Timestamp(end_str) if end_str else pd.Timestamp.now()
+        
+        if start <= date_value <= end:
+            return tariff
+    
+    # Fallback: return current tariff
+    return get_current_tariff()
+
+
+def add_tariff_period(supplier: str, tariff_name: str, start_date: str, end_date: str | None,
+                      day: float, peak: float, night: float, standing: float,
+                      ev_enabled: bool = False, ev_rate: float = 0.12,
+                      ev_start_hour: int = 2, ev_end_hour: int = 4) -> str:
+    """Add a new tariff period and return its ID."""
+    import uuid
+    tariff_id = str(uuid.uuid4())[:8]
+    
+    new_period = {
+        "id": tariff_id,
+        "supplier": supplier,
+        "tariff_name": tariff_name,
+        "start_date": start_date,
+        "end_date": end_date,
+        "day": day,
+        "peak": peak,
+        "night": night,
+        "standing": standing,
+        "ev_enabled": ev_enabled,
+        "ev_rate": ev_rate,
+        "ev_start_hour": ev_start_hour,
+        "ev_start_minute": 0,
+        "ev_end_hour": ev_end_hour,
+        "ev_end_minute": 0,
+    }
+    
+    history = st.session_state.get("tariff_history", [])
+    history.append(new_period)
+    st.session_state["tariff_history"] = history
+    
+    # If this is the only period or end_date is None, set as current
+    if len(history) == 1 or end_date is None:
+        st.session_state["current_tariff_id"] = tariff_id
+        st.session_state["tariff"] = new_period
+    
+    save_config()
+    return tariff_id
+
+
+def delete_tariff_period(tariff_id: str):
+    """Remove a tariff period from history."""
+    history = st.session_state.get("tariff_history", [])
+    st.session_state["tariff_history"] = [t for t in history if t["id"] != tariff_id]
+    save_config()
 
 # ─────────────────────────────────────────────
 #  PAGE CONFIG
@@ -654,13 +752,24 @@ section[data-testid="stSidebar"] [data-testid^="stFileUploader"] ul {
 # ─────────────────────────────────────────────
 #  CONSTANTS  (defaults — overridden by user)
 # ─────────────────────────────────────────────
-DEFAULT_TARIFF = dict(day=0.3397, peak=0.3624, night=0.1785, standing=0.6303)
+DEFAULT_TARIFF = dict(
+    day=0.3397, 
+    peak=0.3624, 
+    night=0.1785, 
+    standing=0.6303,
+    ev_enabled=False,
+    ev_rate=0.1200,
+    ev_start_hour=2,
+    ev_start_minute=0,
+    ev_end_hour=4,
+    ev_end_minute=0
+)
 VAT_RATE       = 0.09
 DISCOUNT       = 0.30
 LOGO_URL       = "https://raw.githubusercontent.com/lucslav/energy-viz/main/img/logo.png"
 
 COLORS = dict(
-    day="#58a6ff", peak="#f0883e", night="#bc8cff",
+    day="#58a6ff", peak="#f0883e", night="#bc8cff", ev="#a371f7",
     total="#3fb950", kw="#39d0d8", bg="#161b22",
     grid="#30363d", text="#e6edf3", muted="#7d8590",
     red="#f85149", yellow="#d29922", green="#3fb950",
@@ -725,6 +834,12 @@ TRANSLATIONS = {
     "day_rate":             {"en": "Day",                         "pl": "Dzień"},
     "peak_rate":            {"en": "Peak",                        "pl": "Szczyt"},
     "night_rate":           {"en": "Night",                       "pl": "Noc"},
+    "ev_rate":              {"en": "EV",                          "pl": "EV"},
+    "ev_tariff":            {"en": "EV Tariff",                   "pl": "Taryfa EV"},
+    "ev_enable":            {"en": "Enable EV tariff (super off-peak)", "pl": "Włącz taryfę EV (super nocna)"},
+    "ev_window":            {"en": "EV window",                   "pl": "Okno EV"},
+    "ev_start":             {"en": "Start",                       "pl": "Start"},
+    "ev_end":               {"en": "End",                         "pl": "Koniec"},
     "standing_rate":        {"en": "Standing €/d",                "pl": "Opłata stała €/d"},
     "configuration":        {"en": "Configuration",               "pl": "Konfiguracja"},
     "reparse_btn":          {"en": "Change rates / Re-parse",     "pl": "Zmień stawki / Przebuduj"},
@@ -1159,6 +1274,19 @@ TRANSLATIONS = {
     "esb_cookies_hint":     {"en": "Export from browser using <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> extension on <a href='https://myaccount.esbnetworks.ie' target='_blank' style='color:#58a6ff;text-decoration:underline'>myaccount.esbnetworks.ie</a>",
                              "pl": "Eksportuj z przeglądarki rozszerzeniem <a href='https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc' target='_blank' style='color:#58a6ff;text-decoration:underline'>Get cookies.txt LOCALLY</a> na <a href='https://myaccount.esbnetworks.ie' target='_blank' style='color:#58a6ff;text-decoration:underline'>myaccount.esbnetworks.ie</a>"},
     "esb_sync_fail":        {"en": "Sync failed",                 "pl": "Błąd synchronizacji"},
+    # ── Tariff History ──
+    "tariff_history_title": {"en": "Tariff History",              "pl": "Historia taryf"},
+    "tariff_history_empty": {"en": "No tariff periods defined. Add one to track historical rate changes.", 
+                             "pl": "Brak okresów taryfowych. Dodaj aby śledzić zmiany stawek."},
+    "tariff_current":       {"en": "Present",                     "pl": "Obecnie"},
+    "tariff_days":          {"en": "days",                        "pl": "dni"},
+    "tariff_add_period":    {"en": "➕ Add New Tariff Period",    "pl": "➕ Dodaj nowy okres"},
+    "tariff_edit":          {"en": "✏️ Edit",                     "pl": "✏️ Edytuj"},
+    "tariff_delete":        {"en": "🗑️ Delete",                  "pl": "🗑️ Usuń"},
+    "tariff_view":          {"en": "👁️ View Details",             "pl": "👁️ Szczegóły"},
+    "tariff_period_from":   {"en": "Valid from",                  "pl": "Obowiązuje od"},
+    "tariff_period_to":     {"en": "Valid until",                 "pl": "Obowiązuje do"},
+    "tariff_period_current":{"en": "Current period (no end date)", "pl": "Okres bieżący (bez daty końca)"},
 }
 
 
@@ -1767,6 +1895,29 @@ def apply_layout(fig, title="", height=380, has_rangeselector=False):
     return fig
 
 def get_period(hour, minute=0):
+    """Assign tariff period based on time. EV window has highest priority."""
+    tariff = st.session_state.get("tariff", DEFAULT_TARIFF)
+    
+    # Check EV window first (highest priority - super off-peak)
+    if tariff.get("ev_enabled", False):
+        ev_start_h = tariff.get("ev_start_hour", 2)
+        ev_end_h = tariff.get("ev_end_hour", 4)
+        ev_start_m = tariff.get("ev_start_minute", 0)
+        ev_end_m = tariff.get("ev_end_minute", 0)
+        
+        ev_start = ev_start_h + ev_start_m / 60
+        ev_end = ev_end_h + ev_end_m / 60
+        current = hour + minute / 60
+        
+        # Handle wrap-around (e.g., 23:00-01:00 crosses midnight)
+        if ev_end < ev_start:  
+            if current >= ev_start or current < ev_end:
+                return "ev"
+        else:
+            if ev_start <= current < ev_end:
+                return "ev"
+    
+    # Standard tariff periods
     t = hour + minute / 60
     if 17 <= t < 19:     return "peak"
     if t >= 23 or t < 8: return "night"
@@ -1805,8 +1956,20 @@ Return ONLY a valid JSON object — no markdown, no explanation, nothing else:
   "billing_period_start": "DD Mon YY e.g. 13 Jan 26 or null",
   "billing_period_end": "DD Mon YY e.g. 12 Mar 26 or null",
   "billing_period_days": <integer or null>,
-  "total_due": <float, total amount due in EURO, or null>
-}"""
+  "total_due": <float, total amount due in EURO, or null>,
+  "ev_enabled": <boolean, true if invoice mentions EV tariff/electric vehicle rate/super off-peak, false otherwise>,
+  "ev_rate": <float, EV/super off-peak rate in EURO per kWh if mentioned, or null>,
+  "ev_start_hour": <integer 0-23, start hour of EV window if mentioned, or null>,
+  "ev_end_hour": <integer 0-23, end hour of EV window if mentioned, or null>
+}
+
+If the invoice mentions an "EV tariff", "electric vehicle rate", "super off-peak", or similar:
+- Set ev_enabled: true
+- Extract ev_rate (€/kWh)
+- Extract ev_start_hour and ev_end_hour if times are specified
+- Common EV windows: 02:00-04:00, 00:00-07:00, 02:00-05:00
+- If times not specified, leave ev_start_hour and ev_end_hour as null
+"""
 
 
 def _parse_raw_json(raw: str) -> dict:
@@ -2262,6 +2425,35 @@ def _show_extracted_review():
         r_peak  = st.number_input(t("peak_rate_label"),     value=float(data.get("rate_peak")       or DEFAULT_TARIFF["peak"]),    step=0.001, format="%.4f")
         r_night = st.number_input(t("night_rate_label"),    value=float(data.get("rate_night")      or DEFAULT_TARIFF["night"]),   step=0.001, format="%.4f")
         r_stand = st.number_input(t("standing_label"), value=float(data.get("standing_charge") or DEFAULT_TARIFF["standing"]),step=0.001, format="%.4f")
+        
+        # EV tariff (optional super off-peak)
+        ev_enabled = st.checkbox(t("ev_enable"), value=data.get("ev_enabled", DEFAULT_TARIFF["ev_enabled"]))
+        
+        if ev_enabled:
+            ev_rate = st.number_input(
+                f"{t('ev_rate')} (€/kWh)", 
+                value=float(data.get("ev_rate") or DEFAULT_TARIFF["ev_rate"]), 
+                step=0.001, 
+                format="%.4f"
+            )
+            
+            ev_col1, ev_col2 = st.columns(2)
+            with ev_col1:
+                st.markdown(f"<div style='font-size:0.8rem;color:#7d8590;margin-bottom:0.3rem'>{t('ev_start')}</div>", unsafe_allow_html=True)
+                ev_start_h = st.number_input("Hour", value=data.get("ev_start_hour", DEFAULT_TARIFF["ev_start_hour"]), min_value=0, max_value=23, step=1, key="ev_start_h_pdf", label_visibility="collapsed")
+            
+            with ev_col2:
+                st.markdown(f"<div style='font-size:0.8rem;color:#7d8590;margin-bottom:0.3rem'>{t('ev_end')}</div>", unsafe_allow_html=True)
+                ev_end_h = st.number_input("Hour", value=data.get("ev_end_hour", DEFAULT_TARIFF["ev_end_hour"]), min_value=0, max_value=23, step=1, key="ev_end_h_pdf", label_visibility="collapsed")
+            
+            ev_start_m = 0
+            ev_end_m = 0
+        else:
+            ev_rate = DEFAULT_TARIFF["ev_rate"]
+            ev_start_h = DEFAULT_TARIFF["ev_start_hour"]
+            ev_start_m = 0
+            ev_end_h = DEFAULT_TARIFF["ev_end_hour"]
+            ev_end_m = 0
 
     st.markdown(f"#### {t('billing_period_hdr')}")
     alert(f'{t("billing_period_hdr")} — {t("billing_period_start")}', "info")
@@ -2298,7 +2490,12 @@ def _show_extracted_review():
         </div>""", unsafe_allow_html=True)
 
     if st.button(t("confirm_continue")):
-        st.session_state["tariff"]        = dict(day=r_day, peak=r_peak, night=r_night, standing=r_stand)
+        st.session_state["tariff"] = dict(
+            day=r_day, peak=r_peak, night=r_night, standing=r_stand,
+            ev_enabled=ev_enabled, ev_rate=ev_rate,
+            ev_start_hour=ev_start_h, ev_start_minute=ev_start_m,
+            ev_end_hour=ev_end_h, ev_end_minute=ev_end_m
+        )
         st.session_state["mprn"]          = mprn
         st.session_state["supplier"]      = supplier
         st.session_state["billing_start"] = b_start
@@ -2325,6 +2522,35 @@ def _setup_manual(inside_expander=False):
             r_peak  = st.number_input(t("peak_rate_label"),     value=DEFAULT_TARIFF["peak"],     step=0.001, format="%.4f")
             r_night = st.number_input(t("night_rate_label"),    value=DEFAULT_TARIFF["night"],    step=0.001, format="%.4f")
             r_stand = st.number_input(t("standing_label"), value=DEFAULT_TARIFF["standing"], step=0.001, format="%.4f")
+            
+            # EV tariff (optional super off-peak)
+            ev_enabled = st.checkbox(t("ev_enable"), value=DEFAULT_TARIFF["ev_enabled"])
+            
+            if ev_enabled:
+                ev_rate = st.number_input(
+                    f"{t('ev_rate')} (€/kWh)", 
+                    value=DEFAULT_TARIFF["ev_rate"], 
+                    step=0.001, 
+                    format="%.4f"
+                )
+                
+                ev_col1, ev_col2 = st.columns(2)
+                with ev_col1:
+                    st.markdown(f"<div style='font-size:0.8rem;color:#7d8590;margin-bottom:0.3rem'>{t('ev_start')}</div>", unsafe_allow_html=True)
+                    ev_start_h = st.number_input("Hour", value=DEFAULT_TARIFF["ev_start_hour"], min_value=0, max_value=23, step=1, key="ev_start_h_manual")
+                
+                with ev_col2:
+                    st.markdown(f"<div style='font-size:0.8rem;color:#7d8590;margin-bottom:0.3rem'>{t('ev_end')}</div>", unsafe_allow_html=True)
+                    ev_end_h = st.number_input("Hour", value=DEFAULT_TARIFF["ev_end_hour"], min_value=0, max_value=23, step=1, key="ev_end_h_manual")
+                
+                ev_start_m = 0
+                ev_end_m = 0
+            else:
+                ev_rate = DEFAULT_TARIFF["ev_rate"]
+                ev_start_h = DEFAULT_TARIFF["ev_start_hour"]
+                ev_start_m = 0
+                ev_end_h = DEFAULT_TARIFF["ev_end_hour"]
+                ev_end_m = 0
     
         st.markdown(t("billing_period_opt"))
         from datetime import date as dt_date, timedelta
@@ -2348,7 +2574,12 @@ def _setup_manual(inside_expander=False):
         submitted = st.form_submit_button(t("save_continue"))
         if submitted:
             b_end = (b_start + timedelta(days=int(b_days))) if b_start else None
-            st.session_state["tariff"]        = dict(day=r_day, peak=r_peak, night=r_night, standing=r_stand)
+            st.session_state["tariff"] = dict(
+                day=r_day, peak=r_peak, night=r_night, standing=r_stand,
+                ev_enabled=ev_enabled, ev_rate=ev_rate,
+                ev_start_hour=ev_start_h, ev_start_minute=ev_start_m,
+                ev_end_hour=ev_end_h, ev_end_minute=ev_end_m
+            )
             st.session_state["mprn"]          = mprn
             st.session_state["supplier"]      = supplier
             st.session_state["billing_start"] = b_start
@@ -2449,8 +2680,22 @@ def load_calc_kwh(file):
     df["weekday"] = df["datetime"].dt.weekday
     df["month"]   = df["datetime"].dt.to_period("M").astype(str)
     df["period"]  = df.apply(lambda r: get_period(r["hour"], r["minute"]), axis=1)
-    tmap = {"day": TARIFF_DAY, "peak": TARIFF_PEAK, "night": TARIFF_NIGHT}
-    df["cost"]     = df["value"] * df["period"].map(tmap)
+    
+    # Apply tariff rates based on date (supports historical rate changes)
+    def get_rate_for_row(row):
+        tariff = get_tariff_for_date(row["date"])
+        period = row["period"]
+        rate_map = {
+            "day": tariff.get("day", DEFAULT_TARIFF["day"]),
+            "peak": tariff.get("peak", DEFAULT_TARIFF["peak"]),
+            "night": tariff.get("night", DEFAULT_TARIFF["night"]),
+        }
+        if tariff.get("ev_enabled", False):
+            rate_map["ev"] = tariff.get("ev_rate", DEFAULT_TARIFF["ev_rate"])
+        return rate_map.get(period, DEFAULT_TARIFF["day"])
+    
+    df["rate"] = df.apply(get_rate_for_row, axis=1)
+    df["cost"] = df["value"] * df["rate"]
     df["cost_net"] = df["cost"] * DISC_FACTOR
     daily = df.groupby("date")["value"].sum().rename("daily_kwh")
     df = df.merge(daily, on="date", how="left")
@@ -2656,10 +2901,69 @@ with st.sidebar:
     t_peak  = st.number_input(t("peak_rate"),          value=TARIFF_PEAK,  step=0.001, format="%.4f")
     t_night = st.number_input(t("night_rate"),         value=TARIFF_NIGHT, step=0.001, format="%.4f")
     t_stand = st.number_input(t("standing_rate"),  value=STANDING_DAY, step=0.001, format="%.4f")
-    # Persist rate edits immediately
+    
+    # EV tariff (optional super off-peak)
+    current_tariff = st.session_state.get("tariff", DEFAULT_TARIFF)
+    t_ev_enabled = st.checkbox(
+        t("ev_tariff"), 
+        value=current_tariff.get("ev_enabled", DEFAULT_TARIFF["ev_enabled"]),
+        key="sidebar_ev_enabled"
+    )
+    
+    if t_ev_enabled:
+        t_ev_rate = st.number_input(
+            f"{t('ev_rate')} (€/kWh)",
+            value=current_tariff.get("ev_rate", DEFAULT_TARIFF["ev_rate"]),
+            step=0.001,
+            format="%.4f",
+            key="sidebar_ev_rate"
+        )
+        
+        ev_col1, ev_col2 = st.columns(2)
+        with ev_col1:
+            t_ev_start_h = st.number_input(
+                t("ev_start"),
+                value=current_tariff.get("ev_start_hour", DEFAULT_TARIFF["ev_start_hour"]),
+                min_value=0,
+                max_value=23,
+                step=1,
+                key="sidebar_ev_start"
+            )
+        
+        with ev_col2:
+            t_ev_end_h = st.number_input(
+                t("ev_end"),
+                value=current_tariff.get("ev_end_hour", DEFAULT_TARIFF["ev_end_hour"]),
+                min_value=0,
+                max_value=23,
+                step=1,
+                key="sidebar_ev_end"
+            )
+        
+        t_ev_start_m = 0
+        t_ev_end_m = 0
+    else:
+        t_ev_rate = DEFAULT_TARIFF["ev_rate"]
+        t_ev_start_h = DEFAULT_TARIFF["ev_start_hour"]
+        t_ev_start_m = 0
+        t_ev_end_h = DEFAULT_TARIFF["ev_end_hour"]
+        t_ev_end_m = 0
+    
+    # Persist rate edits immediately (including EV)
     if (t_day   != TARIFF_DAY   or t_peak  != TARIFF_PEAK or
-        t_night != TARIFF_NIGHT or t_stand != STANDING_DAY):
-        st.session_state["tariff"] = dict(day=t_day, peak=t_peak, night=t_night, standing=t_stand)
+        t_night != TARIFF_NIGHT or t_stand != STANDING_DAY or
+        t_ev_enabled != current_tariff.get("ev_enabled", False) or
+        (t_ev_enabled and (
+            t_ev_rate != current_tariff.get("ev_rate", DEFAULT_TARIFF["ev_rate"]) or
+            t_ev_start_h != current_tariff.get("ev_start_hour", DEFAULT_TARIFF["ev_start_hour"]) or
+            t_ev_end_h != current_tariff.get("ev_end_hour", DEFAULT_TARIFF["ev_end_hour"])
+        ))):
+        st.session_state["tariff"] = dict(
+            day=t_day, peak=t_peak, night=t_night, standing=t_stand,
+            ev_enabled=t_ev_enabled, ev_rate=t_ev_rate,
+            ev_start_hour=t_ev_start_h, ev_start_minute=t_ev_start_m,
+            ev_end_hour=t_ev_end_h, ev_end_minute=t_ev_end_m
+        )
         save_config()
 
     st.divider()
@@ -2734,6 +3038,203 @@ with st.sidebar:
             with st.spinner(t("esb_sync_running")):
                 esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
             st.rerun()
+
+    st.divider()
+    
+    # ── Tariff History ──
+    st.markdown(f"##### 📋 {t('tariff_history_title')}")
+    
+    history = get_tariff_history()
+    
+    if not history:
+        st.caption(t("tariff_history_empty"))
+    else:
+        # Display tariff periods (newest first)
+        for tariff in history:
+            is_current = tariff.get("end_date") is None
+            start = tariff.get("start_date", "")
+            end = tariff.get("end_date", "")
+            supplier = tariff.get("supplier", "Unknown")
+            tariff_name = tariff.get("tariff_name", "")
+            
+            # Format date range
+            if is_current:
+                date_range = f"{start} - {t('tariff_current')}"
+                icon = "●"
+                color = COLORS["green"]
+            else:
+                from datetime import datetime
+                try:
+                    start_dt = datetime.fromisoformat(start)
+                    end_dt = datetime.fromisoformat(end)
+                    days = (end_dt - start_dt).days
+                    date_range = f"{start} - {end} ({days} {t('tariff_days')})"
+                except:
+                    date_range = f"{start} - {end}"
+                icon = "○"
+                color = COLORS["muted"]
+            
+            # Display card
+            st.markdown(f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;
+                        padding:0.7rem;margin:0.5rem 0;border-left:3px solid {color}">
+                <div style="font-size:0.75rem;color:{color};margin-bottom:0.3rem">
+                    {icon} {date_range}
+                </div>
+                <div style="font-weight:600;color:#e6edf3;margin-bottom:0.2rem">
+                    {supplier}{' · ' + tariff_name if tariff_name else ''}
+                </div>
+                <div style="font-size:0.7rem;color:#7d8590;font-family:monospace">
+                    Day: {tariff.get('day', 0):.4f}  Peak: {tariff.get('peak', 0):.4f}  Night: {tariff.get('night', 0):.4f}
+                </div>
+                {f'<div style="font-size:0.7rem;color:{COLORS["ev"]};font-family:monospace">EV: {tariff.get("ev_rate", 0):.4f} ({tariff.get("ev_start_hour", 0):02d}:00-{tariff.get("ev_end_hour", 0):02d}:00)</div>' if tariff.get('ev_enabled') else ''}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Action buttons
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(t("tariff_edit"), key=f"edit_{tariff['id']}", use_container_width=True):
+                    st.session_state["_edit_tariff_id"] = tariff["id"]
+                    st.rerun()
+            with col2:
+                if not is_current and st.button(t("tariff_delete"), key=f"del_{tariff['id']}", use_container_width=True):
+                    delete_tariff_period(tariff["id"])
+                    st.rerun()
+    
+    # Add new period button
+    if st.button(t("tariff_add_period"), use_container_width=True, key="add_tariff"):
+        st.session_state["_add_new_tariff"] = True
+        st.rerun()
+    
+    # Modal for adding/editing tariff
+    if st.session_state.get("_add_new_tariff") or st.session_state.get("_edit_tariff_id"):
+        with st.expander("✏️ Add/Edit Tariff Period", expanded=True):
+            edit_id = st.session_state.get("_edit_tariff_id")
+            existing = None
+            if edit_id:
+                existing = next((t for t in history if t["id"] == edit_id), None)
+            
+            with st.form("tariff_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_supplier = st.text_input(
+                        t("supplier_name"),
+                        value=existing.get("supplier", "") if existing else ""
+                    )
+                    new_start = st.date_input(
+                        t("tariff_period_from"),
+                        value=pd.to_datetime(existing["start_date"]).date() if existing else None
+                    )
+                
+                with col2:
+                    new_tariff_name = st.text_input(
+                        t("tariff_label"),
+                        value=existing.get("tariff_name", "") if existing else ""
+                    )
+                    is_current_period = st.checkbox(
+                        t("tariff_period_current"),
+                        value=(existing.get("end_date") is None) if existing else True
+                    )
+                    if not is_current_period:
+                        new_end = st.date_input(
+                            t("tariff_period_to"),
+                            value=pd.to_datetime(existing["end_date"]).date() if (existing and existing.get("end_date")) else None
+                        )
+                    else:
+                        new_end = None
+                
+                # Rates
+                col3, col4 = st.columns(2)
+                with col3:
+                    new_day = st.number_input(
+                        t("day_rate_label"),
+                        value=float(existing["day"]) if existing else DEFAULT_TARIFF["day"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                    new_peak = st.number_input(
+                        t("peak_rate_label"),
+                        value=float(existing["peak"]) if existing else DEFAULT_TARIFF["peak"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                with col4:
+                    new_night = st.number_input(
+                        t("night_rate_label"),
+                        value=float(existing["night"]) if existing else DEFAULT_TARIFF["night"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                    new_standing = st.number_input(
+                        t("standing_label"),
+                        value=float(existing["standing"]) if existing else DEFAULT_TARIFF["standing"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                
+                # EV tariff
+                new_ev_enabled = st.checkbox(
+                    t("ev_enable"),
+                    value=existing.get("ev_enabled", False) if existing else False
+                )
+                if new_ev_enabled:
+                    ev_col1, ev_col2, ev_col3 = st.columns(3)
+                    with ev_col1:
+                        new_ev_rate = st.number_input(
+                            f"{t('ev_rate')} (€/kWh)",
+                            value=float(existing.get("ev_rate", DEFAULT_TARIFF["ev_rate"])) if existing else DEFAULT_TARIFF["ev_rate"],
+                            step=0.001,
+                            format="%.4f"
+                        )
+                    with ev_col2:
+                        new_ev_start_h = st.number_input(
+                            t("ev_start"),
+                            value=existing.get("ev_start_hour", DEFAULT_TARIFF["ev_start_hour"]) if existing else DEFAULT_TARIFF["ev_start_hour"],
+                            min_value=0,
+                            max_value=23,
+                            step=1
+                        )
+                    with ev_col3:
+                        new_ev_end_h = st.number_input(
+                            t("ev_end"),
+                            value=existing.get("ev_end_hour", DEFAULT_TARIFF["ev_end_hour"]) if existing else DEFAULT_TARIFF["ev_end_hour"],
+                            min_value=0,
+                            max_value=23,
+                            step=1
+                        )
+                else:
+                    new_ev_rate = DEFAULT_TARIFF["ev_rate"]
+                    new_ev_start_h = DEFAULT_TARIFF["ev_start_hour"]
+                    new_ev_end_h = DEFAULT_TARIFF["ev_end_hour"]
+                
+                submitted = st.form_submit_button(t("save_continue"))
+                cancel = st.form_submit_button("Cancel")
+                
+                if cancel:
+                    st.session_state["_add_new_tariff"] = False
+                    st.session_state["_edit_tariff_id"] = None
+                    st.rerun()
+                
+                if submitted:
+                    # Save tariff
+                    add_tariff_period(
+                        supplier=new_supplier,
+                        tariff_name=new_tariff_name,
+                        start_date=new_start.isoformat(),
+                        end_date=new_end.isoformat() if new_end else None,
+                        day=new_day,
+                        peak=new_peak,
+                        night=new_night,
+                        standing=new_standing,
+                        ev_enabled=new_ev_enabled,
+                        ev_rate=new_ev_rate,
+                        ev_start_hour=new_ev_start_h,
+                        ev_end_hour=new_ev_end_h
+                    )
+                    st.session_state["_add_new_tariff"] = False
+                    st.session_state["_edit_tariff_id"] = None
+                    st.rerun()
 
     st.divider()
     
@@ -3000,18 +3501,37 @@ with tabs[0]:
         section("📈", t("daily_energy"), badge=ov_period_idx)
         dp = df_ov.groupby(["date","period"])["value"].sum().reset_index()
         dpiv = dp.pivot(index="date", columns="period", values="value").fillna(0).reset_index()
-        for c in ["day","peak","night"]:
-            if c not in dpiv.columns: dpiv[c] = 0
-        roll7 = dpiv[["day","peak","night"]].sum(axis=1).rolling(7, min_periods=1).mean()
+        
+        # Ensure all periods exist as columns (including EV if present)
+        all_periods = ["day", "peak", "night"]
+        if "ev" in dp["period"].unique():
+            all_periods.append("ev")
+        
+        for c in all_periods:
+            if c not in dpiv.columns: 
+                dpiv[c] = 0
+        
+        # Calculate rolling average using all available periods
+        roll7 = dpiv[all_periods].sum(axis=1).rolling(7, min_periods=1).mean()
 
         fig = go.Figure()
-        for p, color, label in [
-            ("night",COLORS["night"],f"🌙 {t('night_label_chart')}"),
-            ("day",  COLORS["day"],  f"☀️ {t('day_label_chart')}"),
+        
+        # Add bars in reverse order (bottom to top in stack)
+        bar_config = [
+            ("night", COLORS["night"], f"🌙 {t('night_label_chart')}"),
+            ("day", COLORS["day"], f"☀️ {t('day_label_chart')}"),
             ("peak", COLORS["peak"], f"🔥 {t('peak_label_chart')}"),
-        ]:
-            fig.add_trace(go.Bar(x=dpiv["date"], y=dpiv[p], name=label,
-                                 marker_color=color, marker_line_width=0))
+        ]
+        
+        # Add EV if it exists in data
+        if "ev" in dpiv.columns and dpiv["ev"].sum() > 0:
+            bar_config.insert(0, ("ev", COLORS["ev"], f"⚡ {t('ev_rate')}"))
+        
+        for p, color, label in bar_config:
+            if p in dpiv.columns:
+                fig.add_trace(go.Bar(x=dpiv["date"], y=dpiv[p], name=label,
+                                     marker_color=color, marker_line_width=0))
+        
         fig.add_trace(go.Scatter(x=dpiv["date"], y=roll7, name=t("seven_day_avg"), mode="lines",
                                  line=dict(color=COLORS["yellow"], width=2, dash="dot")))
         apply_layout(fig, "", height=360)
@@ -3025,16 +3545,35 @@ with tabs[0]:
         section("🎯", t("tariff_split_full"), badge=_split_label)
         by_p = _split_df.groupby("period")["value"].sum()
         tot  = by_p.sum()
-        c1, c2, c3 = st.columns(3)
-        for col, p, icon, color in [
-            (c1,"day","☀️",COLORS["day"]),
-            (c2,"peak","🔥",COLORS["peak"]),
-            (c3,"night","🌙",COLORS["night"]),
-        ]:
-            v    = by_p.get(p, 0)
-            rate = {"day":t_day,"peak":t_peak,"night":t_night}[p]
-            _p_name = {"day":t("legend_day"),"peak":t("legend_peak"),"night":t("legend_night")}[p]
-            with col:
+        
+        # Build period list dynamically based on what's in data
+        periods_to_show = []
+        if "day" in by_p.index:
+            periods_to_show.append(("day", "☀️", COLORS["day"]))
+        if "peak" in by_p.index:
+            periods_to_show.append(("peak", "🔥", COLORS["peak"]))
+        if "night" in by_p.index:
+            periods_to_show.append(("night", "🌙", COLORS["night"]))
+        if "ev" in by_p.index:
+            periods_to_show.append(("ev", "⚡", COLORS["ev"]))
+        
+        # Create columns dynamically
+        cols = st.columns(len(periods_to_show))
+        
+        for idx, (p, icon, color) in enumerate(periods_to_show):
+            v = by_p.get(p, 0)
+            rate_map = {"day": t_day, "peak": t_peak, "night": t_night, "ev": st.session_state.get("tariff", {}).get("ev_rate", 0.12)}
+            rate = rate_map[p]
+            
+            name_map = {
+                "day": t("legend_day"),
+                "peak": t("legend_peak"),
+                "night": t("legend_night"),
+                "ev": t("ev_rate")
+            }
+            _p_name = name_map[p]
+            
+            with cols[idx]:
                 st.markdown(f"""
                 <div style="background:#161b22;border:1px solid #30363d;
                             border-radius:12px;padding:1rem;border-top:3px solid {color}">
@@ -3300,11 +3839,18 @@ with tabs[4]:
     k4.metric(t("est_total_bill"), f"€{bill_total:.2f}")
 
     st.divider()
-    cmap = {"day":COLORS["day"],"peak":COLORS["peak"],"night":COLORS["night"]}
+    cmap = {"day": COLORS["day"], "peak": COLORS["peak"], "night": COLORS["night"], "ev": COLORS["ev"]}
     c1, c2 = st.columns([1,1])
     with c1:
+        label_map = {
+            'day': t("day_donut"),
+            'peak': t("peak_donut"),
+            'night': t("night_donut"),
+            'ev': t("ev_rate")
+        }
+        
         fig_pie = go.Figure(go.Pie(
-            labels=[{'day': t("day_donut"), 'peak': t("peak_donut"), 'night': t("night_donut")}.get(p, p.capitalize()) for p in by_p["period"]],
+            labels=[label_map.get(p, p.capitalize()) for p in by_p["period"]],
             values=by_p["cost_net"].round(2), hole=0.55,
             marker=dict(colors=[cmap.get(p,"#888") for p in by_p["period"]]),
             textinfo="label+percent", textfont=dict(color=COLORS["text"], size=12),
@@ -3319,9 +3865,16 @@ with tabs[4]:
         )
         st.plotly_chart(fig_pie, use_container_width=True)
     with c2:
+        period_label_map = {
+            "day": t("legend_day"),
+            "peak": t("legend_peak"),
+            "night": t("legend_night"),
+            "ev": t("ev_rate")
+        }
+        
         for _, row in by_p.iterrows():
             p = row["period"]; color = cmap.get(p,"#888")
-            _p_lbl = {"day": t("legend_day"), "peak": t("legend_peak"), "night": t("legend_night")}.get(p, p.capitalize())
+            _p_lbl = period_label_map.get(p, p.capitalize())
             st.markdown(f"""
             <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;
                         padding:.75rem 1.1rem;margin:.4rem 0;border-left:3px solid {color}">
@@ -3561,12 +4114,33 @@ with tabs[5]:
     slot_avg = df_calc.groupby(["hour","minute"])["value"].mean().reset_index()
     slot_avg["time"] = slot_avg["hour"].astype(str).str.zfill(2)+":"+slot_avg["minute"].astype(str).str.zfill(2)
     slot_avg = slot_avg.sort_values(["hour","minute"])
-    sc = [COLORS["peak"] if 17<=r["hour"]<19
-          else COLORS["night"] if (r["hour"]>=23 or r["hour"]<8)
-          else COLORS["day"]
-          for _,r in slot_avg.iterrows()]
+    
+    # Color bars by period (including EV if enabled)
+    sc = []
+    for _, r in slot_avg.iterrows():
+        period = get_period(r["hour"], r["minute"])
+        color_map = {
+            "ev": COLORS["ev"],
+            "peak": COLORS["peak"],
+            "night": COLORS["night"],
+            "day": COLORS["day"]
+        }
+        sc.append(color_map.get(period, COLORS["day"]))
+    
     fig2 = go.Figure(go.Bar(x=slot_avg["time"], y=slot_avg["value"],
                             marker_color=sc, marker_line_width=0))
+    
+    # Add EV window annotation if enabled
+    tariff = st.session_state.get("tariff", DEFAULT_TARIFF)
+    if tariff.get("ev_enabled", False):
+        ev_start_h = tariff.get("ev_start_hour", 2)
+        ev_end_h = tariff.get("ev_end_hour", 4)
+        ev_start_str = f"{ev_start_h:02d}:00"
+        ev_end_str = f"{ev_end_h:02d}:00"
+        fig2.add_vrect(x0=ev_start_str, x1=ev_end_str, fillcolor=_rgba(COLORS["ev"], 0.15), line_width=0,
+                       annotation_text=t("ev_tariff"), annotation_font_color=COLORS["ev"],
+                       annotation_position="top left")
+    
     fig2.add_vrect(x0="17:00", x1="19:00", fillcolor=_rgba(COLORS["peak"], 0.13), line_width=0,
                    annotation_text=t("peak_rate"), annotation_font_color=COLORS["peak"])
     fig2.add_vrect(x0="00:00", x1="07:30", fillcolor=_rgba(COLORS["night"], 0.13), line_width=0,
