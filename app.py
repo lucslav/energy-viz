@@ -2965,82 +2965,9 @@ with st.sidebar:
             ev_end_hour=t_ev_end_h, ev_end_minute=t_ev_end_m
         )
         save_config()
+        st.rerun()  # Reload data with new rates
 
     st.divider()
-    
-    # ── ESB Auto-Sync ──
-    st.markdown(f"##### 🔄 {t('esb_sync_title')}")
-
-    _sync_st   = read_sync_status()
-
-    # Status badge
-    if _sync_st:
-        _last = _sync_st.get("last_attempt", "")[:16].replace("T", " ")
-        if _sync_st.get("success"):
-            _files = ", ".join(_sync_st.get("files_updated", []))
-            st.markdown(
-                f'<div class="alert-box alert-good" style="font-size:.75rem;padding:.4rem .7rem">'
-                f'✅ {t("esb_sync_ok")} · {_last}<br>'
-                f'<span style="opacity:.8">{t("esb_sync_files")}: {_files}</span></div>',
-                unsafe_allow_html=True)
-        else:
-            _err = _sync_st.get("error", "unknown")
-            _emsg = (t("esb_sync_rate_limit") if _err == "rate_limited"
-                     else t("esb_sync_login_fail") if _err.startswith("login_failed")
-                     else f'{t("esb_sync_fail")}: {_err}')
-            st.markdown(
-                f'<div class="alert-box alert-warn" style="font-size:.75rem;padding:.4rem .7rem">'
-                f'⚠️ {_emsg}<br><span style="opacity:.7">{_last}</span></div>',
-                unsafe_allow_html=True)
-    else:
-        st.caption(t("esb_sync_no_creds"))
-
-    # ── cookies.txt section - NO EXPANDER, always visible ──
-    _has_txt = ESB_COOKIES_TXT.exists()
-    
-    st.markdown(f"<div style='font-size:.85rem;font-weight:600;color:#7d8590;margin:.8rem 0 .4rem'>🍪 cookies.txt</div>", unsafe_allow_html=True)
-    
-    # Show hint
-    st.markdown(t("esb_cookies_hint"), unsafe_allow_html=True)
-    
-    # Textarea for cookies
-    _cookies_input = st.text_area(
-        t("esb_cookies_txt"),
-        placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
-        height=100, 
-        key="esb_cookies_txt_input",
-        label_visibility="collapsed"
-    )
-    
-    # Status
-    if _has_txt:
-        st.caption(f"✅ cookies.txt ({ESB_COOKIES_TXT.stat().st_size} B)")
-    
-    # Buttons side by side - FIXED layout
-    _cca, _ccb = st.columns(2)
-    with _cca:
-        if st.button("💾 " + t("esb_sync_save"), key="esb_txt_save",
-                     use_container_width=True):
-            if _cookies_input.strip():
-                ESB_COOKIES_TXT.write_text(_cookies_input.strip())
-                st.success(t("esb_cookies_saved"))
-                st.rerun()
-    with _ccb:
-        if _has_txt:
-            if st.button(t("esb_cookies_clear"), key="esb_txt_clear",
-                         use_container_width=True):
-                ESB_COOKIES_TXT.unlink(missing_ok=True)
-                st.rerun()
-
-    _can_sync = ESB_COOKIES_TXT.exists()
-    if _can_sync:
-        if st.button(t("esb_sync_now"), use_container_width=True, key="esb_now"):
-            with st.spinner(t("esb_sync_running")):
-                esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
-            st.rerun()
-
-    st.divider()
-    
     # ── Tariff History ──
     st.markdown(f"##### 📋 {t('tariff_history_title')}")
     
@@ -3057,9 +2984,14 @@ with st.sidebar:
             supplier = tariff.get("supplier", "Unknown")
             tariff_name = tariff.get("tariff_name", "")
             
-            # Format date range
+            # Format date range (DD/MM/YYYY format)
             if is_current:
-                date_range = f"{start} - {t('tariff_current')}"
+                try:
+                    start_dt = datetime.fromisoformat(start)
+                    start_fmt = start_dt.strftime("%d/%m/%Y")
+                    date_range = f"{start_fmt} - {t('tariff_current')}"
+                except:
+                    date_range = f"{start} - {t('tariff_current')}"
                 icon = "●"
                 color = COLORS["green"]
             else:
@@ -3068,7 +3000,9 @@ with st.sidebar:
                     start_dt = datetime.fromisoformat(start)
                     end_dt = datetime.fromisoformat(end)
                     days = (end_dt - start_dt).days
-                    date_range = f"{start} - {end} ({days} {t('tariff_days')})"
+                    start_fmt = start_dt.strftime("%d/%m/%Y")
+                    end_fmt = end_dt.strftime("%d/%m/%Y")
+                    date_range = f"{start_fmt} - {end_fmt} ({days} {t('tariff_days')})"
                 except:
                     date_range = f"{start} - {end}"
                 icon = "○"
@@ -3173,12 +3107,81 @@ with st.sidebar:
                         format="%.4f"
                     )
                 
-                # EV tariff
-                new_ev_enabled = st.checkbox(
-                    t("ev_enable"),
-                    value=existing.get("ev_enabled", False) if existing else False
-                )
+                # EV tariff - checkbox OUTSIDE form to trigger rerun
+                
+            # Checkbox outside form to allow conditional rendering
+            new_ev_enabled = st.checkbox(
+                t("ev_enable"),
+                value=existing.get("ev_enabled", False) if existing else st.session_state.get("_tariff_form_ev", False),
+                key="tariff_form_ev_checkbox"
+            )
+            
+            # Store in session state to persist across reruns
+            if new_ev_enabled != st.session_state.get("_tariff_form_ev", False):
+                st.session_state["_tariff_form_ev"] = new_ev_enabled
+                st.rerun()
+            
+            with st.form("tariff_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_supplier = st.text_input(
+                        t("supplier_name"),
+                        value=existing.get("supplier", "") if existing else ""
+                    )
+                    new_start = st.date_input(
+                        t("tariff_period_from"),
+                        value=pd.to_datetime(existing["start_date"]).date() if existing else None
+                    )
+                
+                with col2:
+                    new_tariff_name = st.text_input(
+                        t("tariff_label"),
+                        value=existing.get("tariff_name", "") if existing else ""
+                    )
+                    is_current_period = st.checkbox(
+                        t("tariff_period_current"),
+                        value=(existing.get("end_date") is None) if existing else True
+                    )
+                    if not is_current_period:
+                        new_end = st.date_input(
+                            t("tariff_period_to"),
+                            value=pd.to_datetime(existing["end_date"]).date() if (existing and existing.get("end_date")) else None
+                        )
+                    else:
+                        new_end = None
+                
+                # Rates
+                col3, col4 = st.columns(2)
+                with col3:
+                    new_day = st.number_input(
+                        t("day_rate_label"),
+                        value=float(existing["day"]) if existing else DEFAULT_TARIFF["day"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                    new_peak = st.number_input(
+                        t("peak_rate_label"),
+                        value=float(existing["peak"]) if existing else DEFAULT_TARIFF["peak"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                with col4:
+                    new_night = st.number_input(
+                        t("night_rate_label"),
+                        value=float(existing["night"]) if existing else DEFAULT_TARIFF["night"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                    new_standing = st.number_input(
+                        t("standing_label"),
+                        value=float(existing["standing"]) if existing else DEFAULT_TARIFF["standing"],
+                        step=0.001,
+                        format="%.4f"
+                    )
+                
+                # EV tariff fields (shown if enabled)
                 if new_ev_enabled:
+                    st.markdown(f"**{t('ev_tariff')}**")
                     ev_col1, ev_col2, ev_col3 = st.columns(3)
                     with ev_col1:
                         new_ev_rate = st.number_input(
@@ -3235,6 +3238,80 @@ with st.sidebar:
                     st.session_state["_add_new_tariff"] = False
                     st.session_state["_edit_tariff_id"] = None
                     st.rerun()
+
+    st.divider()
+    
+    
+    # ── ESB Auto-Sync ──
+    st.markdown(f"##### 🔄 {t('esb_sync_title')}")
+
+    _sync_st   = read_sync_status()
+
+    # Status badge
+    if _sync_st:
+        _last = _sync_st.get("last_attempt", "")[:16].replace("T", " ")
+        if _sync_st.get("success"):
+            _files = ", ".join(_sync_st.get("files_updated", []))
+            st.markdown(
+                f'<div class="alert-box alert-good" style="font-size:.75rem;padding:.4rem .7rem">'
+                f'✅ {t("esb_sync_ok")} · {_last}<br>'
+                f'<span style="opacity:.8">{t("esb_sync_files")}: {_files}</span></div>',
+                unsafe_allow_html=True)
+        else:
+            _err = _sync_st.get("error", "unknown")
+            _emsg = (t("esb_sync_rate_limit") if _err == "rate_limited"
+                     else t("esb_sync_login_fail") if _err.startswith("login_failed")
+                     else f'{t("esb_sync_fail")}: {_err}')
+            st.markdown(
+                f'<div class="alert-box alert-warn" style="font-size:.75rem;padding:.4rem .7rem">'
+                f'⚠️ {_emsg}<br><span style="opacity:.7">{_last}</span></div>',
+                unsafe_allow_html=True)
+    else:
+        st.caption(t("esb_sync_no_creds"))
+
+    # ── cookies.txt section - NO EXPANDER, always visible ──
+    _has_txt = ESB_COOKIES_TXT.exists()
+    
+    st.markdown(f"<div style='font-size:.85rem;font-weight:600;color:#7d8590;margin:.8rem 0 .4rem'>🍪 cookies.txt</div>", unsafe_allow_html=True)
+    
+    # Show hint
+    st.markdown(t("esb_cookies_hint"), unsafe_allow_html=True)
+    
+    # Textarea for cookies
+    _cookies_input = st.text_area(
+        t("esb_cookies_txt"),
+        placeholder="# Netscape HTTP Cookie File\n.esbnetworks.ie\tTRUE\t/\t...",
+        height=100, 
+        key="esb_cookies_txt_input",
+        label_visibility="collapsed"
+    )
+    
+    # Status
+    if _has_txt:
+        st.caption(f"✅ cookies.txt ({ESB_COOKIES_TXT.stat().st_size} B)")
+    
+    # Buttons side by side - FIXED layout
+    _cca, _ccb = st.columns(2)
+    with _cca:
+        if st.button("💾 " + t("esb_sync_save"), key="esb_txt_save",
+                     use_container_width=True):
+            if _cookies_input.strip():
+                ESB_COOKIES_TXT.write_text(_cookies_input.strip())
+                st.success(t("esb_cookies_saved"))
+                st.rerun()
+    with _ccb:
+        if _has_txt:
+            if st.button(t("esb_cookies_clear"), key="esb_txt_clear",
+                         use_container_width=True):
+                ESB_COOKIES_TXT.unlink(missing_ok=True)
+                st.rerun()
+
+    _can_sync = ESB_COOKIES_TXT.exists()
+    if _can_sync:
+        if st.button(t("esb_sync_now"), use_container_width=True, key="esb_now"):
+            with st.spinner(t("esb_sync_running")):
+                esb_sync_now(DATA_DIR, HDF_SLOTS, ESB_CREDS_FILE, SYNC_STATUS_FILE, _fernet)
+            st.rerun()
 
     st.divider()
     
