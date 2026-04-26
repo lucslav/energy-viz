@@ -6,9 +6,17 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
-from datetime import timedelta
-import base64, re, io, json, os, shutil, hashlib, hmac
+import base64
+import re
+import io
+import json
+import os
+import shutil
+import hashlib
+import hmac
+from datetime import timedelta, datetime, date
 from pathlib import Path
+from typing import Optional, Dict, List, Tuple, Union, Any
 
 # ─────────────────────────────────────────────
 #  PERSISTENCE LAYER
@@ -189,7 +197,7 @@ def hdf_file_info(slot: str) -> dict | None:
 # ─────────────────────────────────────────────
 #  TARIFF HISTORY MANAGEMENT
 # ─────────────────────────────────────────────
-def get_tariff_history() -> list:
+def get_tariff_history() -> List[Dict[str, Any]]:
     """Return list of tariff periods, sorted by start_date (newest first)."""
     history = st.session_state.get("tariff_history", [])
     if not history:
@@ -198,11 +206,11 @@ def get_tariff_history() -> list:
     return sorted(history, key=lambda x: x.get("start_date", ""), reverse=True)
 
 
-def get_current_tariff() -> dict:
+def get_current_tariff() -> Dict[str, Any]:
     """Return the currently active tariff (end_date=null or most recent)."""
     history = get_tariff_history()
     if not history:
-        return st.session_state.get("tariff", DEFAULT_TARIFF)
+        return st.session_state.get("tariff", DEFAULT_TARIFF.copy())
     
     # Find tariff with end_date=null
     for t in history:
@@ -210,16 +218,16 @@ def get_current_tariff() -> dict:
             return t
     
     # Fallback: return most recent
-    return history[0] if history else st.session_state.get("tariff", DEFAULT_TARIFF)
+    return history[0] if history else st.session_state.get("tariff", DEFAULT_TARIFF.copy())
 
 
-def get_tariff_for_date(date_value) -> dict:
+def get_tariff_for_date(date_value: Union[date, pd.Timestamp, str]) -> Dict[str, Any]:
     """Return applicable tariff for a specific date."""
     import pandas as pd
     history = get_tariff_history()
     
     if not history:
-        return st.session_state.get("tariff", DEFAULT_TARIFF)
+        return st.session_state.get("tariff", DEFAULT_TARIFF.copy())
     
     # Convert date to pd.Timestamp for comparison
     if not isinstance(date_value, pd.Timestamp):
@@ -237,12 +245,21 @@ def get_tariff_for_date(date_value) -> dict:
     return get_current_tariff()
 
 
-def add_tariff_period(supplier: str, tariff_name: str, start_date: str, end_date: str | None,
+def add_tariff_period(supplier: str, tariff_name: str, start_date: str, end_date: Optional[str],
                       day: float, peak: float, night: float, standing: float,
                       ev_enabled: bool = False, ev_rate: float = 0.12,
                       ev_start_hour: int = 2, ev_end_hour: int = 4) -> str:
     """Add a new tariff period and return its ID."""
     import uuid
+    
+    # Validate rates
+    if day <= 0 or peak <= 0 or night <= 0 or standing <= 0:
+        raise ValueError("All tariff rates must be positive")
+    if ev_enabled and ev_rate <= 0:
+        raise ValueError("EV rate must be positive when enabled")
+    if not (0 <= ev_start_hour <= 23) or not (0 <= ev_end_hour <= 23):
+        raise ValueError("EV hours must be between 0 and 23")
+    
     tariff_id = str(uuid.uuid4())[:8]
     
     new_period = {
@@ -276,7 +293,7 @@ def add_tariff_period(supplier: str, tariff_name: str, start_date: str, end_date
     return tariff_id
 
 
-def delete_tariff_period(tariff_id: str):
+def delete_tariff_period(tariff_id: str) -> None:
     """Remove a tariff period from history."""
     history = st.session_state.get("tariff_history", [])
     st.session_state["tariff_history"] = [t for t in history if t["id"] != tariff_id]
@@ -1894,9 +1911,10 @@ def apply_layout(fig, title="", height=380, has_rangeselector=False):
         )
     return fig
 
-def get_period(hour, minute=0):
+def get_period(hour: int, minute: int = 0, tariff: Optional[Dict[str, Any]] = None) -> str:
     """Assign tariff period based on time. EV window has highest priority."""
-    tariff = st.session_state.get("tariff", DEFAULT_TARIFF)
+    if tariff is None:
+        tariff = st.session_state.get("tariff", DEFAULT_TARIFF)
     
     # Check EV window first (highest priority - super off-peak)
     if tariff.get("ev_enabled", False):
@@ -2664,7 +2682,7 @@ def _open_hdf(file_or_path):
     return file_or_path  # UploadedFile or BytesIO
 
 @st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
-def load_calc_kwh(file):
+def load_calc_kwh(file: Union[str, io.BytesIO, Path]) -> pd.DataFrame:
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
@@ -2679,12 +2697,12 @@ def load_calc_kwh(file):
     df["date"]    = df["datetime"].dt.date
     df["weekday"] = df["datetime"].dt.weekday
     df["month"]   = df["datetime"].dt.to_period("M").astype(str)
-    df["period"]  = df.apply(lambda r: get_period(r["hour"], r["minute"]), axis=1)
     
-    # Apply tariff rates based on date (supports historical rate changes)
-    def get_rate_for_row(row):
+    # Apply period and rate based on date-specific tariff (supports historical changes)
+    def get_period_and_rate(row):
         tariff = get_tariff_for_date(row["date"])
-        period = row["period"]
+        period = get_period(row["hour"], row["minute"], tariff=tariff)
+        
         rate_map = {
             "day": tariff.get("day", DEFAULT_TARIFF["day"]),
             "peak": tariff.get("peak", DEFAULT_TARIFF["peak"]),
@@ -2692,9 +2710,10 @@ def load_calc_kwh(file):
         }
         if tariff.get("ev_enabled", False):
             rate_map["ev"] = tariff.get("ev_rate", DEFAULT_TARIFF["ev_rate"])
-        return rate_map.get(period, DEFAULT_TARIFF["day"])
+        
+        return period, rate_map.get(period, DEFAULT_TARIFF["day"])
     
-    df["rate"] = df.apply(get_rate_for_row, axis=1)
+    df[["period", "rate"]] = df.apply(lambda r: pd.Series(get_period_and_rate(r)), axis=1)
     df["cost"] = df["value"] * df["rate"]
     df["cost_net"] = df["cost"] * DISC_FACTOR
     daily = df.groupby("date")["value"].sum().rename("daily_kwh")
@@ -2706,7 +2725,7 @@ def load_calc_kwh(file):
 
 
 @st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
-def load_kw(file):
+def load_kw(file: Union[str, io.BytesIO, Path]) -> pd.DataFrame:
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
@@ -2720,7 +2739,7 @@ def load_kw(file):
 
 
 @st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
-def load_dnp(file):
+def load_dnp(file: Union[str, io.BytesIO, Path]) -> pd.DataFrame:
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
@@ -2734,7 +2753,7 @@ def load_dnp(file):
 
 
 @st.cache_data(show_spinner=False, hash_funcs={io.BytesIO: lambda x: x.getvalue(), "streamlit.runtime.uploaded_file_manager.UploadedFile": lambda x: x.getvalue()})
-def load_daily(file):
+def load_daily(file: Union[str, io.BytesIO, Path]) -> pd.DataFrame:
     df = pd.read_csv(_open_hdf(file))
     df.columns = df.columns.str.strip()
     df["datetime"] = pd.to_datetime(df["Read Date and End Time"], dayfirst=True)
@@ -2929,6 +2948,7 @@ with st.sidebar:
                 step=1,
                 key="sidebar_ev_start"
             )
+            st.caption(f"⏰ {t_ev_start_h:02d}:00")
         
         with ev_col2:
             t_ev_end_h = st.number_input(
@@ -2939,6 +2959,7 @@ with st.sidebar:
                 step=1,
                 key="sidebar_ev_end"
             )
+            st.caption(f"⏰ {t_ev_end_h:02d}:00")
         
         t_ev_start_m = 0
         t_ev_end_m = 0
@@ -2958,6 +2979,14 @@ with st.sidebar:
             t_ev_start_h != current_tariff.get("ev_start_hour", DEFAULT_TARIFF["ev_start_hour"]) or
             t_ev_end_h != current_tariff.get("ev_end_hour", DEFAULT_TARIFF["ev_end_hour"])
         ))):
+        # Validate rates before saving
+        if t_day <= 0 or t_peak <= 0 or t_night <= 0 or t_stand <= 0:
+            st.error("❌ All tariff rates must be positive")
+            st.stop()
+        if t_ev_enabled and t_ev_rate <= 0:
+            st.error("❌ EV rate must be positive when enabled")
+            st.stop()
+        
         st.session_state["tariff"] = dict(
             day=t_day, peak=t_peak, night=t_night, standing=t_stand,
             ev_enabled=t_ev_enabled, ev_rate=t_ev_rate,
@@ -3049,79 +3078,21 @@ with st.sidebar:
             if edit_id:
                 existing = next((t for t in history if t["id"] == edit_id), None)
             
-            with st.form("tariff_form"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    new_supplier = st.text_input(
-                        t("supplier_name"),
-                        value=existing.get("supplier", "") if existing else ""
-                    )
-                    new_start = st.date_input(
-                        t("tariff_period_from"),
-                        value=pd.to_datetime(existing["start_date"]).date() if existing else None
-                    )
-                
-                with col2:
-                    new_tariff_name = st.text_input(
-                        t("tariff_label"),
-                        value=existing.get("tariff_name", "") if existing else ""
-                    )
-                    is_current_period = st.checkbox(
-                        t("tariff_period_current"),
-                        value=(existing.get("end_date") is None) if existing else True
-                    )
-                    if not is_current_period:
-                        new_end = st.date_input(
-                            t("tariff_period_to"),
-                            value=pd.to_datetime(existing["end_date"]).date() if (existing and existing.get("end_date")) else None
-                        )
-                    else:
-                        new_end = None
-                
-                # Rates
-                col3, col4 = st.columns(2)
-                with col3:
-                    new_day = st.number_input(
-                        t("day_rate_label"),
-                        value=float(existing["day"]) if existing else DEFAULT_TARIFF["day"],
-                        step=0.001,
-                        format="%.4f"
-                    )
-                    new_peak = st.number_input(
-                        t("peak_rate_label"),
-                        value=float(existing["peak"]) if existing else DEFAULT_TARIFF["peak"],
-                        step=0.001,
-                        format="%.4f"
-                    )
-                with col4:
-                    new_night = st.number_input(
-                        t("night_rate_label"),
-                        value=float(existing["night"]) if existing else DEFAULT_TARIFF["night"],
-                        step=0.001,
-                        format="%.4f"
-                    )
-                    new_standing = st.number_input(
-                        t("standing_label"),
-                        value=float(existing["standing"]) if existing else DEFAULT_TARIFF["standing"],
-                        step=0.001,
-                        format="%.4f"
-                    )
-                
-                # EV tariff - checkbox OUTSIDE form to trigger rerun
-                
-            # Checkbox outside form to allow conditional rendering
+            # EV checkbox OUTSIDE form
             new_ev_enabled = st.checkbox(
                 t("ev_enable"),
                 value=existing.get("ev_enabled", False) if existing else st.session_state.get("_tariff_form_ev", False),
                 key="tariff_form_ev_checkbox"
             )
             
-            # Store in session state to persist across reruns
+            # Store in session state
             if new_ev_enabled != st.session_state.get("_tariff_form_ev", False):
                 st.session_state["_tariff_form_ev"] = new_ev_enabled
                 st.rerun()
             
-            with st.form("tariff_form"):
+            # Form with unique key
+            form_key = f"tariff_form_{edit_id}" if edit_id else "tariff_form_new"
+            with st.form(form_key):
                 col1, col2 = st.columns(2)
                 with col1:
                     new_supplier = st.text_input(
@@ -3192,31 +3163,38 @@ with st.sidebar:
                         )
                     with ev_col2:
                         new_ev_start_h = st.number_input(
-                            t("ev_start"),
+                            f"{t('ev_start')} (HH)",
                             value=existing.get("ev_start_hour", DEFAULT_TARIFF["ev_start_hour"]) if existing else DEFAULT_TARIFF["ev_start_hour"],
                             min_value=0,
                             max_value=23,
-                            step=1
+                            step=1,
+                            help="Format: HH (00-23)"
                         )
                     with ev_col3:
                         new_ev_end_h = st.number_input(
-                            t("ev_end"),
+                            f"{t('ev_end')} (HH)",
                             value=existing.get("ev_end_hour", DEFAULT_TARIFF["ev_end_hour"]) if existing else DEFAULT_TARIFF["ev_end_hour"],
                             min_value=0,
                             max_value=23,
-                            step=1
+                            step=1,
+                            help="Format: HH (00-23)"
                         )
                 else:
                     new_ev_rate = DEFAULT_TARIFF["ev_rate"]
                     new_ev_start_h = DEFAULT_TARIFF["ev_start_hour"]
                     new_ev_end_h = DEFAULT_TARIFF["ev_end_hour"]
                 
-                submitted = st.form_submit_button(t("save_continue"))
-                cancel = st.form_submit_button("Cancel")
+                # Submit buttons
+                col_submit1, col_submit2 = st.columns(2)
+                with col_submit1:
+                    submitted = st.form_submit_button(t("save_continue"), use_container_width=True)
+                with col_submit2:
+                    cancel = st.form_submit_button("Cancel", use_container_width=True)
                 
                 if cancel:
                     st.session_state["_add_new_tariff"] = False
                     st.session_state["_edit_tariff_id"] = None
+                    st.session_state["_tariff_form_ev"] = False
                     st.rerun()
                 
                 if submitted:
@@ -3237,6 +3215,7 @@ with st.sidebar:
                     )
                     st.session_state["_add_new_tariff"] = False
                     st.session_state["_edit_tariff_id"] = None
+                    st.session_state["_tariff_form_ev"] = False
                     st.rerun()
 
     st.divider()
