@@ -143,11 +143,13 @@ def load_config():
 
     from datetime import date
     for k, v in data.items():
-        # lang is always restored from config (overrides default "en")
-        if k == "lang":
-            if v in ("en", "pl"):
-                st.session_state[k] = v
+        # lang and tariff are ALWAYS restored from config (override defaults)
+        if k in ("lang", "tariff"):
+            if k == "lang" and v not in ("en", "pl"):
+                continue
+            st.session_state[k] = v
             continue
+        
         if k not in st.session_state or st.session_state[k] in (None, "", [], {}):
             # Restore dates
             if k in ("billing_start", "billing_end") and isinstance(v, str) and v:
@@ -280,7 +282,7 @@ def add_tariff_period(supplier: str, tariff_name: str, start_date: str, end_date
         "ev_end_minute": 0,
     }
     
-    history = st.session_state.get("tariff_history", [])
+    history = st.session_state.get("tariff_history") or []
     history.append(new_period)
     st.session_state["tariff_history"] = history
     
